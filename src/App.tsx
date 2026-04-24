@@ -1020,7 +1020,7 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
-  const activeTab = h.replace('#admin-', '') || 'overview';
+  const activeTab = h.startsWith('#admin-') ? h.replace('#admin-', '') : (h === '#admin' ? 'overview' : (h.replace('#', '') || 'overview'));
 
   const navigateTo = (tab: string) => {
     window.location.hash = `#admin-${tab}`;
@@ -2468,7 +2468,19 @@ function MembersTab({ store, ...props }: any) {
               <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{new Date(u.createdAt).toLocaleDateString()}</td>
               <td className="p-6">
                 <div className="flex gap-2">
-                  {u.status === 'pending' && <button onClick={() => store.updateUser(u.id, { status: 'approved' })} className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"><ShieldCheck size={14} /></button>}
+                  {u.status === 'pending' && (
+                    <button 
+                      onClick={() => {
+                        store.updateUser(u.id, { status: 'approved' });
+                        store.addLog(user.id, user.username, 'Approval', `Approved user ${u.fullName} (@${u.username})`);
+                        toast(`Member ${u.username} has been approved. Access granted.`, 'success');
+                      }} 
+                      className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"
+                      title="Approve Member"
+                    >
+                      <ShieldCheck size={14} />
+                    </button>
+                  )}
                   <button className="p-2 bg-blue-500/20 text-blue-400 rounded hover:scale-110 transition-all cursor-pointer"><Edit size={14} /></button>
                   {u.role !== 'admin' && <button onClick={() => store.deleteUser(u.id)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer"><Trash2 size={14} /></button>}
                 </div>

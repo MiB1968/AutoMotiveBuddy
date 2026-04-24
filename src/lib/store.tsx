@@ -1395,9 +1395,9 @@ export function useStore() {
   useEffect(() => localStorage.setItem('ab_search_history', JSON.stringify(searchHistory)), [searchHistory]);
 
   // Actions
-  const addUser = (user: User) => setUsers([...users, user]);
+  const addUser = (user: User) => setUsers(prev => [...prev, user]);
   const updateUser = (id: string, updates: Partial<User>) => {
-    setUsers(users.map(u => u.id === id ? { ...u, ...updates } : u));
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
   };
   const deleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
 
