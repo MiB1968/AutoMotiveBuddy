@@ -15,11 +15,47 @@ import {
   BookOpen, Truck, Tractor, Bike, Car, Download, CloudDownload,
   Calendar, FileText, ChevronDown, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer,
-  Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2
+  Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
+import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { generateDynamicVehicleData, askAutomotiveAssistant } from './services/ai';
 
 // --- Shared Components ---
+
+function UserAvatar({ user, size = "md", className = "" }: { user: any, size?: "xs" | "sm" | "md" | "lg" | "xl", className?: string }) {
+  const [imageError, setImageError] = useState(false);
+  
+  const sizeClasses = {
+    xs: "w-6 h-6 text-[8px]",
+    sm: "w-8 h-8 text-[10px]",
+    md: "w-10 h-10 text-sm",
+    lg: "w-12 h-12 text-base",
+    xl: "w-48 h-48 text-4xl"
+  };
+
+  const currentSize = sizeClasses[size];
+
+  if (user.avatarUrl && !imageError) {
+    return (
+      <img 
+        src={user.avatarUrl} 
+        alt={user.fullName} 
+        className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] object-cover shrink-0 ${className}`}
+        referrerPolicy="no-referrer"
+        onError={() => setImageError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0 uppercase ${className}`}>
+      {user.fullName.charAt(0)}
+    </div>
+  );
+}
 
 const Logo = ({ className = "", size = "normal" }: { className?: string, size?: "small" | "normal" | "large" }) => (
   <div className={`flex items-center gap-3 ${className}`}>
@@ -205,18 +241,19 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
           </motion.div>
 
           {/* Stats Bar */}
-          <div className="w-full max-w-5xl mx-auto glass-card flex flex-wrap justify-center md:justify-between items-center gap-6 md:gap-4 py-8 px-10">
+          <div className="w-full max-w-5xl mx-auto glass-card flex flex-wrap justify-center md:items-center gap-6 py-8 px-10 grid grid-cols-2 md:grid-cols-4 lg:flex lg:justify-between">
              {[
                { label: 'DTC Codes', value: '35+' },
                { label: 'Vehicle Brands', value: '50+' },
+               { label: 'Warning Lights', value: '100+' },
                { label: 'Wiring Diagrams', value: 'SVG/Text' },
                { label: 'Fuse Box Guides', value: 'Visual' },
                { label: 'AI Chatbot', value: '24/7' },
-               { label: 'Flexible Plans', value: '3 Tiers' }
+               { label: 'Maintenance Guides', value: 'DIY' }
              ].map((stat, i) => (
                <div key={i} className="flex flex-col items-center gap-1">
                  <span className="text-xl font-accent font-bold text-text-primary">{stat.value}</span>
-                 <span className="text-[9px] font-accent text-text-muted uppercase tracking-widest">{stat.label}</span>
+                 <span className="text-[9px] font-accent text-text-muted uppercase tracking-widest text-center">{stat.label}</span>
                </div>
              ))}
           </div>
@@ -240,12 +277,15 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
-              { icon: Database, title: 'DTC Code Lookup', desc: 'Full fault code database with symptoms, causes, step-by-step fix guides and estimated costs.' },
-              { icon: Map, title: 'Wiring Diagrams', desc: 'Full electrical system diagrams by model. Visual layouts of starting, charging, and ECU circuits.' },
-              { icon: Zap, title: 'Fuse Box Diagrams', desc: 'Complete fuse layouts with amp ratings and circuit protection data for engine bay and interior.' },
-              { icon: BookOpen, title: 'Vehicle Manual Guide', desc: 'Comprehensive service manuals by brand & model including torque specs and fluid types.' },
-              { icon: Truck, title: 'Multi-Vehicle Support', desc: 'Support for Cars, Motorcycles, Heavy Equipment, and Agricultural machines worldwide.' },
-              { icon: MessageSquare, title: 'AI Chatbot', desc: '24/7 automated automotive assistant to help with troubleshooting and system navigation.' }
+              { icon: Database, title: 'OBD2 Fault Codes', desc: 'Full fault code database with symptoms, causes, step-by-step DIY fix guides and estimated repair costs.' },
+              { icon: Zap, title: 'Fuse & Relay Diagrams', desc: 'Complete fuse box layouts and relay locations with amp ratings for the engine bay, interior, and trunk.' },
+              { icon: Map, title: 'Component Locations', desc: 'Visual finders for OBD ports, specific sensors, filters, and fluid reservoirs across hundreds of vehicles.' },
+              { icon: Eye, title: 'Warning Lights Guide', desc: 'Comprehensive visual guide to dashboard warning lights, what they mean, and how to safely reset them.' },
+              { icon: Clock, title: 'Maintenance Schedules', desc: 'Factory-recommended service intervals, fluid capacities, and step-by-step guides for routine DIY maintenance.' },
+              { icon: Activity, title: 'Electrical Wiring', desc: 'Full electrical system diagrams by model. Visual layouts of starting, charging, and engine control circuits.' },
+              { icon: Truck, title: 'Multi-Vehicle Support', desc: 'Extensive coverage for Cars, Motorcycles, Heavy Construction Equipment, and Agricultural machines worldwide.' },
+              { icon: MessageSquare, title: 'Voice-Enabled AI Chatbot', desc: 'Advanced 24/7 intelligent automotive assistant to help with troubleshooting, manual lookups, and system navigation.' },
+              { icon: Globe, title: 'Community Insights', desc: 'Search real-world repair experiences, known common problems, and verified solutions contributed by our community of owners.' }
             ].map((f, i) => (
               <FeatureCard key={i} {...f} delay={i * 0.1} />
             ))}
@@ -290,20 +330,20 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto items-end">
              <PricingCard 
                title="BASIC" price="1,000" duration="1 Month" icon={Shield} 
-               benefits={['Full DTC Lookup Tool', 'Fuse Box Diagrams', 'Wiring Diagram Access', 'Real-time AI Chatbot', 'Member Community', 'Basic Profile', 'Search History']}
+               benefits={['Full OBD2 DTC Lookup', 'Fuse & Relay Layouts', 'Dashboard Warning Lights', 'Real-time AI Chatbot', 'Member Community', 'Basic Profile', 'Search History']}
              />
              <PricingCard 
                title="STANDARD" price="3,000" duration="6 Months" icon={Star} active
-               benefits={['Everything in Basic', 'Full Vehicle Manual Guide', 'Step-by-Step Fix Guides', 'Detailed Wiring Diagrams', 'Torque Specifications', 'Priority AI Support', 'Fluid Type Guide']}
+               benefits={['Everything in Basic', 'Full Maintenance Schedules', 'DIY Step-by-Step Fix Guides', 'Detailed Wiring Diagrams', 'Component Locations', 'Priority AI Support', 'Fluid Capacities']}
              />
              <PricingCard 
                title="PREMIUM" price="5,000" duration="1 Year" icon={Award} featured
-               benefits={['Everything in Standard', 'Experimental AI Features', 'Bulk Data Export', 'Voucher & Partner Perks', 'Priority Admin Support', 'Certificate of Completion', 'Best Value Tier']}
+               benefits={['Everything in Standard', 'Voice-Enabled AI Assistant', 'Experimental AI Features', 'Bulk Data Export', 'Voucher & Partner Perks', 'Certificate of Completion', 'Best Value Tier']}
              />
           </div>
           <p className="mt-16 text-center text-text-muted italic text-[11px] tracking-widest">
             All prices in Philippine Peso ₱. Access activated after admin payment verification. <br />
-            Owner: Ruben Llego — AutoMotive Buddy
+            Owner: Ruben Llego O. — AutoMotive Buddy
           </p>
         </div>
       </section>
@@ -313,7 +353,7 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
         <div className="container max-w-4xl mx-auto glass-card flex flex-col md:flex-row items-center gap-12 text-center md:text-left">
            <div className="w-48 h-48 rounded-full border-4 border-orange/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-orange-glow)] relative">
               <div className="w-full h-full rounded-full bg-orange/10 flex items-center justify-center overflow-hidden">
-                <User size={120} className="text-orange translate-y-4" />
+                <UserAvatar user={{ fullName: "Ruben Llego O.", avatarUrl: "/ruben_avatar.jpg" }} size="xl" className="border-none bg-transparent" />
               </div>
               <div className="absolute -bottom-2 -right-2 bg-orange text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-bg-card">
                 <Award size={20} />
@@ -329,7 +369,7 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
                 </div>
               </div>
               <p className="text-text-secondary leading-relaxed">
-                "Founded and managed by Ruben Llego, AutoMotive Buddy was built to empower every driver, mechanic, and fleet operator with professional-grade diagnostic and repair tools. Our mission is to democratize automotive intelligence through technology."
+                "Founded and managed by Ruben Llego O., AutoMotive Buddy was built to empower every driver, mechanic, and fleet operator with professional-grade diagnostic and repair tools. Our mission is to democratize automotive intelligence through technology."
               </p>
               <div className="flex gap-6 justify-center md:justify-start pt-4">
                  <a href="#" className="text-text-muted hover:text-orange transition-colors"><Globe size={20} /></a>
@@ -670,12 +710,23 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
   );
 }
 
+// --- Shared Utilities ---
+const speakText = (text: string, enabled: boolean) => {
+  if (!enabled || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const cleanText = text.replace(/[*_#]/g, '');
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  // utterance.voice = window.speechSynthesis.getVoices().find(v => v.lang.includes('en-US')) || null;
+  window.speechSynthesis.speak(utterance);
+};
+
 // --- AI ChatBot Components ---
 
 function ChatBot({ currentUser, store, toast }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -686,7 +737,7 @@ function ChatBot({ currentUser, store, toast }: any) {
     if (isOpen) scrollToBottom();
   }, [store.chatLogs, isOpen]);
 
-  const handleSend = (e?: React.FormEvent) => {
+  const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || isTyping) return;
 
@@ -697,43 +748,24 @@ function ChatBot({ currentUser, store, toast }: any) {
 
     setIsTyping(true);
     
-    // Pattern Matching Logic
-    setTimeout(() => {
-      let response = "I'm not quite sure about that, but I can help with DTC codes, vehicle repairs, wiring diagrams, subscription plans, and more. Try asking something like 'What is P0300?' or 'Show me wiring diagrams'.";
-      const q = userMsg.toLowerCase();
-
-      // 1. DTC Codes
-      const dtcMatch = userMsg.match(/[pbcud]\d{4}/i);
-      if (dtcMatch) {
-         const code = dtcMatch[0].toUpperCase();
-         const dtc = store.dtcs.find((d: any) => d.code === code);
-         if (dtc) {
-            response = `Found DTC result for ${code}: ${dtc.description}. This is a ${dtc.severity} severity issue. Symptoms: ${dtc.symptoms.join(', ')}. Check the DTC Lookup tool in your dashboard for full repair steps!`;
-         } else {
-            const prefix = code[0];
-            const meaning = prefix === 'P' ? 'Powertrain' : prefix === 'B' ? 'Body' : prefix === 'C' ? 'Chassis' : 'Network/Communication';
-            response = `I couldn't find ${code} in my specific database, but ${prefix} codes usually relate to the ${meaning} system. I recommend using a professional scanner to verify.`;
-         }
-      } 
-      // 2. Greetings
-      else if (q.includes('hi') || q.includes('hello') || q.includes('kumusta') || q.includes('hey')) {
-         response = `Greetings! I am AutoBot, your premium automotive assistant. ${currentUser ? `Hello ${currentUser.fullName.split(' ')[0]}!` : 'How can I assist you today?'}`;
-      }
-      // 3. Pricing & Plans
-      else if (q.includes('price') || q.includes('cost') || q.includes('subscription') || q.includes('membership') || q.includes('plan')) {
-         response = `We offer 3 performance tiers: Basic (₱1,000 / 1 Month), Standard (₱3,000 / 6 Months), and Premium (₱5,000 / 1 Year - Best Value). Payment is manual via admin Ruben Llego's verification.`;
-      }
-      // 4. Repairs / Advice
-      else if (q.includes('overheat') || q.includes('hot')) {
-         response = `Overheating is critical. Check your coolant level, radiator fan, and thermostat. Do NOT open the radiator cap while hot!`;
-      }
-      else if (q.includes('start') || q.includes('crank')) {
-         response = `Won't start? Check the big three: Battery voltage, Starter solenoid, and Fuel delivery. Does the dashboard light up?`;
-      }
-
+    try {
+      const history = store.chatLogs
+        .filter((m: any) => m.userId === userId)
+        .map((m: any) => ({
+          role: m.role === 'ai' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }));
+      
+      const response = await askAutomotiveAssistant(userMsg, history);
       store.addChatMessage(userId, 'ai', response);
-      setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+      if (autoSpeak) speakText(response, true);
+    } catch (err) {
+      const errMsg = "System temporarily offline. Please try again later.";
+      store.addChatMessage(userId, 'ai', errMsg);
+      if (autoSpeak) speakText(errMsg, true);
+    } finally {
+       setIsTyping(false);
+    }
   };
 
   const currentChats = store.chatLogs.filter((m: any) => m.userId === (currentUser?.id || 'guest'));
@@ -767,7 +799,17 @@ function ChatBot({ currentUser, store, toast }: any) {
                       <div className="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Online Diagnostics Matrix</div>
                    </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                   <button 
+                     onClick={() => {
+                        setAutoSpeak(!autoSpeak);
+                        if (autoSpeak) window.speechSynthesis.cancel();
+                     }} 
+                     className={`transition-colors ${autoSpeak ? 'text-green-400' : 'text-text-muted hover:text-white'}`}
+                     title={autoSpeak ? "Voice Response ON" : "Voice Response OFF"}
+                   >
+                     {autoSpeak ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                   </button>
                    <button onClick={() => setIsOpen(false)} className="text-text-muted hover:text-orange transition-colors"><X size={18} /></button>
                 </div>
              </header>
@@ -830,19 +872,7 @@ function ChatBot({ currentUser, store, toast }: any) {
   );
 }
 
-// --- AI Assistant Logic ---
-async function askAutomotiveAssistant(query: string) {
-  await new Promise(r => setTimeout(r, 1500));
-  const q = query.toLowerCase();
-  
-  if (q.includes('p0100')) return "MAF Sensor Circuit Malfunction. Recommended: Clean MAF sensor, check for air leaks in the intake system, and verify wiring integrity.";
-  if (q.includes('p0300')) return "Random/Multiple Cylinder Misfire. Recommended: Inspect spark plugs, ignition coils, and fuel injectors. Check for vacuum leaks or engine mechanical issues.";
-  if (q.includes('ford') && q.includes('pats')) return "Ford PATS (Passive Anti-Theft System) error. Theft light flashing? This indicates an immobilizer fault. Try a different key or check PATS transceiver ring.";
-  if (q.includes('manual') || q.includes('guide')) return "I can help you navigate our Vehicle Manual Guides. Select the 'Manual Guides' tab and specify your vehicle category and model for deeper insights.";
-  if (q.includes('premium') || q.includes('membership')) return "AutoMotive Buddy Premium provides full wiring diagrams, advanced AI diagnostics, and the exclusive 'Manual Guides' database. Established at ₱1,500/mo.";
-
-  return "Diagnostic query processed. While I can see patterns in your telemetry, a physical inspection is recommended. Would you like me to look up a specific DTC or vehicle specification?";
-}
+// --- Removed Mock AI Assistant Logic ---
 
 // --- Dashboard Layout Logic ---
 
@@ -871,6 +901,9 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={Users} label="Member Core" active={activeTab === 'members'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('members')} />
         <NavItem icon={Database} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={BookOpen} label="Unit Manuals" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
+        <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
+        <NavItem icon={Map} label="Component Locations" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
+        <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
         <NavItem icon={Bell} label="Transmissions" active={activeTab === 'announcements'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('announcements')} />
         <NavItem icon={Activity} label="Audit Registry" active={activeTab === 'logs'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('logs')} />
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
@@ -878,9 +911,7 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
 
       <div className="p-4 border-t border-border-glass">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
-          <div className="w-10 h-10 rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0">
-            {user.fullName.charAt(0)}
-          </div>
+          <UserAvatar user={user} size="md" />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
@@ -953,6 +984,9 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
           {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} />}
           {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
           {activeTab === 'manuals' && <ManualsTab key="adm-man" store={store} user={user} toast={toast} />}
+          {activeTab === 'warning_lights' && <DynamicResourceTab key="adm-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
+          {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+          {activeTab === 'fuses' && <DynamicResourceTab key="adm-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
           {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
           {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
@@ -986,7 +1020,10 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
       <nav className="flex-1 px-4 space-y-1 md:space-y-2 overflow-y-auto">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
         <NavItem icon={Search} label="DTC Lookup" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
-        <NavItem icon={BookOpen} label="Manual Guides" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
+        <NavItem icon={BookOpen} label="Manuals & Schematics" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
+        <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
+        <NavItem icon={Map} label="Component Locations" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
+        <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
         <NavItem icon={MessageSquare} label="AI Diagnostics" active={activeTab === 'chat'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('chat')} />
         <NavItem icon={Star} label="Saved Items" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
         <NavItem icon={History} label="Search History" active={activeTab === 'history'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('history')} />
@@ -998,9 +1035,7 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
 
       <div className="p-4 border-t border-border-glass">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
-          <div className="w-10 h-10 rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0">
-            {user.fullName.charAt(0)}
-          </div>
+          <UserAvatar user={user} size="md" />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
@@ -1080,8 +1115,11 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
           {activeTab === 'chat' && <AIChatTab key="mbr-chat" user={user} store={store} />}
           {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
           {activeTab === 'history' && <SearchHistoryTab key="mbr-history" user={user} store={store} />}
+          {activeTab === 'warning_lights' && <DynamicResourceTab key="mbr-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
+          {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+          {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
           {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">No new transmissions from HQ</div>}
-          {activeTab === 'profile' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Member profile signature: {user.username}</div>}
+          {activeTab === 'profile' && <ProfileTab user={user} store={store} />}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
         </AnimatePresence>
       </main>
@@ -1108,6 +1146,67 @@ const NavItem = ({ icon: Icon, label, active, collapsed, onClick }: any) => (
 );
 
 // --- Sub-Tabs ---
+
+function ProfileTab({ user, store }: any) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-8">
+      <div className="glass-panel p-8 flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
+        <UserAvatar user={user} size="xl" className="w-32 h-32 md:w-48 md:h-48 border-4 border-primary-orange shadow-[0_0_30px_rgba(249,115,22,0.3)]" />
+        <div className="flex-1">
+          <div className="flex flex-col md:flex-row md:items-end gap-3 mb-4">
+            <h2 className="text-3xl md:text-4xl font-display font-bold uppercase tracking-tight">{user.fullName}</h2>
+            <span className="badge badge-orange font-accent mb-1">{user.role.toUpperCase()} LEVEL 01</span>
+          </div>
+          <p className="text-text-secondary uppercase text-xs tracking-widest mb-6">Neural Access Credential: <span className="text-primary-orange font-accent">{user.id}</span></p>
+          <div className="flex flex-wrap justify-center md:justify-start gap-4">
+            <div className="px-4 py-2 bg-white/5 border border-border-glass rounded-lg text-[10px] font-bold uppercase tracking-widest">
+              <span className="text-text-secondary">Joined:</span> {new Date(user.createdAt).toLocaleDateString()}
+            </div>
+            <div className="px-4 py-2 bg-white/5 border border-border-glass rounded-lg text-[10px] font-bold uppercase tracking-widest">
+              <span className="text-text-secondary">Status:</span> <span className="text-green-400">{user.status.toUpperCase()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="glass-panel space-y-6">
+          <h3 className="text-sm font-bold uppercase tracking-widest border-b border-border-glass pb-4 flex items-center gap-2">
+             <Shield size={16} className="text-primary-orange" /> Security Protocols
+          </h3>
+          <div className="space-y-4">
+             <div>
+               <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest mb-2 block">Matrix Email</label>
+               <div className="p-3 bg-black/40 border border-border-glass rounded text-xs select-none opacity-60">ADMIN_ENCRYPTED_LOG</div>
+             </div>
+             <div>
+               <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest mb-2 block">Credential Access</label>
+               <button className="btn-secondary w-full py-3 text-[10px] font-bold">REGENERATE NEURAL KEY</button>
+             </div>
+          </div>
+        </div>
+
+        <div className="glass-panel space-y-6">
+          <h3 className="text-sm font-bold uppercase tracking-widest border-b border-border-glass pb-4 flex items-center gap-2">
+             <Activity size={16} className="text-primary-orange" /> Recent Telemetry
+          </h3>
+          <div className="space-y-3">
+             {store.logs.filter((l: any) => l.username === user.username).slice(0, 3).map((l: any) => (
+               <div key={l.id} className="flex gap-3 items-center text-[10px] border-b border-white/5 pb-2 last:border-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary-orange" />
+                  <div className="flex-1 text-text-primary uppercase tracking-tight">{l.action}</div>
+                  <div className="text-text-secondary font-accent">{new Date(l.timestamp).toLocaleDateString()}</div>
+               </div>
+             ))}
+             {store.logs.filter((l: any) => l.username === user.username).length === 0 && (
+               <div className="text-center py-8 opacity-30 text-[10px] uppercase font-bold tracking-widest italic">No telemetry recorded</div>
+             )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 function OverviewTab({ user, store }: any) {
   const isAdmin = user.role === 'admin';
@@ -1166,92 +1265,472 @@ function StatItem({ label, value }: any) {
 
 // --- DTC Lookup Tool Component ---
 function DTCLookupTab({ store, toast, user, ...props }: any) {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<DTC | null>(null);
+  const [selectedManufacturer, setSelectedManufacturer] = useState('ford');
+  const [selectedModel, setSelectedModel] = useState('f150');
+  const [selectedYear, setSelectedYear] = useState(2023);
+  const [selectedEngine, setSelectedEngine] = useState('');
+  const [dtcInput, setDtcInput] = useState('');
+  const [searchResults, setSearchResults] = useState<DTC[]>([]);
+  const [selectedDTC, setSelectedDTC] = useState<DTC | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filtered = store.dtcs.filter((d: DTC) => 
-    d.code.toLowerCase().includes(query.toLowerCase()) ||
-    d.description.toLowerCase().includes(query.toLowerCase()) ||
-    d.symptoms.some(s => s.toLowerCase().includes(query.toLowerCase()))
-  );
+  const currentManufacturer = vehicleDatabase.manufacturers.find(m => m.id === selectedManufacturer);
+  const currentModel = currentManufacturer?.models.find(m => m.id === selectedModel);
+
+  // Auto-select first engine when model changes
+  useEffect(() => {
+    if (currentModel?.engines) {
+      setSelectedEngine(currentModel.engines[0]);
+    }
+  }, [currentModel]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const query = dtcInput.toUpperCase().trim();
+      
+      // Combine all DTC databases
+      const allDTCs = [
+        ...(fordDTCDatabase as unknown as DTC[]), 
+        ...(otherMfrDTCs as unknown as DTC[]), 
+        ...(genericDTCs as unknown as DTC[]),
+        ...(komatsuDTCs as unknown as DTC[]),
+        ...store.dtcs
+      ];
+      
+      // Filter by manufacturer if applicable
+      const relevantDTCs = allDTCs.filter(dtc => {
+        // Generic DTCs always show up
+        if (!dtc.manufacturer) return true;
+        
+        if (selectedManufacturer === 'ford') {
+          return dtc.manufacturer === 'ford';
+        }
+        return dtc.manufacturer === selectedManufacturer;
+      });
+
+      // Search by code or title/description
+      const results = relevantDTCs.filter(dtc => 
+        dtc.code.toUpperCase().includes(query) || 
+        (dtc.title && dtc.title.toUpperCase().includes(query)) ||
+        (dtc.description && dtc.description.toUpperCase().includes(query))
+      );
+
+      // Deduplicate results by code
+      const uniqueResults = results.reduce((acc: DTC[], current) => {
+        const x = acc.find(item => item.code === current.code);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+
+      setSearchResults(uniqueResults);
+      setIsLoading(false);
+    }, 500);
+  };
 
   const handleSave = (dtc: DTC) => {
     store.addSavedItem({
       userId: user.id,
       type: 'DTC',
-      itemId: dtc.id,
-      title: `${dtc.code} - ${dtc.description}`
+      itemId: dtc.id || dtc.code,
+      title: `${dtc.code} - ${dtc.title || dtc.description}`
     });
     if (toast) toast('DTC Protocol successfully saved to your neural library', 'success');
   };
 
   return (
-    <div className="flex flex-col lg:grid lg:grid-cols-[1fr_380px] gap-6 md:gap-8">
-      <div className="space-y-6">
-        <div className="glass-panel py-4">
-          <label className="text-[10px] uppercase font-bold tracking-widest text-text-secondary mb-2 block ml-1">System Scan ID</label>
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary/50" size={18} />
-            <input type="text" placeholder="ENTER FAULT CODE (E.G. P0300)..." className="input-field pl-12 h-[52px] md:h-[56px] text-xs md:text-sm font-accent uppercase tracking-widest" value={query} onChange={e => setQuery(e.target.value)} />
-          </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Vehicle Selection Section */}
+      <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Car size={24} className="text-primary-orange" />
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 1: VEHICLE BIOMETRICS</h2>
         </div>
-        <div className="glass-panel overflow-hidden p-0">
-          <div className="p-4 border-b border-border-glass bg-white/5 uppercase text-[9px] font-bold tracking-widest text-text-secondary">Diagnostic Index</div>
-          <div className="max-h-[400px] md:max-h-[500px] overflow-y-auto divide-y divide-border-glass">
-            {filtered.length > 0 ? filtered.map((d: DTC) => (
-              <button key={d.id} onClick={() => {
-                setSelected(d);
-                if (window.innerWidth < 1024) {
-                   document.getElementById('dtc-results-detail')?.scrollIntoView({ behavior: 'smooth' });
-                }
-              }} className={`w-full p-4 md:p-5 text-left transition-all group flex items-center justify-between ${selected?.id === d.id ? 'bg-primary-orange/10' : 'hover:bg-white/5'}`}>
-                <div>
-                  <div className={`font-accent text-base md:text-lg font-bold ${selected?.id === d.id ? 'text-primary-orange' : 'text-text-primary'}`}>{d.code}</div>
-                  <div className="text-[10px] text-text-secondary uppercase tracking-tight line-clamp-1">{d.description}</div>
-                </div>
-                <ChevronRight size={16} className={`text-text-secondary group-hover:text-primary-orange group-hover:translate-x-1 transition-all ${selected?.id === d.id ? 'text-primary-orange' : ''}`} />
-              </button>
-            )) : (
-              <div className="p-10 text-center text-text-muted text-[10px] uppercase tracking-widest opacity-50">No diagnostic matches found</div>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="space-y-6" id="dtc-results-detail">
-        {selected ? (
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="glass-panel border-t-2 border-t-primary-orange flex flex-col gap-6">
-            <header>
-              <div className="flex justify-between items-start mb-4">
-                <div className="font-accent text-3xl text-primary-orange font-bold tracking-tighter">{selected.code}</div>
-                <span className="badge badge-red">{selected.severity}</span>
-              </div>
-              <div className="text-lg text-text-primary uppercase tracking-tight font-display">{selected.description}</div>
-            </header>
 
-            <div className="space-y-6">
-              <div>
-                <h5 className="font-display font-bold text-text-secondary uppercase text-[10px] tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={12} /> ALERT SYMPTOMS</h5>
-                <div className="space-y-2">{selected.symptoms.map((s, i) => <div key={i} className="text-xs text-text-secondary border-b border-border-glass pb-2 last:border-0">• {s}</div>)}</div>
-              </div>
-              <div>
-                <h5 className="font-display font-bold text-text-secondary uppercase text-[10px] tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 size={12} /> REMEDIATION</h5>
-                <div className="p-4 bg-black/20 rounded-lg border-l-2 border-primary-orange">
-                  <p className="text-xs text-text-primary leading-relaxed">{selected.solutions[0]}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <button onClick={() => handleSave(selected)} className="btn-secondary flex-1 py-4 text-[10px] flex items-center justify-center gap-2"><Star size={14} /> SAVE TO LIBRARY</button>
-              <button className="btn-primary flex-1 py-4 text-[10px]">GENERATE REPORT</button>
-            </div>
-          </motion.div>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center glass-panel text-center text-text-secondary/50 border-dashed">
-            <Search size={48} className="mb-4 opacity-20" />
-            <p className="text-[10px] uppercase tracking-widest">Select an entry to view deep analytics</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {/* Manufacturer Select */}
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Manufacturer</label>
+            <select 
+              value={selectedManufacturer}
+              onChange={(e) => setSelectedManufacturer(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+            >
+              {vehicleDatabase.manufacturers.map(mfr => (
+                <option key={mfr.id} value={mfr.id}>{mfr.logo} {mfr.name}</option>
+              ))}
+            </select>
           </div>
-        )}
+
+          {/* Model Select */}
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Model</label>
+            <select 
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+            >
+              {currentManufacturer?.models.map(model => (
+                <option key={model.id} value={model.id}>{model.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Year Select */}
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Year</label>
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+            >
+              {currentModel?.years.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Engine Select */}
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Engine Configuration</label>
+            <select 
+              value={selectedEngine}
+              onChange={(e) => setSelectedEngine(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+            >
+              {currentModel?.engines.map(engine => (
+                <option key={engine} value={engine}>{engine}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Vehicle Info Card */}
+        <div className="mt-6 p-4 bg-white/5 border border-primary-orange/20 rounded-lg flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-primary-orange/20 flex items-center justify-center text-primary-orange shrink-0">
+             <Shield size={24} />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs font-bold text-text-primary mb-1">
+              {currentManufacturer?.logo} {currentManufacturer?.name} {currentModel?.name} — {selectedYear} SERIES
+            </div>
+            <div className="text-[10px] text-text-secondary uppercase tracking-widest">
+              DEPLOYED POWERPLANT: <span className="text-primary-orange font-accent">{selectedEngine}</span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* DTC Search Section */}
+      <div className="glass-panel p-6 md:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Search size={24} className="text-primary-orange" />
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 2: NEURAL FAULT SCAN</h2>
+        </div>
+
+        <form onSubmit={handleSearch} className="flex gap-2 mb-8">
+          <input
+            type="text"
+            placeholder="ENTER OBD-II FAULT CODE (E.G. P0101)..."
+            value={dtcInput}
+            onChange={(e) => setDtcInput(e.target.value)}
+            className="input-field flex-1 h-[52px] font-accent uppercase tracking-widest"
+          />
+          <button 
+            type="submit"
+            className="btn-primary px-8 h-[52px] flex items-center justify-center min-w-[120px]"
+          >
+            {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'SCAN'}
+          </button>
+        </form>
+
+        {/* Results Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+          <div className="space-y-4">
+            <h3 className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">
+              {searchResults.length} SCAN RESULTS RETURNED
+            </h3>
+
+            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              {searchResults.map((dtc, idx) => (
+                <button 
+                  key={`${dtc.code}-${idx}`}
+                  className={`w-full text-left p-6 glass-panel border transition-all hover:-translate-y-1 ${selectedDTC?.code === dtc.code ? 'border-primary-orange bg-primary-orange/5' : 'border-border-glass hover:border-primary-orange/50'}`}
+                  onClick={() => setSelectedDTC(dtc)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-accent text-xl text-primary-orange font-bold">{dtc.code}</span>
+                        <span className={`badge ${dtc.severity === 'critical' ? 'badge-red' : dtc.severity === 'high' ? 'badge-orange' : 'badge-yellow'}`}>
+                          {dtc.severity.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-text-primary font-display font-medium uppercase tracking-tight">
+                        {dtc.title || dtc.description}
+                      </p>
+                    </div>
+                    <ChevronRight size={20} className={`text-text-secondary mt-1 transition-transform ${selectedDTC?.code === dtc.code ? 'rotate-90 text-primary-orange' : ''}`} />
+                  </div>
+                </button>
+              ))}
+
+              {searchResults.length === 0 && dtcInput && !isLoading && (
+                <div className="py-20 text-center glass-panel opacity-50 border-dashed">
+                  <AlertTriangle size={48} className="mx-auto mb-4 text-red-500" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-2">SCAN FAILURE: NO MATCHES</p>
+                  <p className="text-[9px] text-text-secondary uppercase">Check fault code syntax and retry uplink</p>
+                </div>
+              )}
+
+              {searchResults.length === 0 && !dtcInput && (
+                <div className="py-20 text-center glass-panel opacity-30 border-dashed">
+                  <Database size={48} className="mx-auto mb-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Awaiting Scanner Input</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Details Panel */}
+          <div className="lg:sticky lg:top-8 h-fit">
+            <AnimatePresence mode="wait">
+              {selectedDTC ? (
+                <motion.div 
+                  key={`detail-${selectedDTC.code}`}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="glass-panel border-t-4 border-t-primary-orange space-y-6"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="font-accent text-4xl text-primary-orange font-bold tracking-tighter">{selectedDTC.code}</div>
+                    <button onClick={() => handleSave(selectedDTC)} className="w-10 h-10 rounded-full bg-white/5 border border-border-glass flex items-center justify-center text-text-secondary hover:text-primary-orange transition-colors">
+                      <Star size={18} />
+                    </button>
+                  </div>
+
+                  <h2 className="text-xl font-display font-bold uppercase tracking-tight text-text-primary">
+                    {selectedDTC.title || selectedDTC.description}
+                  </h2>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
+                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock size={10} /> TIME BASE</div>
+                      <div className="text-xs font-bold text-text-primary">{selectedDTC.timeEstimate || '30-45 MIN'}</div>
+                    </div>
+                    <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
+                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><CreditCard size={10} /> UNIT COST</div>
+                      <div className="text-xs font-bold text-text-primary">{selectedDTC.estimatedCost || '₱1,500 - ₱4,000'}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14} className="text-red-400" /> ALERT SYMPTOMS</h4>
+                      <ul className="space-y-2">
+                        {selectedDTC.symptoms.map((s, i) => (
+                          <li key={i} className="text-xs text-text-secondary flex gap-2">
+                            <span className="text-primary-orange select-none">•</span> {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 size={14} className="text-green-400" /> REPAIR PROTOCOL</h4>
+                      <div className="space-y-3">
+                        {(selectedDTC.remediation || selectedDTC.solutions || []).slice(0, 3).map((step, i) => (
+                          <div key={i} className="p-3 bg-black/30 border-l-2 border-primary-orange rounded-r text-[11px] leading-relaxed text-text-primary italic">
+                            {step}
+                          </div>
+                        ))}
+                        {(selectedDTC.remediation || selectedDTC.solutions || []).length > 3 && (
+                          <button className="text-[9px] font-bold text-primary-orange uppercase tracking-widest hover:underline">View Full 12-Step Protocol</button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                      <button className="btn-primary flex-1 py-4 text-[10px] font-bold tracking-widest">COMMAND CENTER PRINT</button>
+                      <button className="btn-secondary w-14 h-14 flex items-center justify-center p-0 rounded-lg"><Share2 size={18} /></button>
+                    </div>
+
+                    <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+                       <div className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-1">STRICT SAFETY PROTOCOL</div>
+                       <p className="text-[10px] text-red-300 opacity-80 uppercase leading-tight">THREAT LEVEL: {selectedDTC.dangerLevel || 'HIGH'}. PROCEED WITH CAUTION OR ENGAGE PROFESSIONAL SUPPORT.</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="h-[500px] glass-panel border-dashed border-2 flex flex-col items-center justify-center text-center opacity-30">
+                  <Cpu size={64} className="mb-6" />
+                  <p className="text-xs uppercase font-bold tracking-widest">Select an entry for<br />deep system analysis</p>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Dynamic Resource Tab Component ---
+function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any) {
+  const [selectedManufacturer, setSelectedManufacturer] = useState('ford');
+  const [selectedModel, setSelectedModel] = useState('f150');
+  const [selectedYear, setSelectedYear] = useState('2023');
+  const [selectedEngine, setSelectedEngine] = useState('');
+  
+  const [result, setResult] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const currentManufacturer = vehicleDatabase.manufacturers.find(m => m.id === selectedManufacturer);
+  const currentModel = currentManufacturer?.models.find(m => m.id === selectedModel);
+
+  // Auto-select first model and engine
+  useEffect(() => {
+    if (currentManufacturer && !currentManufacturer.models.find(m => m.id === selectedModel)) {
+      setSelectedModel(currentManufacturer.models[0]?.id || '');
+    }
+  }, [currentManufacturer, selectedModel]);
+
+  useEffect(() => {
+    if (currentModel && !currentModel.engines.includes(selectedEngine)) {
+      setSelectedEngine(currentModel.engines[0] || '');
+    }
+  }, [currentModel, selectedEngine]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setResult(null);
+
+    store.addLog(user.id, `AI Data Generation`, `Generated ${type} for ${selectedYear} ${currentManufacturer?.name} ${currentModel?.name}`);
+
+    try {
+      const data = await generateDynamicVehicleData(type, currentManufacturer?.name || selectedManufacturer, currentModel?.name || selectedModel, selectedYear, selectedEngine);
+      setResult(data);
+    } catch(err) {
+      if (toast) toast('Failed to retrieve vehicle data module from cloud matrix.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Icon size={24} className="text-primary-orange" />
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">VEHICLE SELECT: {title}</h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Manufacturer</label>
+            <select 
+              value={selectedManufacturer}
+              onChange={(e) => setSelectedManufacturer(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+            >
+              {vehicleDatabase.manufacturers.map((mfr: any) => (
+                <option key={mfr.id} value={mfr.id}>{mfr.logo} {mfr.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Model</label>
+            <select 
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+              disabled={!currentManufacturer || currentManufacturer.models.length === 0}
+            >
+              {currentManufacturer?.models.map(mdl => (
+                <option key={mdl.id} value={mdl.id}>{mdl.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Year</label>
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+              disabled={!currentModel || currentModel.years.length === 0}
+            >
+              {currentModel?.years.map(yr => (
+                <option key={yr} value={yr.toString()}>{yr}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Engine</label>
+            <select 
+              value={selectedEngine}
+              onChange={(e) => setSelectedEngine(e.target.value)}
+              className="input-field cursor-pointer appearance-none bg-black/40"
+              disabled={!currentModel || currentModel.engines.length === 0}
+            >
+              {currentModel?.engines.map(eng => (
+                <option key={eng} value={eng}>{eng}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button 
+              onClick={handleSearch} 
+              disabled={isLoading || !currentModel || !selectedEngine} 
+              className="btn-primary w-full h-[50px] gap-2"
+            >
+              <Search size={16} />
+              {isLoading ? "Querying..." : "Search"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="glass-panel p-12 text-center space-y-4">
+           <div className="animate-spin text-primary-orange flex justify-center"><CloudDownload size={32} /></div>
+           <p className="text-text-secondary uppercase tracking-[0.2em] text-xs">Querying neural matrix and compiling structural vehicle report</p>
+        </div>
+      )}
+
+      {result && !isLoading && (
+        <div className="glass-panel p-6 md:p-10 space-y-6">
+          <div className="border-b border-white/10 pb-4 mb-4 flex items-center justify-between">
+             <h3 className="text-lg text-primary-orange font-bold uppercase">{selectedYear} {currentManufacturer?.name} {currentModel?.name} - {title}</h3>
+             <button onClick={() => {
+                store.addSavedItem({
+                  userId: user.id,
+                  type: 'Article (AI)',
+                  itemId: `${type}-${selectedYear}-${selectedModel}`,
+                  title: `${selectedYear} ${currentManufacturer?.name} ${currentModel?.name} - ${title}`
+                });
+                if (toast) toast('Report saved to Neural Library', 'success');
+             }} className="btn-secondary h-10 px-4 gap-2 text-[10px]">
+                <Save size={14} /> SAVE TO LIBRARY
+             </button>
+          </div>
+          <div className="markdown-body text-sm font-sans leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {result}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1594,32 +2073,46 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                     {activeTab === 'fuses' && (
                       <RetrievalPlaceholder unitId={selectedUnit.id} data={selectedUnit.fuseBoxes}>
                         <div className="space-y-8">
-                          {Object.entries(selectedUnit.fuseBoxes || {}).length > 0 ? Object.entries(selectedUnit.fuseBoxes || {}).map(([boxName, fuses]) => (
-                            <div key={boxName} className="space-y-4">
+                          {Object.entries(selectedUnit.fuseBoxes || {}).length > 0 ? Object.entries(selectedUnit.fuseBoxes || {}).map(([boxName, fuses], boxIdx) => (
+                            <motion.div 
+                              key={boxName} 
+                              className="space-y-4"
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3, delay: boxIdx * 0.1 }}
+                            >
                               <h5 className="text-xs font-bold text-primary-orange uppercase tracking-widest border-b border-primary-orange/20 pb-2">{boxName} FUSE BOX</h5>
-                              <div className="overflow-x-auto glass-panel p-0">
+                              <div className="overflow-x-auto glass-panel p-0 hover:border-primary-orange/50 transition-colors duration-300">
                                 <table className="w-full text-left text-[10px]">
                                   <thead className="bg-white/5 text-text-secondary uppercase font-accent">
                                     <tr>
-                                      <th className="p-3">#</th>
-                                      <th className="p-3">Amp</th>
-                                      <th className="p-3">Circuit</th>
-                                      <th className="p-3">Function</th>
+                                      <th className="p-3 font-semibold">#</th>
+                                      <th className="p-3 font-semibold">Amp</th>
+                                      <th className="p-3 font-semibold">Circuit</th>
+                                      <th className="p-3 font-semibold">Function</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-white/5">
-                                    {(fuses as any[]).map((f: any) => (
-                                      <tr key={f.id} className="hover:bg-white/2">
+                                    {(fuses as any[]).map((f: any, idx: number) => (
+                                      <motion.tr 
+                                        key={f.id} 
+                                        className="hover:bg-primary-orange/10 transition-colors"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.2, delay: 0.1 + (idx * 0.05) }}
+                                      >
                                         <td className="p-3 font-bold text-primary-orange">{f.number}</td>
-                                        <td className="p-3 font-accent">{f.amperage}</td>
-                                        <td className="p-3 uppercase">{f.circuit}</td>
-                                        <td className="p-3 text-text-secondary uppercase">{f.protects}</td>
-                                      </tr>
+                                        <td className="p-3 font-accent">
+                                          <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold bg-white/10 text-white shadow-sm border border-white/5">{f.amperage}</span>
+                                        </td>
+                                        <td className="p-3 uppercase text-text-primary">{f.circuit}</td>
+                                        <td className="p-3 text-text-secondary uppercase max-w-[200px] truncate" title={f.protects}>{f.protects}</td>
+                                      </motion.tr>
                                     ))}
                                   </tbody>
                                 </table>
                               </div>
-                            </div>
+                            </motion.div>
                           )) : <div className="text-center py-20 opacity-30 uppercase text-[10px] font-bold tracking-widest text-text-secondary">No fuse mapping data</div>}
                         </div>
                       </RetrievalPlaceholder>
@@ -1629,7 +2122,13 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                       <RetrievalPlaceholder unitId={selectedUnit.id} data={selectedUnit.fluids}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {(selectedUnit.fluids || []).length > 0 ? selectedUnit.fluids.map((fluid, idx) => (
-                            <div key={idx} className="glass-panel p-6 bg-black/20 hover:bg-black/30 transition-all">
+                            <motion.div 
+                              key={idx} 
+                              className="glass-panel p-6 bg-black/20 hover:bg-black/30 transition-all hover:border-primary-orange/30"
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ duration: 0.3, delay: idx * 0.05 }}
+                            >
                               <h6 className="text-[10px] font-bold text-primary-orange uppercase mb-3 tracking-widest">{fluid.name}</h6>
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center text-[10px] border-b border-white/5 pb-2">
@@ -1645,7 +2144,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                                   <span className="text-text-primary font-accent font-bold uppercase">{fluid.interval}</span>
                                 </div>
                               </div>
-                            </div>
+                            </motion.div>
                           )) : <div className="col-span-full py-20 text-center opacity-30 uppercase text-[10px] font-bold tracking-widest text-text-secondary">Fluid database unavailable</div>}
                         </div>
                       </RetrievalPlaceholder>
@@ -1691,6 +2190,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
 function AIChatTab({ user, store, ...props }: any) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const myMessages = store.chatLogs.filter((m: any) => m.userId === user.id);
@@ -1709,10 +2209,20 @@ function AIChatTab({ user, store, ...props }: any) {
     setLoading(true);
 
     try {
-      const resp = await askAutomotiveAssistant(userText);
+      const history = store.chatLogs
+        .filter((m: any) => m.userId === user.id)
+        .map((m: any) => ({
+          role: m.role === 'ai' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }));
+
+      const resp = await askAutomotiveAssistant(userText, history);
       store.addChatMessage(user.id, 'ai', resp);
+      if (autoSpeak) speakText(resp, true);
     } catch (err) {
-      store.addChatMessage(user.id, 'ai', "Neural link disrupted. Reconnecting to diagnostic cloud...");
+      const errMsg = "Neural link disrupted. Reconnecting to diagnostic cloud...";
+      store.addChatMessage(user.id, 'ai', errMsg);
+      if (autoSpeak) speakText(errMsg, true);
     } finally {
       setLoading(false);
     }
@@ -1731,9 +2241,13 @@ function AIChatTab({ user, store, ...props }: any) {
         {myMessages.map((m: any) => (
           <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[90%] md:max-w-[80%] flex gap-3 md:gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center shrink-0 font-bold border text-[10px] md:text-xs ${m.role === 'user' ? 'bg-primary-orange text-white border-primary-orange' : 'bg-blue-500/20 text-blue-400 border-blue-500/30 font-accent'}`}>
-                {m.role === 'user' ? user.fullName.charAt(0) : 'AI'}
-              </div>
+              {m.role === 'user' ? (
+                <UserAvatar user={user} size="sm" className="w-7 h-7 md:w-8 md:h-8 border-primary-orange" />
+              ) : (
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center shrink-0 font-bold border border-blue-500/30 text-blue-400 bg-blue-500/20 text-[10px] md:text-xs font-accent">
+                   AI
+                </div>
+              )}
               <div className={`p-3 md:p-4 rounded-2xl text-xs md:text-sm leading-relaxed ${m.role === 'user' ? 'bg-primary-orange/10 border border-primary-orange/20 text-white rounded-tr-none' : 'bg-white/5 border border-border-glass text-text-primary rounded-tl-none'}`}>
                 {m.content}
               </div>
@@ -1751,14 +2265,27 @@ function AIChatTab({ user, store, ...props }: any) {
           <input 
             type="text" 
             placeholder="QUERY VEHICLE SYSTEM..." 
-            className="input-field pr-16 h-[50px] md:h-[56px] text-xs font-accent uppercase tracking-widest" 
+            className="input-field pr-32 h-[50px] md:h-[56px] text-xs font-accent uppercase tracking-widest" 
             value={input} 
             onChange={e => setInput(e.target.value)} 
             disabled={loading} 
           />
-          <button type="submit" disabled={!input.trim() || loading} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 rounded-lg bg-primary-orange text-white flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-            <Send size={18} />
-          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            <button 
+              type="button" 
+              onClick={() => {
+                setAutoSpeak(!autoSpeak);
+                if (autoSpeak) window.speechSynthesis.cancel();
+              }}
+              title={autoSpeak ? "Voice Response ON" : "Voice Response OFF"}
+              className={`w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center transition-colors ${autoSpeak ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-text-muted hover:text-white'}`}
+            >
+              {autoSpeak ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+            <button type="submit" disabled={!input.trim() || loading} className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-primary-orange text-white flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+              <Send size={18} />
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -1783,7 +2310,7 @@ function MembersTab({ store, ...props }: any) {
             <tr key={u.id} className="hover:bg-white/2 transition-colors">
               <td className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-800 border border-border-glass flex items-center justify-center font-bold text-[10px] text-white">{u.fullName.charAt(0)}</div>
+                  <UserAvatar user={u} size="sm" className="border-border-glass bg-slate-800" />
                   <div><div className="text-sm font-bold text-text-primary uppercase">{u.fullName}</div><div className="text-[9px] text-text-secondary uppercase">@{u.username}</div></div>
                 </div>
               </td>

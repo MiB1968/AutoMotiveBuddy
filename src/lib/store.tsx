@@ -9,16 +9,25 @@ import { useState, useEffect } from 'react';
 export interface DTC {
   id: string;
   code: string;
-  description: string;
-  category: string; // e.g. Powertrain
-  system: string; // e.g. Engine
+  description?: string;
+  category?: string; // e.g. Powertrain
+  system?: string; // e.g. Engine
   severity: 'low' | 'medium' | 'high' | 'critical';
   symptoms: string[];
-  causes: string[];
-  solutions: string[]; // step-by-step
-  tools: string[];
-  costPrefix: string;
-  costRange: string;
+  causes?: string[];
+  probableCauses?: string[];
+  solutions?: string[]; // step-by-step
+  remediation?: string[];
+  tools?: string[];
+  costPrefix?: string;
+  costRange?: string;
+  manufacturer?: string;
+  dtcPrefix?: string;
+  affectedYears?: number[];
+  timeEstimate?: string;
+  estimatedCost?: string;
+  dangerLevel?: string;
+  title?: string;
 }
 
 export interface FuseEntry {
@@ -70,6 +79,7 @@ export interface User {
     plan: string;
     expiryDate: string;
   };
+  avatarUrl?: string;
 }
 
 export interface Announcement {
@@ -118,11 +128,12 @@ export interface SearchHistory {
 const INITIAL_ADMIN: User = {
   id: 'admin-001',
   username: 'rubenllego',
-  fullName: 'Ruben Llego',
+  fullName: 'Ruben Llego O.',
   password: 'admin123',
   role: 'admin',
   status: 'approved',
   createdAt: new Date().toISOString(),
+  avatarUrl: '/ruben_avatar.jpg',
 };
 
 // PRE-LOADED DTC DATABASE

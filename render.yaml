@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: automotive-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    branch: main
