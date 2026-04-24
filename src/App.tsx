@@ -1822,7 +1822,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                       <div className="flex flex-wrap gap-2">
                         {(() => {
                           const causes = Array.isArray(selectedDTC?.causes) ? selectedDTC.causes : 
-                                        (typeof selectedDTC?.causes === 'string' ? selectedDTC.causes.split(',') : []);
+                                        (typeof (selectedDTC as any)?.causes === 'string' ? (selectedDTC as any).causes.split(',') : []);
                           return causes.length > 0 ? causes.map((c: string, i: number) => (
                             <span key={i} className="px-2 py-1 bg-white/5 border border-border-glass rounded text-[10px] text-text-secondary">
                               {c.trim()}
