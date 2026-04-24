@@ -204,6 +204,10 @@ function UnitManualsTab() {
 function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any, size?: "xs" | "sm" | "md" | "lg" | "xl", className?: string, onUpdate?: (url: string) => void }) {
   const [imageError, setImageError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [user.avatarUrl]);
   
   const sizeClasses = {
     xs: "w-6 h-6 text-[8px]",
@@ -410,7 +414,7 @@ export default function App() {
     const h = hash.split('?')[0];
 
     // Public
-    if (h === '#home') return <LandingPage onNavigate={setHash} />;
+    if (h === '#home') return <LandingPage onNavigate={setHash} user={currentUser} onUpdateAvatar={updateAvatar} />;
     if (h === '#login') return <AuthPage mode="login" onLogin={login} onBack={() => window.location.hash = '#home'} store={store} toast={addToast} />;
     if (h === '#register') return <AuthPage mode="register" onLogin={login} onBack={() => window.location.hash = '#home'} store={store} toast={addToast} />;
 
@@ -452,7 +456,7 @@ export default function App() {
 
 // --- Home/Landing Page ---
 
-function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
+function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: string) => void, user: any, onUpdateAvatar?: (url: string) => void }) {
   const [scrollY, setScrollY] = useState(0);
   useEffect(() => {
     const h = () => setScrollY(window.scrollY);
@@ -588,18 +592,22 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
             <p className="text-text-secondary tracking-widest uppercase text-xs">Unlock professional grade diagnostics</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch">
              <PricingCard 
-               title="BASIC" price="1,000" duration="1 Month" icon={Shield} 
-               benefits={['Full OBD2 DTC Lookup', 'Fuse & Relay Layouts', 'Dashboard Warning Lights', 'Real-time AI Chatbot', 'Member Community', 'Basic Profile', 'Search History']}
+               title="Single Phase" price="500" duration="1 Month" icon={Shield} 
+               benefits={['Full OBD2 DTC Lookup', 'Fuse & Relay Layouts', 'Dashboard Warning Lights', 'AI Chatbot Support', 'Member Community Access']}
              />
              <PricingCard 
-               title="STANDARD" price="3,000" duration="6 Months" icon={Star} active
-               benefits={['Everything in Basic', 'Full Maintenance Schedules', 'DIY Step-by-Step Fix Guides', 'Detailed Wiring Diagrams', 'Component Locations', 'Priority AI Support', 'Fluid Capacities']}
+               title="Quarterly Sync" price="1,000" duration="3 Months" icon={Zap}
+               benefits={['Everything in 1 Month', 'Priority Database Updates', 'Manual Archiving', 'Bulk Data Access', 'Standard Support']}
              />
              <PricingCard 
-               title="PREMIUM" price="5,000" duration="1 Year" icon={Award} featured
-               benefits={['Everything in Standard', 'Voice-Enabled AI Assistant', 'Experimental AI Features', 'Bulk Data Export', 'Voucher & Partner Perks', 'Certificate of Completion', 'Best Value Tier']}
+               title="Semi-Annual" price="1,500" duration="6 Months" icon={Star} active
+               benefits={['Everything in Quarterly', 'DIY Repair Guides', 'Detailed Wire Maps', 'Component Finder', 'Maintenance Schedules']}
+             />
+             <PricingCard 
+               title="Infinite Cycle" price="2,000" duration="1 Year" icon={Award} featured
+               benefits={['Everything in Semi-Annual', 'Voice Protocol Access', 'Export Bulk Stats', 'Partner Perks', 'Certificate of Access']}
              />
           </div>
           <p className="mt-16 text-center text-text-muted italic text-[11px] tracking-widest">
@@ -611,33 +619,98 @@ function LandingPage({ onNavigate }: { onNavigate: (h: string) => void }) {
 
       {/* About Section */}
       <section id="about" className="py-32 px-6 relative">
-        <div className="container max-w-4xl mx-auto glass-card flex flex-col md:flex-row items-center gap-12 text-center md:text-left">
-           <div className="w-48 h-48 rounded-full border-4 border-orange/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-orange-glow)] relative">
-              <div className="w-full h-full rounded-full bg-orange/10 flex items-center justify-center overflow-hidden">
-                <UserAvatar user={{ fullName: "Ruben Llego O.", avatarUrl: "/ruben_avatar.jpg" }} size="xl" className="border-none bg-transparent" />
-              </div>
-              <div className="absolute -bottom-2 -right-2 bg-orange text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-bg-card">
-                <Award size={20} />
-              </div>
-           </div>
-           <div className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-3xl font-display font-bold">RUBEN LLEGO</h3>
-                <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                  <span className="badge badge-high">OWNER</span>
-                  <span className="badge badge-medium">LEAD DEVELOPER</span>
-                  <span className="badge badge-low">AUTOMOTIVE EXPERT</span>
+        <div className="container max-w-5xl mx-auto">
+          <div className="glass-card overflow-hidden flex flex-col lg:flex-row shadow-[0_0_50px_rgba(249,115,22,0.1)] border-white/5">
+            {/* Left: Ruben's Profile */}
+            <div className="lg:w-1/2 p-8 md:p-12 border-b lg:border-b-0 lg:border-r border-white/5">
+              <div className="flex flex-col items-center lg:items-start gap-8 text-center lg:text-left">
+                <div className="w-40 h-40 rounded-full border-4 border-orange/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-orange-glow)] relative group">
+                  <div className="w-full h-full rounded-full bg-orange/10 flex items-center justify-center overflow-hidden">
+                    <UserAvatar 
+                      user={user && user.fullName === "Ruben Llego O." ? user : { fullName: "Ruben Llego O.", avatarUrl: "/ruben_avatar.jpg" }} 
+                      size="xl" 
+                      onUpdate={user && user.fullName === "Ruben Llego O." ? onUpdateAvatar : (url: string) => {
+                        // If not logged in as Ruben, we still want to show the change if the user is just "playing" with the UI
+                        // but normally this would be disabled if not admin.
+                      }}
+                      className="border-none bg-transparent hover:scale-110 transition-transform duration-500" 
+                    />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-orange text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-4 border-bg-card">
+                    <Award size={18} />
+                  </div>
+                </div>
+                
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-4xl font-display font-bold tracking-tight">RUBEN LLEGO O.</h3>
+                    <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+                      <span className="badge badge-high bg-orange/20 text-orange border-orange/30">OWNER & FOUNDER</span>
+                      <span className="badge badge-medium">LEAD DEVELOPER</span>
+                      <span className="badge badge-low">AUTOMOTIVE EXPERT</span>
+                    </div>
+                  </div>
+                  
+                  <p className="text-text-secondary leading-relaxed text-base italic">
+                    "AutoMotive Buddy was built to empower every driver, mechanic, and fleet operator with professional-grade diagnostic and repair tools. Our mission is to democratize automotive intelligence through technology."
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Mail size={16} /></div>
+                      <span className="text-xs font-bold uppercase tracking-widest">info@automotivebuddy.io</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Globe size={16} /></div>
+                      <span className="text-xs font-bold uppercase tracking-widest">automotivebuddy.io</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Award size={16} /></div>
+                      <span className="text-xs font-bold uppercase tracking-widest">Ruben Llego Management</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Phone size={16} /></div>
+                      <span className="text-xs font-bold uppercase tracking-widest">@ruben.llego.ben</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <p className="text-text-secondary leading-relaxed">
-                "Founded and managed by Ruben Llego O., AutoMotive Buddy was built to empower every driver, mechanic, and fleet operator with professional-grade diagnostic and repair tools. Our mission is to democratize automotive intelligence through technology."
-              </p>
-              <div className="flex gap-6 justify-center md:justify-start pt-4">
-                 <a href="#" className="text-text-muted hover:text-orange transition-colors"><Globe size={20} /></a>
-                 <a href="#" className="text-text-muted hover:text-orange transition-colors"><Mail size={20} /></a>
-                 <a href="#" className="text-text-muted hover:text-orange transition-colors"><Phone size={20} /></a>
+            </div>
+
+            {/* Right: QR Code & Contact Call-to-Action */}
+            <div className="lg:w-1/2 bg-white/5 p-8 md:p-12 flex flex-col items-center justify-center text-center">
+              <div className="space-y-8 max-w-sm">
+                <div className="space-y-2">
+                  <h4 className="text-xl font-display font-bold uppercase tracking-widest text-primary-orange">Direct Connection</h4>
+                  <p className="text-text-secondary text-xs font-bold uppercase tracking-widest">Scan to Message or Call Ruben Llego</p>
+                </div>
+                
+                <div className="relative p-6 bg-white rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] group">
+                  <div className="w-48 h-48 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border-4 border-white">
+                    <img 
+                      src="/ruben_qr.jpg" 
+                      alt="Ruben Llego QR Contact" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://facebook.com/ruben.llego.ben";
+                      }}
+                    />
+                  </div>
+                  <div className="absolute -inset-2 rounded-[2rem] border-2 border-orange/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                </div>
+                
+                <div className="space-y-4">
+                  <p className="text-text-muted text-[10px] uppercase font-bold tracking-[.2em] leading-relaxed">
+                    Personalized support and fleet bulk licensing available through direct admin consult.
+                  </p>
+                  <button onClick={() => window.location.href = 'mailto:info@automotivebuddy.io'} className="btn-primary w-full py-4 rounded-2xl flex items-center justify-center gap-2">
+                    <Mail size={18} />
+                    SEND DIRECT INQUIRY
+                  </button>
+                </div>
               </div>
-           </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1281,7 +1354,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
-          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} />
+          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} key={`admin-v-${user.avatarUrl}`} />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
@@ -1423,7 +1496,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
-          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} />
+          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} key={`member-v-${user.avatarUrl}`} />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
@@ -1631,16 +1704,43 @@ function OverviewTab({ user, store }: any) {
           </div>
         </section>
 
-        <section className="glass-panel border-primary-orange/20 bg-primary-orange/5">
-          <h2 className="text-xl mb-4 text-primary-orange">AI ASSISTANT</h2>
-          <div className="text-sm text-text-secondary leading-relaxed mb-6">
-            Greeting set to: "Hello {user.fullName.split(' ')[0]}, how can I assist with your diagnostics today?"
+        <section className="glass-panel border-primary-orange/20 bg-primary-orange/5 lg:col-span-1">
+          <h2 className="text-xl mb-6 text-primary-orange uppercase tracking-tight">Access Protocol</h2>
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-black/40 border border-white/5 hover:border-primary-orange/30 transition-all flex justify-between items-center group">
+              <div>
+                <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-widest">Single Phase</div>
+                <div className="text-[11px] text-text-muted leading-tight">1 Month Access</div>
+              </div>
+              <div className="text-primary-orange font-bold font-display">₱500</div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-black/40 border border-white/5 hover:border-primary-orange/30 transition-all flex justify-between items-center group">
+              <div>
+                <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-widest">Quarterly Sync</div>
+                <div className="text-[11px] text-text-muted leading-tight">3 Months Access</div>
+              </div>
+              <div className="text-primary-orange font-bold font-display">₱1,000</div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/30 hover:border-primary-orange/60 transition-all relative overflow-hidden flex justify-between items-center group">
+              <div className="absolute top-0 right-0 py-0.5 px-2 bg-primary-orange text-white text-[7px] font-bold uppercase tracking-widest transform">Value Choice</div>
+              <div>
+                <div className="text-[10px] font-accent font-bold text-primary-orange uppercase tracking-widest">Semi-Annual</div>
+                <div className="text-[11px] text-text-primary leading-tight font-medium">6 Months Access</div>
+              </div>
+              <div className="text-primary-orange font-bold font-display">₱1,500</div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-black/40 border border-white/5 hover:border-primary-orange/30 transition-all flex justify-between items-center group">
+              <div>
+                <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-widest">Infinite Cycle</div>
+                <div className="text-[11px] text-text-muted leading-tight">12 Months Access</div>
+              </div>
+              <div className="text-primary-orange font-bold font-display">₱2,000</div>
+            </div>
           </div>
-          <div className="p-4 bg-black/30 rounded-lg border-l-2 border-primary-orange mb-8">
-            <div className="text-[11px] uppercase text-text-primary mb-2 tracking-widest">Recent Interaction</div>
-            <p className="italic text-sm text-text-secondary">"Analyzed Ford PATS error for user. Immobilizer reset protocol generated..."</p>
-          </div>
-          <button onClick={() => {}} className="btn-primary w-full">CONFIGURE BOT</button>
+          <button onClick={() => {}} className="btn-primary w-full mt-6 text-[11px] h-10">INITIALIZE UPGRADE</button>
         </section>
       </div>
     </motion.div>
