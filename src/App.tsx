@@ -290,6 +290,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 
 export default function App() {
   const store = useStore();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hash, setHash] = useState(window.location.hash || '#home');
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     const saved = sessionStorage.getItem('ab_session');
@@ -298,10 +299,45 @@ export default function App() {
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
 
   useEffect(() => {
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+          console.log('SW registered');
+        }).catch(err => {
+          console.log('SW failed', err);
+        });
+      });
+    }
+
     const handleHash = () => setHash(window.location.hash || '#home');
     window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+
+    // PWA Install Prompt
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHash);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        addToast('Installation protocol initiated.', 'success');
+      }
+      setDeferredPrompt(null);
+    } else {
+      addToast('App is already installed or not compatible for standalone mode.', 'info');
+    }
+  };
 
   const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -339,10 +375,10 @@ export default function App() {
     }
 
     if (currentUser.role === 'admin') {
-      return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} />;
+      return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} />;
     }
 
-    return <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} />;
+    return <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} />;
   };
 
   return (
@@ -1151,7 +1187,7 @@ function ChatBot({ currentUser, store, toast }: any) {
 
 // --- Dashboard Layout Logic ---
 
-function AdminDashboard({ h, user, store, onLogout, toast }: any) {
+function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstall }: any) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -1182,6 +1218,19 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={Activity} label="Audit Registry" active={activeTab === 'logs'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('logs')} />
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
+
+      {showInstall && (
+        <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
+          <button 
+            onClick={onInstall} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
+            title="Install Application"
+          >
+            <Download size={18} />
+            {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[10px] font-bold uppercase tracking-widest">Install App</span>}
+          </button>
+        </div>
+      )}
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
@@ -1277,7 +1326,7 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
   );
 }
 
-function MemberDashboard({ h, user, store, onLogout, toast }: any) {
+function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInstall }: any) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -1310,6 +1359,19 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={User} label="Profile" active={activeTab === 'profile'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('profile')} />
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
+
+      {showInstall && (
+        <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
+          <button 
+            onClick={onInstall} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
+            title="Install Application"
+          >
+            <Download size={18} />
+            {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[10px] font-bold uppercase tracking-widest">Install App</span>}
+          </button>
+        </div>
+      )}
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>

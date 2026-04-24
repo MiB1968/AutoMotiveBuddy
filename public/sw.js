@@ -1,27 +1,22 @@
-const CACHE_NAME = "auto-buddy-v1";
+const CACHE_NAME = 'automotive-buddy-v1';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json'
+];
 
-self.addEventListener("install", (event) => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Basic assets to cache
-      return cache.addAll([
-        "/",
-        "/index.html"
-      ]);
+      return cache.addAll(ASSETS);
     })
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  // We don't want to intercept API network requests with simple match cache.
-  // Instead, pass through API calls, and cache static assets if they fail
-  if (event.request.url.includes('/api/')) {
-    return; // allow api calls to just fail or succeed naturally to hit offline fallbacks in code
-  }
-  
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
