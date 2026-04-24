@@ -23,7 +23,150 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateDynamicVehicleData, askAutomotiveAssistant } from './services/ai';
 
-// --- Shared Components ---
+import api from './services/api';
+import HUDPanel from './components/HUDPanel';
+import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
+import { syncData } from './sync/syncEngine';
+
+function NetworkStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setOnline(true);
+      syncData();
+    };
+    const handleOffline = () => setOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return (
+    <div className={`p-2 text-sm text-center font-bold tracking-widest uppercase transition-colors ${online ? "text-green-400 bg-green-500/10" : "text-amber-400 bg-amber-500/10"}`}>
+      {online ? "SYSTEM ONLINE - SYNC ACTIVE" : "OFFLINE MODE - LOCAL DB ACTIVE"}
+    </div>
+  );
+}
+
+function LiveDataTab() {
+  const [data, setData] = useState({ rpm: 0, temp: 0 });
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get("/live/all");
+        setData(res.data);
+      } catch (e) {
+        console.error('Failed to fetch telemetry');
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-3 mb-6">
+        <Activity size={24} className="text-primary-orange" />
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">LIVE TELEMETRY STREAM</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <HUDPanel>
+          <div className="flex flex-col items-center justify-center py-6">
+             <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold mb-2">Engine RPM</div>
+             <div className="text-5xl md:text-6xl text-primary-orange font-accent font-bold tracking-tighter">
+                {data.rpm}
+             </div>
+             <div className="text-[9px] uppercase mt-2 text-text-muted">Revolutions Per Minute</div>
+          </div>
+        </HUDPanel>
+
+        <HUDPanel>
+          <div className="flex flex-col items-center justify-center py-6">
+             <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold mb-2">Intake Temp</div>
+             <div className="text-5xl md:text-6xl text-blue-400 font-accent font-bold tracking-tighter">
+                {data.temp}°C
+             </div>
+             <div className="text-[9px] uppercase mt-2 text-text-muted">Celsius</div>
+          </div>
+        </HUDPanel>
+      </div>
+    </div>
+  );
+}
+
+function AdminNodeTab() {
+  const [logs, setLogs] = useState<{action: string, timestamp: string}[]>([]);
+
+  useEffect(() => {
+    api.get("/admin/logs").then((res) => setLogs(res.data)).catch(() => {});
+  }, []);
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-3 mb-6">
+        <Shield size={24} className="text-primary-orange" />
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">ADMIN NODE: AUDIT REGISTRY</h2>
+      </div>
+      
+      <HUDPanel className="p-0 overflow-hidden bg-black/40">
+        <div className="max-h-[600px] overflow-y-auto">
+          {logs.map((log, i) => (
+            <div key={i} className="p-4 border-b border-white/5 mx-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+              <div className="text-sm font-bold text-text-primary uppercase tracking-tight">{log.action}</div>
+              <div className="text-[10px] font-accent text-text-secondary">{new Date(log.timestamp).toLocaleString()}</div>
+            </div>
+          ))}
+          {logs.length === 0 && <div className="p-20 text-center opacity-30 uppercase tracking-widest text-[10px] font-bold">No Audit Logs Received</div>}
+        </div>
+      </HUDPanel>
+    </div>
+  );
+}
+
+function UnitManualsTab() {
+  const [manual, setManual] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const fetchManual = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/manual");
+      setManual(res.data.content);
+    } catch (e) {
+      console.error("Failed to load generic manual");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-3 mb-6">
+        <BookOpen size={24} className="text-primary-orange" />
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">GENERIC TECHNICAL MANUALS</h2>
+      </div>
+
+      <button onClick={fetchManual} disabled={loading} className="btn-primary">
+        {loading ? "DOWNLOADING..." : "LOAD GLOBAL SERVICE PROTOCOL"}
+      </button>
+
+      {manual && (
+        <HUDPanel>
+          <div className="markdown-body font-sans text-sm">
+             <ReactMarkdown remarkPlugins={[remarkGfm]}>{manual}</ReactMarkdown>
+          </div>
+        </HUDPanel>
+      )}
+    </div>
+  );
+}
 
 function UserAvatar({ user, size = "md", className = "" }: { user: any, size?: "xs" | "sm" | "md" | "lg" | "xl", className?: string }) {
   const [imageError, setImageError] = useState(false);
@@ -173,6 +316,8 @@ export default function App() {
     <div className="relative">
       <div className="noise-texture" />
       <div className="mesh-bg" />
+      
+      <NetworkStatus />
       
       <AnimatePresence>
         {renderContent()}
@@ -749,14 +894,12 @@ function ChatBot({ currentUser, store, toast }: any) {
     setIsTyping(true);
     
     try {
-      const history = store.chatLogs
-        .filter((m: any) => m.userId === userId)
-        .map((m: any) => ({
-          role: m.role === 'ai' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-        }));
-      
-      const response = await askAutomotiveAssistant(userMsg, history);
+      const { make, model, year, engine } = useVehicleStore.getState();
+      const res = await api.post("/ai/diagnose", {
+        vehicle: { make, model, year, engine },
+        query: userMsg
+      });
+      const response = res.data.answer;
       store.addChatMessage(userId, 'ai', response);
       if (autoSpeak) speakText(response, true);
     } catch (err) {
@@ -1019,15 +1162,14 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
 
       <nav className="flex-1 px-4 space-y-1 md:space-y-2 overflow-y-auto">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
-        <NavItem icon={Search} label="DTC Lookup" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
-        <NavItem icon={BookOpen} label="Manuals & Schematics" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
-        <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
-        <NavItem icon={Map} label="Component Locations" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
-        <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
+        <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={MessageSquare} label="AI Diagnostics" active={activeTab === 'chat'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('chat')} />
-        <NavItem icon={Star} label="Saved Items" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
-        <NavItem icon={History} label="Search History" active={activeTab === 'history'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('history')} />
-        <NavItem icon={Bell} label="Announcements" active={activeTab === 'announcements'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('announcements')} />
+        <NavItem icon={Activity} label="Live Telemetry" active={activeTab === 'live'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('live')} />
+        <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
+        <NavItem icon={Map} label="Component Locator" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
+        <NavItem icon={BookOpen} label="Unit Manuals" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
+        <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
+        <NavItem icon={Shield} label="Admin Node" active={activeTab === 'admin'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('admin')} />
         <div className="border-t border-white/5 my-4 mx-4 pt-4" />
         <NavItem icon={User} label="Profile" active={activeTab === 'profile'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('profile')} />
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
@@ -1111,14 +1253,13 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
           {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
-          {activeTab === 'manuals' && <ManualsTab key="mbr-man" store={store} user={user} toast={toast} />}
           {activeTab === 'chat' && <AIChatTab key="mbr-chat" user={user} store={store} />}
-          {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
-          {activeTab === 'history' && <SearchHistoryTab key="mbr-history" user={user} store={store} />}
-          {activeTab === 'warning_lights' && <DynamicResourceTab key="mbr-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
-          {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+          {activeTab === 'live' && <LiveDataTab key="mbr-live" />}
           {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
-          {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">No new transmissions from HQ</div>}
+          {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+          {activeTab === 'manuals' && <UnitManualsTab key="mbr-unit" />}
+          {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
+          {activeTab === 'admin' && <AdminNodeTab key="mbr-admin" />}
           {activeTab === 'profile' && <ProfileTab user={user} store={store} />}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
         </AnimatePresence>
@@ -1263,74 +1404,152 @@ function StatItem({ label, value }: any) {
   );
 }
 
+import { useVehicleStore } from './store/vehicleStore';
+
+function GlobalVehicleSelector() {
+  const { make, model, year, engine, setVehicle } = useVehicleStore();
+
+  return (
+    <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8 mb-8">
+      <div className="flex items-center gap-3 mb-6">
+        <Car size={24} className="text-primary-orange" />
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 1: DYNAMIC MATRIX SELECTOR</h2>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="space-y-2">
+          <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Manufacturer</label>
+          <input 
+            list="makes"
+            value={make}
+            onChange={(e) => setVehicle({ make: e.target.value })}
+            placeholder="e.g. Ford, Toyota..."
+            className="input-field w-full bg-black/40"
+          />
+          <datalist id="makes">
+            {vehicleDatabase.manufacturers.map(mfr => (
+              <option key={mfr.id} value={mfr.name} />
+            ))}
+          </datalist>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Model</label>
+          <input 
+            value={model}
+            onChange={(e) => setVehicle({ model: e.target.value })}
+            placeholder="e.g. F-150, Hilux..."
+            className="input-field w-full bg-black/40"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Year</label>
+          <input 
+            type="number"
+            value={year}
+            onChange={(e) => setVehicle({ year: e.target.value })}
+            placeholder="e.g. 2023"
+            className="input-field w-full bg-black/40"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Engine Configuration</label>
+          <input 
+            value={engine}
+            onChange={(e) => setVehicle({ engine: e.target.value })}
+            placeholder="e.g. 3.5L V6, 2.0L Diesel..."
+            className="input-field w-full bg-black/40"
+          />
+        </div>
+      </div>
+
+      <div className="mt-6 p-4 bg-white/5 border border-primary-orange/20 rounded-lg flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-primary-orange/20 flex items-center justify-center text-primary-orange shrink-0">
+           <Shield size={24} />
+        </div>
+        <div className="flex-1">
+          <div className="text-xs font-bold text-text-primary mb-1 uppercase">
+            {make || 'UNKNOWN'} {model} — {year || 'ANY'} SERIES
+          </div>
+          <div className="text-[10px] text-text-secondary uppercase tracking-widest">
+            DEPLOYED POWERPLANT: <span className="text-primary-orange font-accent">{engine || 'ANY IDENTIFIED CONSTRUCT'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- DTC Lookup Tool Component ---
 function DTCLookupTab({ store, toast, user, ...props }: any) {
-  const [selectedManufacturer, setSelectedManufacturer] = useState('ford');
-  const [selectedModel, setSelectedModel] = useState('f150');
-  const [selectedYear, setSelectedYear] = useState(2023);
-  const [selectedEngine, setSelectedEngine] = useState('');
+  const { make: selectedManufacturer, model: selectedModel, year: selectedYear, engine: selectedEngine } = useVehicleStore();
   const [dtcInput, setDtcInput] = useState('');
   const [searchResults, setSearchResults] = useState<DTC[]>([]);
   const [selectedDTC, setSelectedDTC] = useState<DTC | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const currentManufacturer = vehicleDatabase.manufacturers.find(m => m.id === selectedManufacturer);
-  const currentModel = currentManufacturer?.models.find(m => m.id === selectedModel);
-
-  // Auto-select first engine when model changes
-  useEffect(() => {
-    if (currentModel?.engines) {
-      setSelectedEngine(currentModel.engines[0]);
-    }
-  }, [currentModel]);
-
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    const query = dtcInput.toUpperCase().trim();
+    if (!query) return;
+
     setIsLoading(true);
+    setSearchResults([]);
+    setSelectedDTC(null);
 
-    setTimeout(() => {
-      const query = dtcInput.toUpperCase().trim();
+    let dtcData;
+    try {
+      const res = await api.get(`/dtc/${query}`);
+      dtcData = {
+        ...res.data,
+        id: res.data.code,
+        title: res.data.description,
+      };
       
-      // Combine all DTC databases
-      const allDTCs = [
-        ...(fordDTCDatabase as unknown as DTC[]), 
-        ...(otherMfrDTCs as unknown as DTC[]), 
-        ...(genericDTCs as unknown as DTC[]),
-        ...(komatsuDTCs as unknown as DTC[]),
-        ...store.dtcs
-      ];
+      // Save offline
+      await saveDTCOffline(res.data);
       
-      // Filter by manufacturer if applicable
-      const relevantDTCs = allDTCs.filter(dtc => {
-        // Generic DTCs always show up
-        if (!dtc.manufacturer) return true;
-        
-        if (selectedManufacturer === 'ford') {
-          return dtc.manufacturer === 'ford';
-        }
-        return dtc.manufacturer === selectedManufacturer;
+    } catch (err) {
+      console.error(err);
+      if (toast) toast('Network error. Checking offline database...', 'warning');
+      
+      const offlineData = await getDTCOffline(query);
+      if (offlineData) {
+        dtcData = {
+           ...offlineData,
+           id: offlineData.code,
+           title: offlineData.description,
+           status: 'OFFLINE_CACHE'
+        };
+      } else {
+        if (toast) toast('Fault code not found in offline database.', 'error');
+      }
+    }
+
+    if (dtcData) {
+      setSearchResults([dtcData]);
+      
+      store.addSearchHistory({
+        userId: user.id,
+        query: query,
+        type: 'dtc',
+        timestamp: new Date().toISOString()
       });
+      store.addLog(user.id, `DTC Search`, `Searched for fault code ${query}`);
+      
+      // Store log for sync when offline
+      if (!navigator.onLine) {
+        await addOfflineLog({
+          action: "DTC Search",
+          code: query,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
 
-      // Search by code or title/description
-      const results = relevantDTCs.filter(dtc => 
-        dtc.code.toUpperCase().includes(query) || 
-        (dtc.title && dtc.title.toUpperCase().includes(query)) ||
-        (dtc.description && dtc.description.toUpperCase().includes(query))
-      );
-
-      // Deduplicate results by code
-      const uniqueResults = results.reduce((acc: DTC[], current) => {
-        const x = acc.find(item => item.code === current.code);
-        if (!x) {
-          return acc.concat([current]);
-        } else {
-          return acc;
-        }
-      }, []);
-
-      setSearchResults(uniqueResults);
-      setIsLoading(false);
-    }, 500);
+    setIsLoading(false);
   };
 
   const handleSave = (dtc: DTC) => {
@@ -1345,86 +1564,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Vehicle Selection Section */}
-      <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <Car size={24} className="text-primary-orange" />
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 1: VEHICLE BIOMETRICS</h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {/* Manufacturer Select */}
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Manufacturer</label>
-            <select 
-              value={selectedManufacturer}
-              onChange={(e) => setSelectedManufacturer(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-            >
-              {vehicleDatabase.manufacturers.map(mfr => (
-                <option key={mfr.id} value={mfr.id}>{mfr.logo} {mfr.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Model Select */}
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Model</label>
-            <select 
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-            >
-              {currentManufacturer?.models.map(model => (
-                <option key={model.id} value={model.id}>{model.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Year Select */}
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Year</label>
-            <select 
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-            >
-              {currentModel?.years.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Engine Select */}
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Engine Configuration</label>
-            <select 
-              value={selectedEngine}
-              onChange={(e) => setSelectedEngine(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-            >
-              {currentModel?.engines.map(engine => (
-                <option key={engine} value={engine}>{engine}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Vehicle Info Card */}
-        <div className="mt-6 p-4 bg-white/5 border border-primary-orange/20 rounded-lg flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary-orange/20 flex items-center justify-center text-primary-orange shrink-0">
-             <Shield size={24} />
-          </div>
-          <div className="flex-1">
-            <div className="text-xs font-bold text-text-primary mb-1">
-              {currentManufacturer?.logo} {currentManufacturer?.name} {currentModel?.name} — {selectedYear} SERIES
-            </div>
-            <div className="text-[10px] text-text-secondary uppercase tracking-widest">
-              DEPLOYED POWERPLANT: <span className="text-primary-orange font-accent">{selectedEngine}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <GlobalVehicleSelector />
 
       {/* DTC Search Section */}
       <div className="glass-panel p-6 md:p-8">
@@ -1583,42 +1723,23 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
 
 // --- Dynamic Resource Tab Component ---
 function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any) {
-  const [selectedManufacturer, setSelectedManufacturer] = useState('ford');
-  const [selectedModel, setSelectedModel] = useState('f150');
-  const [selectedYear, setSelectedYear] = useState('2023');
-  const [selectedEngine, setSelectedEngine] = useState('');
+  const { make, model, year, engine } = useVehicleStore();
   
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const currentManufacturer = vehicleDatabase.manufacturers.find(m => m.id === selectedManufacturer);
-  const currentModel = currentManufacturer?.models.find(m => m.id === selectedModel);
-
-  // Auto-select first model and engine
-  useEffect(() => {
-    if (currentManufacturer && !currentManufacturer.models.find(m => m.id === selectedModel)) {
-      setSelectedModel(currentManufacturer.models[0]?.id || '');
-    }
-  }, [currentManufacturer, selectedModel]);
-
-  useEffect(() => {
-    if (currentModel && !currentModel.engines.includes(selectedEngine)) {
-      setSelectedEngine(currentModel.engines[0] || '');
-    }
-  }, [currentModel, selectedEngine]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setResult(null);
 
-    store.addLog(user.id, `AI Data Generation`, `Generated ${type} for ${selectedYear} ${currentManufacturer?.name} ${currentModel?.name}`);
+    store.addLog(user.id, `AI Data Generation`, `Generated ${type} for ${year} ${make} ${model}`);
 
     try {
-      const data = await generateDynamicVehicleData(type, currentManufacturer?.name || selectedManufacturer, currentModel?.name || selectedModel, selectedYear, selectedEngine);
+      const data = await generateDynamicVehicleData(type, make, model, year, engine);
       setResult(data);
-    } catch(err) {
-      if (toast) toast('Failed to retrieve vehicle data module from cloud matrix.', 'error');
+    } catch(err: any) {
+      if (toast) toast(err.message || 'Failed to retrieve vehicle data module from cloud matrix.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -1626,79 +1747,24 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8">
+      <GlobalVehicleSelector />
+      
+      <div className="glass-panel p-6 md:p-8">
         <div className="flex items-center gap-3 mb-6">
           <Icon size={24} className="text-primary-orange" />
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">VEHICLE SELECT: {title}</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Manufacturer</label>
-            <select 
-              value={selectedManufacturer}
-              onChange={(e) => setSelectedManufacturer(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-            >
-              {vehicleDatabase.manufacturers.map((mfr: any) => (
-                <option key={mfr.id} value={mfr.id}>{mfr.logo} {mfr.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Model</label>
-            <select 
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-              disabled={!currentManufacturer || currentManufacturer.models.length === 0}
-            >
-              {currentManufacturer?.models.map(mdl => (
-                <option key={mdl.id} value={mdl.id}>{mdl.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Year</label>
-            <select 
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-              disabled={!currentModel || currentModel.years.length === 0}
-            >
-              {currentModel?.years.map(yr => (
-                <option key={yr} value={yr.toString()}>{yr}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Engine</label>
-            <select 
-              value={selectedEngine}
-              onChange={(e) => setSelectedEngine(e.target.value)}
-              className="input-field cursor-pointer appearance-none bg-black/40"
-              disabled={!currentModel || currentModel.engines.length === 0}
-            >
-              {currentModel?.engines.map(eng => (
-                <option key={eng} value={eng}>{eng}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-end">
+        <form onSubmit={handleSearch} className="flex gap-4 items-center">
             <button 
-              onClick={handleSearch} 
-              disabled={isLoading || !currentModel || !selectedEngine} 
-              className="btn-primary w-full h-[50px] gap-2"
+              type="submit"
+              disabled={isLoading || !make || !model || !year || !engine} 
+              className="btn-primary w-full max-w-sm h-[50px] gap-2"
             >
               <Search size={16} />
               {isLoading ? "Querying..." : "Search"}
             </button>
-          </div>
-        </div>
+        </form>
       </div>
 
       {isLoading && (
@@ -1711,13 +1777,13 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
       {result && !isLoading && (
         <div className="glass-panel p-6 md:p-10 space-y-6">
           <div className="border-b border-white/10 pb-4 mb-4 flex items-center justify-between">
-             <h3 className="text-lg text-primary-orange font-bold uppercase">{selectedYear} {currentManufacturer?.name} {currentModel?.name} - {title}</h3>
+             <h3 className="text-lg text-primary-orange font-bold uppercase">{year} {make} {model} - {title}</h3>
              <button onClick={() => {
                 store.addSavedItem({
                   userId: user.id,
                   type: 'Article (AI)',
-                  itemId: `${type}-${selectedYear}-${selectedModel}`,
-                  title: `${selectedYear} ${currentManufacturer?.name} ${currentModel?.name} - ${title}`
+                  itemId: `${type}-${year}-${model}`,
+                  title: `${year} ${make} ${model} - ${title}`
                 });
                 if (toast) toast('Report saved to Neural Library', 'success');
              }} className="btn-secondary h-10 px-4 gap-2 text-[10px]">
@@ -2192,6 +2258,7 @@ function AIChatTab({ user, store, ...props }: any) {
   const [loading, setLoading] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { make, model, year, engine } = useVehicleStore();
 
   const myMessages = store.chatLogs.filter((m: any) => m.userId === user.id);
 
@@ -2209,14 +2276,11 @@ function AIChatTab({ user, store, ...props }: any) {
     setLoading(true);
 
     try {
-      const history = store.chatLogs
-        .filter((m: any) => m.userId === user.id)
-        .map((m: any) => ({
-          role: m.role === 'ai' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-        }));
-
-      const resp = await askAutomotiveAssistant(userText, history);
+      const res = await api.post("/ai/diagnose", {
+        vehicle: { make, model, year, engine },
+        query: userText
+      });
+      const resp = res.data.answer;
       store.addChatMessage(user.id, 'ai', resp);
       if (autoSpeak) speakText(resp, true);
     } catch (err) {

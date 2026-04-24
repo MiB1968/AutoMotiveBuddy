@@ -1,0 +1,38 @@
+[
+  {
+    "code": "P0101",
+    "description": "Mass Air Flow Sensor Range/Performance",
+    "system": "Powertrain",
+    "severity": "Medium",
+    "causes": "Dirty MAF sensor, vacuum leak",
+    "solutions": "Clean or replace MAF sensor",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0102",
+    "description": "Mass or Volume Air Flow Circuit Low Input",
+    "system": "Powertrain",
+    "severity": "Medium",
+    "causes": "Faulty MAF sensor, intake leak, wiring issue",
+    "solutions": "Test MAF wiring, replace sensor",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0300",
+    "description": "Random/Multiple Cylinder Misfire Detected",
+    "system": "Powertrain",
+    "severity": "High",
+    "causes": "Faulty spark plugs, ignition coils, low fuel pressure, vacuum leak",
+    "solutions": "Inspect plugs, test coils, check fuel pressure",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0420",
+    "description": "Catalyst System Efficiency Below Threshold (Bank 1)",
+    "system": "Emissions",
+    "severity": "Low",
+    "causes": "Failed catalytic converter, faulty O2 sensor, exhaust leak",
+    "solutions": "Replace catalytic converter, replace O2 sensor",
+    "manufacturer": "Generic"
+  }
+]
