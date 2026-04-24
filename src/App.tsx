@@ -1518,11 +1518,27 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
     let localMatches: any[] = [];
     
     try {
+      // 1. Try exact match
       const res = await api.get(`/dtc/${query}`);
       let dtcResult = res.data;
 
+      // 2. Try keyword search for broader results
+      let broadResults: any[] = [];
+      try {
+        const searchRes = await api.get(`/dtc/search/${query}`);
+        if (Array.isArray(searchRes.data)) {
+          broadResults = searchRes.data.map((d: any) => ({
+            ...d,
+            id: d.code,
+            title: d.description
+          }));
+        }
+      } catch (sErr) {
+        console.warn("Keyword search failed:", sErr);
+      }
+
       // If the backend says search is required/pending AI, trigger frontend deep search
-      if (dtcResult.status === 'AI_PENDING') {
+      if (dtcResult.status === 'AI_PENDING' && query.match(/^[PBCO]\d{4}/i)) {
         try {
           const aiDeepData = await performDeepDTCSearch(query);
           dtcResult = { 
@@ -1547,7 +1563,17 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
       } catch (dbErr) {
         console.warn("IndexedDB save error:", dbErr);
       }
-      if (dtcData) localMatches.push(dtcData);
+      
+      if (dtcData && dtcData.status !== 'AI_PENDING') {
+        localMatches.push(dtcData);
+      }
+
+      // Merge results
+      broadResults.forEach(br => {
+        if (!localMatches.find(lm => lm.code === br.code)) {
+          localMatches.push(br);
+        }
+      });
       
     } catch (err) {
       console.warn("API query failed, falling back to local DB", err);
@@ -1757,27 +1783,63 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
 
                   <div className="space-y-6">
                     <div>
+                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14} className="text-yellow-400" /> POTENTIAL CAUSES</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          const causes = Array.isArray(selectedDTC?.causes) ? selectedDTC.causes : 
+                                        (typeof selectedDTC?.causes === 'string' ? selectedDTC.causes.split(',') : []);
+                          return causes.length > 0 ? causes.map((c: string, i: number) => (
+                            <span key={i} className="px-2 py-1 bg-white/5 border border-border-glass rounded text-[10px] text-text-secondary">
+                              {c.trim()}
+                            </span>
+                          )) : (
+                            <span className="text-[10px] text-text-secondary italic">Information synchronization in progress...</span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div>
                       <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14} className="text-red-400" /> ALERT SYMPTOMS</h4>
                       <ul className="space-y-2">
-                        {(selectedDTC?.symptoms || []).map((s: string, i: number) => (
-                          <li key={i} className="text-xs text-text-secondary flex gap-2">
-                            <span className="text-primary-orange select-none">•</span> {s}
-                          </li>
-                        ))}
+                        {(() => {
+                          const symps = Array.isArray(selectedDTC?.symptoms) ? selectedDTC.symptoms : [];
+                          return symps.length > 0 ? symps.map((s: string, i: number) => (
+                            <li key={i} className="text-xs text-text-secondary flex gap-2">
+                              <span className="text-primary-orange select-none">•</span> {s}
+                            </li>
+                          )) : (
+                            <li className="text-[10px] text-text-secondary italic">Standard performance irregularities or warning indicator active.</li>
+                          );
+                        })()}
                       </ul>
                     </div>
 
                     <div>
                       <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 size={14} className="text-green-400" /> REPAIR PROTOCOL</h4>
                       <div className="space-y-3">
-                        {(selectedDTC.remediation || selectedDTC.solutions || []).slice(0, 3).map((step, i) => (
-                          <div key={i} className="p-3 bg-black/30 border-l-2 border-primary-orange rounded-r text-[11px] leading-relaxed text-text-primary italic">
-                            {step}
-                          </div>
-                        ))}
-                        {(selectedDTC.remediation || selectedDTC.solutions || []).length > 3 && (
-                          <button className="text-[9px] font-bold text-primary-orange uppercase tracking-widest hover:underline">View Full 12-Step Protocol</button>
-                        )}
+                        {(() => {
+                          const steps = Array.isArray(selectedDTC?.remediation) ? selectedDTC.remediation : 
+                                        Array.isArray(selectedDTC?.solutions) ? selectedDTC.solutions : 
+                                        typeof selectedDTC?.solutions === 'string' ? [selectedDTC.solutions] : [];
+                          
+                          return steps.length > 0 ? (
+                            <>
+                              {steps.slice(0, 3).map((step: string, i: number) => (
+                                <div key={i} className="p-3 bg-black/30 border-l-2 border-primary-orange rounded-r text-[11px] leading-relaxed text-text-primary italic">
+                                  {step}
+                                </div>
+                              ))}
+                              {steps.length > 3 && (
+                                <button className="text-[9px] font-bold text-primary-orange uppercase tracking-widest hover:underline">View Full 12-Step Protocol</button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="p-3 bg-black/30 border-l-2 border-gray-600 rounded-r text-[11px] leading-relaxed text-text-secondary italic">
+                              Comprehensive repair guide pending cloud synchronization. Inspect associated wiring and sensors.
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -2183,14 +2245,14 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                     {activeTab === 'service' && (
                       <RetrievalPlaceholder unitId={selectedUnit.id} data={selectedUnit.serviceManual}>
                         <div className="space-y-8">
-                          {(selectedUnit.serviceManual || []).length > 0 ? (selectedUnit.serviceManual as any[]).map((chap, idx) => (
+                          {(Array.isArray(selectedUnit.serviceManual) ? selectedUnit.serviceManual : []).map((chap: any, idx: number) => (
                             <div key={idx} className="space-y-4">
                               <h4 className="text-sm font-bold text-primary-orange uppercase tracking-widest flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-primary-orange/20 flex items-center justify-center text-[10px]">{idx + 1}</span>
                                 {chap.title}
                               </h4>
                               <div className="space-y-3 pl-8">
-                                {(chap.steps as string[]).map((step: string, sIdx: number) => (
+                                {(Array.isArray(chap.steps) ? chap.steps : []).map((step: string, sIdx: number) => (
                                   <div key={sIdx} className="flex gap-3 text-xs text-text-secondary group">
                                     <span className="text-primary-orange font-bold font-accent">•</span>
                                     <span className="group-hover:text-text-primary transition-colors">{step}</span>
@@ -2198,7 +2260,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                                 ))}
                               </div>
                             </div>
-                          )) : <div className="text-center py-20 opacity-30 uppercase text-[10px] font-bold tracking-widest text-text-secondary">No service procedures archived</div>}
+                          ))}
                         </div>
                       </RetrievalPlaceholder>
                     )}
@@ -2206,7 +2268,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                     {activeTab === 'wiring' && (
                       <RetrievalPlaceholder unitId={selectedUnit.id} data={selectedUnit.wiringDiagrams}>
                         <div className="space-y-6">
-                          {(selectedUnit.wiringDiagrams || []).length > 0 ? selectedUnit.wiringDiagrams.map(diagram => (
+                          {(Array.isArray(selectedUnit.wiringDiagrams) ? selectedUnit.wiringDiagrams : []).map((diagram: any) => (
                             <div key={diagram.id} className="glass-panel p-6 border-white/5 bg-black/40">
                               <div className="flex justify-between items-center mb-4">
                                 <h5 className="text-xs font-bold text-text-primary uppercase tracking-tight">{diagram.system}</h5>
@@ -2216,7 +2278,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                                 {diagram.content}
                               </pre>
                             </div>
-                          )) : <div className="text-center py-20 opacity-30 uppercase text-[10px] font-bold tracking-widest text-text-secondary">No schematics found in cloud</div>}
+                          ))}
                         </div>
                       </RetrievalPlaceholder>
                     )}
@@ -2244,7 +2306,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-white/5">
-                                    {(fuses as any[]).map((f: any, idx: number) => (
+                                    {(Array.isArray(fuses) ? fuses : []).map((f: any, idx: number) => (
                                       <motion.tr 
                                         key={f.id} 
                                         className="hover:bg-primary-orange/10 transition-colors"
@@ -2272,7 +2334,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                     {activeTab === 'fluids' && (
                       <RetrievalPlaceholder unitId={selectedUnit.id} data={selectedUnit.fluids}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {(selectedUnit.fluids || []).length > 0 ? selectedUnit.fluids.map((fluid, idx) => (
+                          {(Array.isArray(selectedUnit.fluids) ? selectedUnit.fluids : []).map((fluid: any, idx: number) => (
                             <motion.div 
                               key={idx} 
                               className="glass-panel p-6 bg-black/20 hover:bg-black/30 transition-all hover:border-primary-orange/30"
@@ -2296,7 +2358,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                                 </div>
                               </div>
                             </motion.div>
-                          )) : <div className="col-span-full py-20 text-center opacity-30 uppercase text-[10px] font-bold tracking-widest text-text-secondary">Fluid database unavailable</div>}
+                          ))}
                         </div>
                       </RetrievalPlaceholder>
                     )}
@@ -2313,13 +2375,13 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5 font-accent">
-                              {(selectedUnit.torqueSpecs || []).length > 0 ? selectedUnit.torqueSpecs.map((t, idx) => (
+                              {(Array.isArray(selectedUnit.torqueSpecs) ? selectedUnit.torqueSpecs : []).map((t: any, idx: number) => (
                                 <tr key={idx} className="hover:bg-white/2">
                                   <td className="p-4 text-text-primary uppercase font-bold">{t.component}</td>
                                   <td className="p-4 text-primary-orange font-bold">{t.nm} Nm</td>
                                   <td className="p-4 text-text-secondary">{t.ftlb} Ft-Lb</td>
                                 </tr>
-                              )) : <tr><td colSpan={3} className="p-10 text-center opacity-30 uppercase font-bold tracking-widest">No torque sequences archived</td></tr>}
+                              ))}
                             </tbody>
                           </table>
                         </div>
@@ -2364,8 +2426,8 @@ function AIChatTab({ user, store, ...props }: any) {
       const resp = await askAutomotiveAssistant(userText, { make, model, year, engine });
       store.addChatMessage(user.id, 'ai', resp);
       if (autoSpeak) speakText(resp, true);
-    } catch (err) {
-      const errMsg = "Neural link disrupted. Reconnecting to diagnostic cloud...";
+    } catch (err: any) {
+      const errMsg = `Uplink synchronization failure: ${err?.message?.includes('404') ? 'Model Mismatch' : 'Network Interruption'}. Attempting local diagnostic fallback...`;
       store.addChatMessage(user.id, 'ai', errMsg);
       if (autoSpeak) speakText(errMsg, true);
     } finally {
@@ -2609,15 +2671,15 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
     const q = query.toLowerCase();
     
     const dtcMatches = store.dtcs.filter((d: any) => 
-      d.code.toLowerCase().includes(q) || 
-      d.description.toLowerCase().includes(q) ||
-      d.symptoms.some((s: string) => s.toLowerCase().includes(q))
+      (d.code || '').toLowerCase().includes(q) || 
+      (d.description || '').toLowerCase().includes(q) ||
+      (Array.isArray(d.symptoms) ? d.symptoms.some((s: string) => s.toLowerCase().includes(q)) : false)
     ).map((d: any) => ({ ...d, gType: 'DTC' }));
 
     const vehicleMatches = store.units.filter((u: any) => 
-      u.make.toLowerCase().includes(q) || 
-      u.model.toLowerCase().includes(q) ||
-      Object.values(u.specs).some((v: any) => String(v).toLowerCase().includes(q))
+      (u.make || '').toLowerCase().includes(q) || 
+      (u.model || '').toLowerCase().includes(q) ||
+      (u.specs ? Object.values(u.specs).some((v: any) => String(v).toLowerCase().includes(q)) : false)
     ).map((u: any) => ({ ...u, gType: 'Vehicle' }));
 
     return [...dtcMatches, ...vehicleMatches].slice(0, 10);

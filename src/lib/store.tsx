@@ -1399,15 +1399,15 @@ export function useStore() {
   const updateUser = (id: string, updates: Partial<User>) => {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
   };
-  const deleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
+  const deleteUser = (id: string) => setUsers(prev => prev.filter(u => u.id !== id));
 
-  const addDtc = (dtc: DTC) => setDtcs([...dtcs, dtc]);
+  const addDtc = (dtc: DTC) => setDtcs(prev => [...prev, dtc]);
   const updateDtc = (id: string, updates: Partial<DTC>) => {
-    setDtcs(dtcs.map(d => d.id === id ? { ...d, ...updates } : d));
+    setDtcs(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
   };
-  const deleteDtc = (id: string) => setDtcs(dtcs.filter(d => d.id !== id));
+  const deleteDtc = (id: string) => setDtcs(prev => prev.filter(d => d.id !== id));
 
-  const addAnnouncement = (a: Announcement) => setAnnouncements([a, ...announcements]);
+  const addAnnouncement = (a: Announcement) => setAnnouncements(prev => [a, ...prev]);
   
   const addLog = (userId: string, username: string, action: string, details: string) => {
     const newLog: ActivityLog = {
@@ -1418,7 +1418,7 @@ export function useStore() {
       details,
       timestamp: new Date().toISOString(),
     };
-    setLogs([newLog, ...logs].slice(0, 500));
+    setLogs(prev => [newLog, ...prev].slice(0, 500));
   };
 
   const addChatMessage = (userId: string, role: 'user' | 'ai', content: string) => {
@@ -1429,7 +1429,7 @@ export function useStore() {
       content,
       timestamp: new Date().toISOString(),
     };
-    setChatLogs([...chatLogs, newMessage]);
+    setChatLogs(prev => [...prev, newMessage]);
   };
 
   const toggleFavorite = (dtcId: string) => {

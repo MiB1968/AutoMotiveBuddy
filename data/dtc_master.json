@@ -1,38 +1,152 @@
 [
   {
-    "code": "P0101",
-    "description": "Mass Air Flow Sensor Range/Performance",
-    "system": "Powertrain",
-    "severity": "Medium",
-    "causes": "Dirty MAF sensor, vacuum leak",
-    "solutions": "Clean or replace MAF sensor",
-    "manufacturer": "Generic"
-  },
-  {
-    "code": "P0102",
-    "description": "Mass or Volume Air Flow Circuit Low Input",
-    "system": "Powertrain",
-    "severity": "Medium",
-    "causes": "Faulty MAF sensor, intake leak, wiring issue",
-    "solutions": "Test MAF wiring, replace sensor",
-    "manufacturer": "Generic"
-  },
-  {
     "code": "P0300",
     "description": "Random/Multiple Cylinder Misfire Detected",
+    "causes": ["Bad fuel", "Vacuum leak", "Ignition issue", "Faulty spark plugs", "Ignition coils"],
+    "symptoms": ["Rough idle", "Engine shaking", "Loss of power", "Poor acceleration"],
+    "solutions": ["Check spark plugs", "Check fuel system", "Test ignition coils", "Inspect for vacuum leaks"],
+    "severity": "high",
     "system": "Powertrain",
-    "severity": "High",
-    "causes": "Faulty spark plugs, ignition coils, low fuel pressure, vacuum leak",
-    "solutions": "Inspect plugs, test coils, check fuel pressure",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0301",
+    "description": "Cylinder 1 Misfire",
+    "causes": ["Bad spark plug", "Faulty ignition coil", "Injector cleaner requirement", "Low compression"],
+    "symptoms": ["Engine vibration", "Loss of power", "Jerking during acceleration"],
+    "solutions": ["Replace spark plug", "Replace ignition coil", "Swap coil with cylinder 2 to test"],
+    "severity": "medium",
+    "system": "Powertrain",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0171",
+    "description": "System Too Lean (Bank 1)",
+    "causes": ["Vacuum leak", "Dirty MAF sensor", "Faulty fuel pump", "Clogged fuel filter"],
+    "symptoms": ["Poor acceleration", "Engine hesitation", "Check engine light"],
+    "solutions": ["Clean MAF sensor", "Fix vacuum leaks", "Check fuel pressure"],
+    "severity": "medium",
+    "system": "Powertrain",
     "manufacturer": "Generic"
   },
   {
     "code": "P0420",
     "description": "Catalyst System Efficiency Below Threshold (Bank 1)",
+    "causes": ["Bad catalytic converter", "O2 sensor failure", "Exhaust leak", "Engine misfire damage"],
+    "symptoms": ["Check engine light", "Reduced performance", "Sulfur smell"],
+    "solutions": ["Replace catalytic converter", "Check O2 sensor", "Fix exhaust leaks"],
+    "severity": "high",
     "system": "Emissions",
-    "severity": "Low",
-    "causes": "Failed catalytic converter, faulty O2 sensor, exhaust leak",
-    "solutions": "Replace catalytic converter, replace O2 sensor",
     "manufacturer": "Generic"
+  },
+  {
+    "code": "P0133",
+    "description": "O2 Sensor Slow Response (Bank 1 Sensor 1)",
+    "causes": ["Aging O2 sensor", "Wiring issue", "Exhaust leak near sensor"],
+    "symptoms": ["Poor fuel economy", "Failed emissions test"],
+    "solutions": ["Replace O2 sensor", "Inspect sensor wiring harness"],
+    "severity": "low",
+    "system": "Emissions",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0101",
+    "description": "Mass Air Flow Sensor Range/Performance",
+    "causes": ["Dirty MAF sensor", "Vacuum leak", "Restricted intake air flow"],
+    "symptoms": ["Check Engine Light", "Poor fuel economy", "Engine stalling"],
+    "solutions": ["Clean or replace MAF sensor", "Check air filter condition"],
+    "severity": "medium",
+    "system": "Powertrain",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0102",
+    "description": "Mass or Volume Air Flow Circuit Low Input",
+    "causes": ["Faulty MAF sensor", "Intake leak", "Wiring issue", "Blown fuse"],
+    "symptoms": ["Hard starting", "Rough idle", "Engine stall"],
+    "solutions": ["Test MAF wiring", "Replace sensor", "Verify power and ground to sensor"],
+    "severity": "medium",
+    "system": "Powertrain",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0500",
+    "description": "Vehicle Speed Sensor (VSS) Malfunction",
+    "causes": ["Faulty speed sensor", "Wiring issue", "Instrument cluster failure", "Transmission problem"],
+    "symptoms": ["Inaccurate speedometer", "ABS light on", "Erratic transmission shifting"],
+    "solutions": ["Check speed sensor wiring", "Test/Replace vehicle speed sensor", "Inspect speedometer function"],
+    "severity": "medium",
+    "system": "Vehicle Controls",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0113",
+    "description": "Intake Air Temperature (IAT) Sensor 1 Circuit High Input",
+    "causes": ["Faulty IAT sensor", "Open circuit in sensor wiring", "Dirty air filter", "Faulty ECU"],
+    "symptoms": ["Check engine light", "Hard starting", "Rich fuel mixture"],
+    "solutions": ["Clean or replace IAT sensor", "Verify harness integrity", "Check ECU ground"],
+    "severity": "low",
+    "system": "Powertrain",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "P0442",
+    "description": "Evaporative Emission (EVAP) System Leak Detected (Small Leak)",
+    "causes": ["Loose or damaged gas cap", "Leaky charcoal canister", "Damaged EVAP hose", "Vent solenoid failure"],
+    "symptoms": ["Check engine light", "Faint fuel odor"],
+    "solutions": ["Tighten or replace gas cap", "Perform an EVAP smoke test", "Inspect charcoal canister hoses"],
+    "severity": "low",
+    "system": "Emissions",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "C0035",
+    "description": "Left Front Wheel Speed Sensor Circuit Malfunction",
+    "causes": ["Faulty ABS sensor", "Damaged sensor tone ring", "Wiring connector corrosion"],
+    "symptoms": ["ABS warning light", "Traction control light", "Erratic braking assist"],
+    "solutions": ["Inspect wheel speed sensor wiring", "Clean tone ring", "Replace wheel speed sensor"],
+    "severity": "medium",
+    "system": "Braking/Chassis",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "B1202",
+    "description": "Fuel Sender Circuit Open",
+    "causes": ["Faulty fuel level sender", "Broken fuel pump harness wiring", "Instrument cluster fault"],
+    "symptoms": ["Fuel gauge shows empty", "Inaccurate range-to-empty reading"],
+    "solutions": ["Check fuel pump assembly connector", "Test fuel sender resistance", "Verify wiring continuity"],
+    "severity": "low",
+    "system": "Instruments/Body",
+    "manufacturer": "Generic"
+  },
+  {
+    "code": "E11",
+    "description": "Engine Oil Pressure Low (Komatsu Error)",
+    "causes": ["Low oil level", "Faulty oil pressure switch", "Oil pump failure", "Clogged oil filter"],
+    "symptoms": ["Warning light on dashboard", "Engine derate or shutdown"],
+    "solutions": ["Check oil level immediately", "Inspect pressure sensor wiring", "Replace oil filter", "Test oil pump pressure"],
+    "severity": "critical",
+    "system": "Lubrication System",
+    "manufacturer": "Komatsu"
+  },
+  {
+    "code": "E15",
+    "description": "Water Temperature High (Komatsu Error)",
+    "causes": ["Clogged radiator", "Damaged fan belt", "Faulty thermostat", "Low coolant level"],
+    "symptoms": ["Dashboard temperature gauge rising", "Engine power reduction"],
+    "solutions": ["Check coolant level and concentration", "Inspect radiator for debris", "Test thermostat operation"],
+    "severity": "critical",
+    "system": "Cooling System",
+    "manufacturer": "Komatsu"
+  },
+  {
+    "code": "L03",
+    "description": "Electronic Control System Failure",
+    "causes": ["Voltage spikes", "Harness damage", "Internal controller fault"],
+    "symptoms": ["Intermittent machine function", "Display errors"],
+    "solutions": ["Restart system", "Inspect controller wiring", "Check battery voltage"],
+    "severity": "high",
+    "system": "Electronics",
+    "manufacturer": "Komatsu"
   }
 ]

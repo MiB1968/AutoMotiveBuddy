@@ -45,19 +45,34 @@ async function startServer() {
 
   // --- API ROUTES ---
 
+  // NEW: Search DTC by keyword
+  app.get('/api/dtc/search/:keyword', (req, res) => {
+    const { keyword } = req.params;
+    const q = keyword.toLowerCase();
+
+    const results = dtcMaster.filter(d =>
+      d.code.toLowerCase().includes(q) ||
+      d.description.toLowerCase().includes(q) ||
+      (d.system && d.system.toLowerCase().includes(q))
+    );
+
+    res.json(results.slice(0, 50)); // Limit to 50 results
+  });
+
   // DTC Route (Multi-Layer Logic)
   app.get('/api/dtc/:code', async (req, res) => {
     const code = req.params.code.toUpperCase();
-    
+
     // 1. Verified Lookups
     const dtc = dtcMaster.find(d => d.code === code);
     if (dtc) {
-      return res.json({ 
-        ...dtc, 
-        symptoms: typeof dtc.causes === 'string' ? dtc.causes.split(',') : (dtc.symptoms || []),
-        solutions: typeof dtc.solutions === 'string' ? dtc.solutions.split(',') : (dtc.solutions || []),
-        status: "VERIFIED", 
-        confidence: 1.0 
+      return res.json({
+        ...dtc,
+        causes: Array.isArray(dtc.causes) ? dtc.causes : (typeof dtc.causes === 'string' ? dtc.causes.split(',') : []),
+        symptoms: Array.isArray(dtc.symptoms) ? dtc.symptoms : (typeof dtc.symptoms === 'string' ? dtc.symptoms.split(',') : []),
+        solutions: Array.isArray(dtc.solutions) ? dtc.solutions : (typeof dtc.solutions === 'string' ? dtc.solutions.split(',') : []),
+        status: "VERIFIED",
+        confidence: 1.0
       });
     }
 
