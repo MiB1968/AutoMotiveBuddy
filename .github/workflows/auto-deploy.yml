@@ -12,10 +12,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Build Docker Images
+      - name: Build and Verify (Dry Run)
         run: |
-          docker build -t auto-backend ./backend
-          docker build -t auto-frontend ./frontend
+          docker build -t automotive-buddy .
 
       - name: Deploy to AWS EC2 (Auto Sync)
         uses: appleboy/ssh-action@v1.0.0
