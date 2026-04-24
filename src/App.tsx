@@ -1183,13 +1183,13 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
-      <div className="p-4 border-t border-border-glass">
+      <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
           <UserAvatar user={user} size="md" />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
-              <div className="text-[11px] text-text-secondary">Super Administrator</div>
+              <div className="text-[11px] text-orange font-bold uppercase tracking-widest">Master Admin</div>
             </div>
           )}
           {(!sidebarCollapsed || mobileMenuOpen) && (
@@ -1198,6 +1198,13 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
             </button>
           )}
         </div>
+        {(!sidebarCollapsed || mobileMenuOpen) && (
+          <div className="pt-2 flex items-center justify-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
+            <div className="h-px w-4 bg-white/20" />
+            <span className="text-[9px] font-accent font-bold uppercase tracking-[0.2em] whitespace-nowrap">Developed by Ruben Llego</span>
+            <div className="h-px w-4 bg-white/20" />
+          </div>
+        )}
       </div>
     </>
   );
@@ -1304,7 +1311,7 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
-      <div className="p-4 border-t border-border-glass">
+      <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
           <UserAvatar user={user} size="md" />
           {(!sidebarCollapsed || mobileMenuOpen) && (
@@ -1319,6 +1326,13 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
             </button>
           )}
         </div>
+        {(!sidebarCollapsed || mobileMenuOpen) && (
+          <div className="pt-2 flex items-center justify-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
+            <div className="h-px w-4 bg-white/20" />
+            <span className="text-[9px] font-accent font-bold uppercase tracking-[0.2em] whitespace-nowrap">Developed by Ruben Llego</span>
+            <div className="h-px w-4 bg-white/20" />
+          </div>
+        )}
       </div>
     </>
   );
