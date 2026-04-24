@@ -16,7 +16,8 @@ import {
   BookOpen, Truck, Tractor, Bike, Car, Download, CloudDownload,
   Calendar, FileText, ChevronDown, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer,
-  Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX
+  Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
+  Mic, MicOff
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
@@ -892,12 +893,55 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
 }
 
 // --- Shared Utilities ---
+const isTagalog = (text: string) => {
+  const commonTagalog = [
+    'ang', 'ng', 'mga', 'sa', 'ay', 'may', 'ito', 'siya', 'ako', 'po', 'opo', 'ano', 'saan', 'kailan', 'bakit', 'paano', 'salamat', 'kamusta', 'tagalog',
+    'kumusta', 'mabuti', 'natin', 'inyo', 'kami', 'tayo', 'sila', 'ito', 'iyon', 'doon', 'dito', 'gaano', 'alin', 'sino', 'kanino', 'nasaan',
+    'magkano', 'ilan', 'kasi', 'dahil', 'ngunit', 'pero', 'subalit', 'habang', 'kapag', 'kung', 'maging', 'para', 'upang', 'kahit', 'bagaman',
+    'pwedeng', 'pwede', 'nagawa', 'gagawin', 'tulungan', 'tulong', 'kotse', 'sasakyan', 'makina'
+  ];
+  const words = text.toLowerCase().split(/\W+/);
+  return words.some(word => commonTagalog.includes(word));
+};
+
 const speakText = (text: string, enabled: boolean) => {
   if (!enabled || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const cleanText = text.replace(/[*_#]/g, '');
+  
+  // Remove markdown and unwanted symbols
+  const cleanText = text.replace(/[*_#]/g, '').replace(/\[.*?\]/g, '').trim();
+  if (!cleanText) return;
+
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  // utterance.voice = window.speechSynthesis.getVoices().find(v => v.lang.includes('en-US')) || null;
+  
+  // Wait for voices to be loaded if they aren't
+  const getBestVoice = () => {
+    const voices = window.speechSynthesis.getVoices();
+    const isTagalogText = isTagalog(cleanText);
+    
+    if (isTagalogText) {
+      utterance.lang = 'tl-PH';
+      // Priority: Natural/Google voices usually sound better
+      const filVoices = voices.filter(v => v.lang.includes('tl') || v.lang.includes('fil') || v.name.toLowerCase().includes('tagalog') || v.name.toLowerCase().includes('filipino'));
+      const bestFil = filVoices.find(v => v.name.includes('Google') || v.name.includes('Natural')) || filVoices[0];
+      if (bestFil) utterance.voice = bestFil;
+      utterance.rate = 1.0; 
+      utterance.pitch = 1.0;
+    } else {
+      utterance.lang = 'en-US';
+      const enVoices = voices.filter(v => v.lang.includes('en-US'));
+      const bestEn = enVoices.find(v => v.name.includes('Google') || v.name.includes('Natural')) || enVoices[0];
+      if (bestEn) utterance.voice = bestEn;
+      utterance.rate = 1.0;
+    }
+  };
+
+  getBestVoice();
+  // Some browsers need a tiny delay or event listener for getVoices()
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.onvoiceschanged = getBestVoice;
+  }
+
   window.speechSynthesis.speak(utterance);
 };
 
@@ -908,7 +952,44 @@ function ChatBot({ currentUser, store, toast }: any) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast("Speech recognition is not supported in your browser.", "error");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    // Default to Tagalog if the text likely is Tagalog or if starting fresh
+    recognition.lang = (input && isTagalog(input)) ? 'tl-PH' : 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event: any) => {
+      console.error("Speech Recognition Error:", event.error);
+      setIsListening(false);
+    };
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      // Optional: auto-send if you want it faster
+      // setTimeout(() => handleSend(), 500); 
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -974,18 +1055,20 @@ function ChatBot({ currentUser, store, toast }: any) {
                       <div className="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Online Diagnostics Matrix</div>
                    </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                    <button 
                      onClick={() => {
-                        setAutoSpeak(!autoSpeak);
-                        if (autoSpeak) window.speechSynthesis.cancel();
+                        const newState = !autoSpeak;
+                        setAutoSpeak(newState);
+                        if (!newState) window.speechSynthesis.cancel();
+                        toast(newState ? "AI Voice established" : "AI Voice deactivated", newState ? "success" : "info");
                      }} 
-                     className={`transition-colors ${autoSpeak ? 'text-green-400' : 'text-text-muted hover:text-white'}`}
-                     title={autoSpeak ? "Voice Response ON" : "Voice Response OFF"}
+                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 ${autoSpeak ? 'bg-orange/10 border-orange/40 text-orange shadow-[0_0_10px_rgba(249,115,22,0.2)]' : 'bg-white/5 border-white/10 text-text-muted hover:text-white'}`}
                    >
-                     {autoSpeak ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                     {autoSpeak ? <Volume2 size={14} className="animate-pulse" /> : <VolumeX size={14} />}
+                     <span className="text-[9px] font-bold uppercase tracking-wider">{autoSpeak ? 'Voice On' : 'Voice Off'}</span>
                    </button>
-                   <button onClick={() => setIsOpen(false)} className="text-text-muted hover:text-orange transition-colors"><X size={18} /></button>
+                   <button onClick={() => setIsOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-orange hover:bg-orange/10 transition-all"><X size={18} /></button>
                 </div>
              </header>
 
@@ -1019,24 +1102,41 @@ function ChatBot({ currentUser, store, toast }: any) {
              </div>
 
              <footer className="p-4 bg-sidebar-bg/50 border-t border-white/5">
-                <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar scroll-smooth">
-                   {['🔍 Search DTC', '🚗 Guide', '💳 Pricing', '🆘 Support'].map(chip => (
-                      <button key={chip} onClick={() => setInput(chip.replace(/[^a-zA-Z\s]/g, '').trim())} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-white/5 text-[9px] font-accent font-bold uppercase tracking-widest text-text-muted hover:border-orange hover:text-orange transition-all cursor-pointer">
-                        {chip}
-                      </button>
-                   ))}
+                <div className="flex justify-between items-center mb-3">
+                   <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+                      {['🔍 Search DTC', '🚗 Guide', '💳 Pricing', '🆘 Support', '🇵🇭 Tagalog Help'].map(chip => (
+                         <button key={chip} onClick={() => setInput(chip.replace(/[^a-zA-Z\s]/g, '').trim())} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-white/5 text-[9px] font-accent font-bold uppercase tracking-widest text-text-muted hover:border-orange hover:text-orange transition-all cursor-pointer">
+                           {chip}
+                         </button>
+                      ))}
+                   </div>
+                   {autoSpeak && (
+                     <div className="flex items-center gap-1.5 text-orange animate-pulse ml-2 px-2 py-1 bg-orange/5 rounded-md border border-orange/20">
+                        <Volume2 size={10} />
+                        <span className="text-[8px] font-bold uppercase tracking-tighter">AI Voice</span>
+                     </div>
+                   )}
                 </div>
-                <form onSubmit={handleSend} className="relative">
-                   <input 
-                     type="text" 
-                     placeholder="Inquire the matrix..." 
-                     className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 text-[11px] text-text-primary focus:outline-none focus:border-orange/50 transition-all pr-12"
-                     value={input}
-                     onChange={e => setInput(e.target.value.slice(0, 500))}
-                     maxLength={500}
-                   />
-                   <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-orange text-white flex items-center justify-center hover:bg-orange-dark transition-colors ripple">
-                     <ArrowRight size={16} />
+                <form onSubmit={handleSend} className="relative flex items-center gap-2">
+                   <div className="relative flex-1">
+                      <input 
+                        type="text" 
+                        placeholder="Inquire the matrix..." 
+                        className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 text-[11px] text-text-primary focus:outline-none focus:border-orange/50 transition-all pr-10"
+                        value={input}
+                        onChange={e => setInput(e.target.value.slice(0, 500))}
+                        maxLength={500}
+                      />
+                      <button 
+                        type="button"
+                        onClick={toggleListening}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${isListening ? 'bg-red text-white animate-pulse' : 'text-text-muted hover:text-white'}`}
+                      >
+                        {isListening ? <Mic size={14} /> : <Mic size={14} />}
+                      </button>
+                   </div>
+                   <button type="submit" className="w-10 h-10 shrink-0 rounded-xl bg-orange text-white flex items-center justify-center hover:bg-orange-dark transition-colors ripple shadow-lg shadow-orange/20">
+                     <ArrowRight size={18} />
                    </button>
                 </form>
              </footer>
