@@ -29,6 +29,37 @@ import HUDPanel from './components/HUDPanel';
 import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
 import { syncData } from './sync/syncEngine';
 
+// --- UI Helper Components ---
+
+function FloatingBackground() {
+  const icons = [Wrench, Cpu, Map, History, Shield, Zap, Activity, Car, Truck, ToolIcon];
+  return (
+    <div className="floating-bg">
+      {[...Array(20)].map((_, i) => {
+        const Icon = icons[i % icons.length];
+        const top = Math.random() * 100;
+        const left = Math.random() * 100;
+        const delay = Math.random() * 5;
+        const size = 20 + Math.random() * 30;
+        return (
+          <div 
+            key={i}
+            className="float-icon absolute"
+            style={{ 
+              top: `${top}%`, 
+              left: `${left}%`, 
+              animationDelay: `${delay}s`,
+              fontSize: `${size}px`
+            }}
+          >
+            <Icon size={size} strokeWidth={1} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function NetworkStatus() {
   const [online, setOnline] = useState(navigator.onLine);
 
@@ -317,6 +348,7 @@ export default function App() {
     <div className="relative">
       <div className="noise-texture" />
       <div className="mesh-bg" />
+      <FloatingBackground />
       
       <NetworkStatus />
       
@@ -579,9 +611,9 @@ function FeatureCard({ icon: Icon, title, desc, delay }: any) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5, delay }}
-      className="glass-card group hover:-translate-y-2"
+      className="glass-card group hover:bg-orange/5 border-white/5 hover:border-orange/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
     >
-      <div className="w-14 h-14 bg-orange/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-orange/20 transition-all duration-300">
+      <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-orange/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-xl">
         <Icon size={24} className="text-orange" />
       </div>
       <h3 className="text-xl font-display font-bold text-text-primary mb-3 uppercase tracking-wider">{title}</h3>
@@ -593,11 +625,11 @@ function FeatureCard({ icon: Icon, title, desc, delay }: any) {
 function PricingCard({ title, price, duration, icon: Icon, benefits, featured, active }: any) {
   return (
     <motion.div 
-      whileHover={{ y: featured ? -8 : -6 }}
+      whileHover={{ y: featured ? -12 : -8 }}
       className={`
-        glass-card flex flex-col p-9 relative
-        ${featured ? 'scale-105 z-10 border-orange/30 shadow-[0_20px_50px_rgba(249,115,22,0.1)] bg-orange/5' : 'opacity-90'}
-        ${active && !featured ? 'border-blue/30 shadow-[0_15px_30px_rgba(59,130,246,0.1)]' : ''}
+        glass-card flex flex-col p-9 relative rounded-[2rem] border transition-all duration-500
+        ${featured ? 'scale-105 z-10 border-orange/40 shadow-[0_20px_60px_rgba(249,115,22,0.2)] bg-orange/5' : 'opacity-90 hover:opacity-100 hover:border-white/20'}
+        ${active && !featured ? 'border-blue/40 shadow-[0_15px_40px_rgba(59,130,246,0.15)] bg-blue/5' : ''}
       `}
     >
       {featured && (
@@ -705,10 +737,12 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
+      <FloatingBackground />
+      
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }} 
         animate={{ opacity: 1, scale: 1 }} 
-        className={`w-full ${mode === 'register' ? 'max-w-5xl' : 'max-w-[460px]'} glass-card p-0 overflow-hidden flex flex-col md:flex-row`}
+        className={`w-full ${mode === 'register' ? 'max-w-5xl' : 'max-w-[460px]'} glass-card p-0 overflow-hidden flex flex-col md:flex-row shadow-[0_40px_100px_rgba(0,0,0,0.6)] border-white/10`}
       >
         {mode === 'register' && (
           <div className="hidden md:flex flex-col justify-between w-2/5 bg-sidebar-bg/50 p-12 border-r border-white/5 relative">
@@ -747,7 +781,7 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
             <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">{mode === 'login' ? 'Input credentials to establish link' : 'Complete the following fields to join'}</p>
           </header>
 
-          <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+          <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
             {mode === 'register' && (
               <div className="input-group md:col-span-2">
                 <input type="text" placeholder=" " className="input-field" required value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
@@ -828,14 +862,15 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn-primary w-full md:col-span-2 py-5 text-sm shadow-xl ripple mt-6 group">
+            <button type="submit" disabled={loading} className="btn-primary w-full md:col-span-2 py-5 text-sm shadow-2xl ripple mt-8 group relative overflow-hidden">
+              <div className="absolute inset-0 bg-white/10 -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
               {loading ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center gap-3 relative z-10">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span className="animate-pulse">Authorizing...</span>
                 </div>
               ) : (
-                <span className="flex items-center gap-2">{mode === 'login' ? 'Establish Secure Link' : 'Initialize Account Protocol'} <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" /></span>
+                <span className="flex items-center justify-center gap-2 relative z-10">{mode === 'login' ? 'Establish Secure Link' : 'Initialize Account Protocol'} <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" /></span>
               )}
             </button>
           </form>

@@ -3,10 +3,10 @@
 
 @theme {
   --color-bg-base-start: #0a0e1a;
-  --color-bg-base-end: #0d1117;
-  --color-bg-card: rgba(17, 24, 39, 0.85);
-  --color-bg-card-hover: rgba(22, 31, 50, 0.95);
-  --color-glass-border: rgba(249, 115, 22, 0.12);
+  --color-bg-base-end: #080c14;
+  --color-bg-card: rgba(17, 24, 39, 0.75);
+  --color-bg-card-hover: rgba(22, 31, 50, 0.85);
+  --color-glass-border: rgba(249, 115, 22, 0.15);
   --color-orange: #f97316;
   --color-orange-glow: rgba(249, 115, 22, 0.35);
   --color-orange-dark: #ea580c;
@@ -18,7 +18,7 @@
   --color-text-secondary: #94a3b8;
   --color-text-muted: #475569;
   --color-border: rgba(255, 255, 255, 0.07);
-  --color-sidebar-bg: #080c14;
+  --color-sidebar-bg: #04070d;
 
   --font-sans: "Exo 2", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Rajdhani", sans-serif;
@@ -27,12 +27,15 @@
   --animate-pulse-glow: pulse-glow 3s infinite;
   --animate-drift: drift 20s linear infinite;
   --animate-shake: shake 0.4s ease-in-out;
+  --animate-gradient: gradientBG 15s ease infinite;
 }
 
 @layer base {
   body {
     @apply text-text-primary min-h-screen font-sans selection:bg-orange/30 selection:text-white;
-    background: linear-gradient(135deg, var(--color-bg-base-start) 0%, var(--color-bg-base-end) 100%);
+    background: linear-gradient(-45deg, #0a0e1a, #111827, #080c14, #0f172a);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
     background-attachment: fixed;
     overflow-x: hidden;
   }
@@ -194,6 +197,45 @@
   .badge-red { @apply bg-red/10 text-red border-red/30; }
   .badge-blue { @apply bg-blue/10 text-blue border-blue/30; }
   .badge-green { @apply bg-green/10 text-green border-green/30; }
+
+  /* New Floating Background Styles */
+  .floating-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .float-icon {
+    display: inline-block;
+    color: var(--color-orange);
+    opacity: 0.1;
+    animation: floaty 6s ease-in-out infinite alternate;
+    pointer-events: auto;
+    cursor: crosshair;
+    transition: opacity 0.3s ease, transform 0.3s ease, filter 0.3s ease;
+  }
+
+  .float-icon:hover {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 15px var(--color-orange-glow));
+    transform: scale(1.3) rotate(15deg);
+  }
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floaty {
+  0% { transform: translateY(0px) rotate(0deg); }
+  100% { transform: translateY(-20px) rotate(10deg); }
 }
 
 @keyframes pulse-glow {
