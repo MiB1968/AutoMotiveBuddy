@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useVehicleStore } from './store/vehicleStore';
 import { 
   Wrench, Cpu, Map, History, Star, Shield, 
   ChevronRight, LogOut, LayoutDashboard, Database, 
@@ -21,7 +22,7 @@ import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory,
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateDynamicVehicleData, askAutomotiveAssistant } from './services/ai';
+import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch } from './services/ai';
 
 import api from './services/api';
 import HUDPanel from './components/HUDPanel';
@@ -895,11 +896,7 @@ function ChatBot({ currentUser, store, toast }: any) {
     
     try {
       const { make, model, year, engine } = useVehicleStore.getState();
-      const res = await api.post("/ai/diagnose", {
-        vehicle: { make, model, year, engine },
-        query: userMsg
-      });
-      const response = res.data.answer;
+      const response = await askAutomotiveAssistant(userMsg, { make, model, year, engine });
       store.addChatMessage(userId, 'ai', response);
       if (autoSpeak) speakText(response, true);
     } catch (err) {
@@ -1043,7 +1040,6 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'overview'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('overview')} />
         <NavItem icon={Users} label="Member Core" active={activeTab === 'members'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('members')} />
         <NavItem icon={Database} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
-        <NavItem icon={BookOpen} label="Unit Manuals" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
         <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
         <NavItem icon={Map} label="Component Locations" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
         <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
@@ -1126,7 +1122,6 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
           {activeTab === 'overview' && <OverviewTab key="adm-ov" user={user} store={store} />}
           {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} />}
           {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
-          {activeTab === 'manuals' && <ManualsTab key="adm-man" store={store} user={user} toast={toast} />}
           {activeTab === 'warning_lights' && <DynamicResourceTab key="adm-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
           {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
           {activeTab === 'fuses' && <DynamicResourceTab key="adm-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
@@ -1167,7 +1162,6 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
         <NavItem icon={Activity} label="Live Telemetry" active={activeTab === 'live'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('live')} />
         <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
         <NavItem icon={Map} label="Component Locator" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
-        <NavItem icon={BookOpen} label="Unit Manuals" active={activeTab === 'manuals'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('manuals')} />
         <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
         <NavItem icon={Shield} label="Admin Node" active={activeTab === 'admin'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('admin')} />
         <div className="border-t border-white/5 my-4 mx-4 pt-4" />
@@ -1257,7 +1251,6 @@ function MemberDashboard({ h, user, store, onLogout, toast }: any) {
           {activeTab === 'live' && <LiveDataTab key="mbr-live" />}
           {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
           {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
-          {activeTab === 'manuals' && <UnitManualsTab key="mbr-unit" />}
           {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
           {activeTab === 'admin' && <AdminNodeTab key="mbr-admin" />}
           {activeTab === 'profile' && <ProfileTab user={user} store={store} />}
@@ -1371,8 +1364,8 @@ function OverviewTab({ user, store }: any) {
                   <div className="font-accent text-primary-orange text-sm mb-1">{l.action}</div>
                   <div className="text-xs text-text-secondary">{l.details}</div>
                 </div>
-                <span className={`badge ${l.action.includes('Login') ? 'badge-blue' : 'badge-green'}`}>
-                  {l.action.includes('Login') ? 'Session' : 'Audit'}
+                <span className={`badge ${(l.action || '').includes('Login') ? 'badge-blue' : 'badge-green'}`}>
+                  {(l.action || '').includes('Login') ? 'Session' : 'Audit'}
                 </span>
               </div>
             ))}
@@ -1404,10 +1397,11 @@ function StatItem({ label, value }: any) {
   );
 }
 
-import { useVehicleStore } from './store/vehicleStore';
-
 function GlobalVehicleSelector() {
   const { make, model, year, engine, setVehicle } = useVehicleStore();
+
+  const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
+  const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
 
   return (
     <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8 mb-8">
@@ -1422,7 +1416,7 @@ function GlobalVehicleSelector() {
           <input 
             list="makes"
             value={make}
-            onChange={(e) => setVehicle({ make: e.target.value })}
+            onChange={(e) => setVehicle({ make: e.target.value, model: '', year: '', engine: '' })}
             placeholder="e.g. Ford, Toyota..."
             className="input-field w-full bg-black/40"
           />
@@ -1436,32 +1430,53 @@ function GlobalVehicleSelector() {
         <div className="space-y-2">
           <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Model</label>
           <input 
+            list="models"
             value={model}
-            onChange={(e) => setVehicle({ model: e.target.value })}
+            onChange={(e) => setVehicle({ model: e.target.value, year: '', engine: '' })}
             placeholder="e.g. F-150, Hilux..."
             className="input-field w-full bg-black/40"
+            disabled={!make}
           />
+          <datalist id="models">
+            {selectedMfr?.models.map(mdl => (
+              <option key={mdl.id} value={mdl.name} />
+            ))}
+          </datalist>
         </div>
 
         <div className="space-y-2">
           <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Year</label>
           <input 
+            list="years"
             type="number"
             value={year}
             onChange={(e) => setVehicle({ year: e.target.value })}
             placeholder="e.g. 2023"
             className="input-field w-full bg-black/40"
+            disabled={!model}
           />
+          <datalist id="years">
+            {selectedMod?.years.map(yr => (
+              <option key={yr} value={yr} />
+            ))}
+          </datalist>
         </div>
 
         <div className="space-y-2">
           <label className="text-[9px] uppercase font-bold text-text-secondary tracking-widest block ml-1">Engine Configuration</label>
           <input 
+            list="engines"
             value={engine}
             onChange={(e) => setVehicle({ engine: e.target.value })}
             placeholder="e.g. 3.5L V6, 2.0L Diesel..."
             className="input-field w-full bg-black/40"
+             disabled={!model}
           />
+          <datalist id="engines">
+            {selectedMod?.engines.map(eng => (
+              <option key={eng} value={eng} />
+            ))}
+          </datalist>
         </div>
       </div>
 
@@ -1504,20 +1519,46 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
     
     try {
       const res = await api.get(`/dtc/${query}`);
+      let dtcResult = res.data;
+
+      // If the backend says search is required/pending AI, trigger frontend deep search
+      if (dtcResult.status === 'AI_PENDING') {
+        try {
+          const aiDeepData = await performDeepDTCSearch(query);
+          dtcResult = { 
+            ...aiDeepData, 
+            status: 'AI_SEARCH_GENERATED',
+            manufacturer: 'Verified Global Search'
+          };
+        } catch (aiErr) {
+          console.error("Deep search failed, sticking with placeholder", aiErr);
+        }
+      }
+
       dtcData = {
-        ...res.data,
-        id: res.data.code,
-        title: res.data.description,
+        ...dtcResult,
+        id: dtcResult.code,
+        title: dtcResult.description,
       };
       
       // Save offline
-      await saveDTCOffline(res.data);
+      try {
+        await saveDTCOffline(dtcResult);
+      } catch (dbErr) {
+        console.warn("IndexedDB save error:", dbErr);
+      }
       if (dtcData) localMatches.push(dtcData);
       
     } catch (err) {
       console.warn("API query failed, falling back to local DB", err);
       
-      const offlineData = await getDTCOffline(query);
+      let offlineData = null;
+      try {
+        offlineData = await getDTCOffline(query);
+      } catch (dbErr) {
+        console.warn("IndexedDB error:", dbErr);
+      }
+      
       if (offlineData) {
         dtcData = {
            ...offlineData,
@@ -1537,15 +1578,15 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
         ];
         
         const results = allLocalDTCs.filter(dtc => 
-          dtc.code.toUpperCase().includes(query) || 
-          (dtc.title && dtc.title.toUpperCase().includes(query)) ||
-          (dtc.description && dtc.description.toUpperCase().includes(query))
+          String(dtc?.code || '').toUpperCase().includes(query) || 
+          (dtc?.title && String(dtc.title).toUpperCase().includes(query)) ||
+          (dtc?.description && String(dtc.description).toUpperCase().includes(query))
         );
         
         if (results.length > 0) {
           // Deduplicate
-          const uniqueResults = results.reduce((acc: DTC[], current) => {
-            if (!acc.find(item => item.code === current.code)) return acc.concat([current]);
+          const uniqueResults = results.reduce((acc: any[], current: any) => {
+            if (!acc.find(item => item?.code === current?.code)) return acc.concat([current]);
             return acc;
           }, []);
           localMatches = uniqueResults.slice(0, 10);
@@ -1577,15 +1618,19 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
         type: 'dtc',
         timestamp: new Date().toISOString()
       });
-      store.addLog(user.id, `DTC Search`, `Searched for fault code ${query}`);
+      store.addLog(user.id, user.username, `DTC Search`, `Searched for fault code ${query}`);
       
       // Store log for sync when offline
       if (!navigator.onLine) {
-        await addOfflineLog({
-          action: "DTC Search",
-          code: query,
-          timestamp: new Date().toISOString()
-        });
+        try {
+          await addOfflineLog({
+            action: "DTC Search",
+            code: query,
+            timestamp: new Date().toISOString()
+          });
+        } catch (dbErr) {
+           console.warn("Offline log error", dbErr);
+        }
       }
     }
 
@@ -1647,8 +1692,8 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="font-accent text-xl text-primary-orange font-bold">{dtc.code}</span>
-                        <span className={`badge ${(dtc.severity || 'low').toLowerCase() === 'critical' ? 'badge-red' : (dtc.severity || 'low').toLowerCase() === 'high' ? 'badge-orange' : 'badge-yellow'}`}>
-                          {(dtc.severity || 'low').toUpperCase()}
+                        <span className={`badge ${String(dtc.severity || 'low').toLowerCase() === 'critical' ? 'badge-red' : String(dtc.severity || 'low').toLowerCase() === 'high' ? 'badge-orange' : 'badge-yellow'}`}>
+                          {String(dtc.severity || 'low').toUpperCase()}
                         </span>
                       </div>
                       <p className="text-sm text-text-primary font-display font-medium uppercase tracking-tight">
@@ -1714,7 +1759,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                     <div>
                       <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14} className="text-red-400" /> ALERT SYMPTOMS</h4>
                       <ul className="space-y-2">
-                        {selectedDTC.symptoms.map((s, i) => (
+                        {(selectedDTC?.symptoms || []).map((s: string, i: number) => (
                           <li key={i} className="text-xs text-text-secondary flex gap-2">
                             <span className="text-primary-orange select-none">•</span> {s}
                           </li>
@@ -1773,7 +1818,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
     setIsLoading(true);
     setResult(null);
 
-    store.addLog(user.id, `AI Data Generation`, `Generated ${type} for ${year} ${make} ${model}`);
+    store.addLog(user.id, user.username, `AI Data Generation`, `Generated ${type} for ${year} ${make} ${model}`);
 
     try {
       const data = await generateDynamicVehicleData(type, make, model, year, engine);
@@ -2316,11 +2361,7 @@ function AIChatTab({ user, store, ...props }: any) {
     setLoading(true);
 
     try {
-      const res = await api.post("/ai/diagnose", {
-        vehicle: { make, model, year, engine },
-        query: userText
-      });
-      const resp = res.data.answer;
+      const resp = await askAutomotiveAssistant(userText, { make, model, year, engine });
       store.addChatMessage(user.id, 'ai', resp);
       if (autoSpeak) speakText(resp, true);
     } catch (err) {

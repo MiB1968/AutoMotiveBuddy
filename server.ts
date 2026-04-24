@@ -46,7 +46,7 @@ async function startServer() {
   // --- API ROUTES ---
 
   // DTC Route (Multi-Layer Logic)
-  app.get('/api/dtc/:code', (req, res) => {
+  app.get('/api/dtc/:code', async (req, res) => {
     const code = req.params.code.toUpperCase();
     
     // 1. Verified Lookups
@@ -78,93 +78,32 @@ async function startServer() {
       });
     }
 
-    // 3. AI Fallback (Mocked response)
+    // 3. AI Fallback (Live Search Proxy)
+    // We move this to the frontend as per security guidelines.
+    // For now, return a placeholder that tells the frontend to use its own AI.
     return res.json({
       code: code,
-      description: `AI Extrapolated Meaning for ${code}. System likely implies a specialized module fault.`,
-      system: "Unknown Module",
-      severity: "Requires Attention",
-      symptoms: ["Check Engine Light", "Possible performance decrease"],
-      solutions: ["Check live telemetry", "Consult OEM repair manual", "Trace circuits to associated sensor"],
-      manufacturer: "AI_ESTIMATED",
-      status: "AI_ESTIMATED",
-      confidence: 0.75
+      description: `Searching for ${code} in global database...`,
+      system: "Cloud Matrix Sync",
+      severity: "medium",
+      symptoms: ["Pending live retrieval"],
+      solutions: ["System initializing search protocols"],
+      manufacturer: "SEARCH_REQUIRED",
+      status: "AI_PENDING",
+      confidence: 0.5
     });
   });
 
   app.post('/api/ai/diagnose', async (req, res) => {
-    const { vehicle, query } = req.body;
-    
-    // Check if we can use server-side AI
-    if (process.env.GEMINI_API_KEY) {
-       try {
-          const { GoogleGenAI } = await import('@google/genai');
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-          const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
-          
-          const chat = ai.chats.create({
-            model: "gemini-2.5-flash",
-            config: {
-              systemInstruction: `You are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant. Your goal is to help users identify engine codes (DTCs), explain symptoms, and suggest solutions. Be professional, technical yet accessible, and always prioritize safety. Owner: Ruben Llego. Greeting: "Hello! I'm your AutoMotive Buddy. How can I help with your vehicle today?" Do not use markdown headers larger than h3.`,
-            }
-          });
-          const response = await chat.sendMessage({ message: `Vehicle: ${vStr}\n\nQuery: ${query}` });
-          return res.json({ answer: response.text });
-       } catch (err) {
-          console.error("AI Error:", err);
-       }
-    }
-    
-    const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
-
     return res.json({
-      answer: `[AI Diagnostician for ${vStr}]\n\nProcessing symptom: "${query}".\n\nAI Estimation: Check common failure points for this make and model. If no verified data exists, fallback protocols suggest testing power and ground at the affected sensor.`
+      answer: "Frontend AI fallback triggered. Please ensure Gemini API is configured in the browser."
     });
   });
 
   app.post('/api/ai/generate', async (req, res) => {
-    const { type, make, modelStr, year, engine } = req.body;
-    
-    if (process.env.GEMINI_API_KEY) {
-       try {
-          const { GoogleGenAI } = await import('@google/genai');
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-          let systemPrompt = "";
-
-          if (type === 'fuses') {
-            systemPrompt = `You are a professional automotive electrician. Provide a detailed summary of the main fuse boxes (Engine Bay and Interior/Passenger Compartment), relay locations, and critical fuse diagrams for the ${year} ${make} ${modelStr} (${engine}). Format your response in clean Markdown with tables for the fuse numbers, amp ratings, and descriptions.`;
-          } else if (type === 'components') {
-            systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${make} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, main engine computer (ECU/PCM), starter motor, alternator, oxygen sensors, mass airflow sensor, and oil/air/cabin filters. Format your response in clean Markdown.`;
-          } else if (type === 'warning_lights') {
-            systemPrompt = `You are an expert automotive diagnostician. Provide a detailed guide on the dashboard warning lights for the ${year} ${make} ${modelStr}. Categorize them by severity (Red = Stop ASAP, Yellow = Check soon, Green/Blue = Informational). Describe what each light looks like, what it means, and recommended actions. Format your response in clean Markdown.`;
-          }
-          
-          const chat = ai.chats.create({
-            model: "gemini-2.5-flash",
-            config: { systemInstruction: systemPrompt, temperature: 0.3 }
-          });
-          
-          const response = await chat.sendMessage({ message: `I need the ${type} data for a ${year} ${make} ${modelStr} with engine ${engine}.` });
-          return res.json({ result: response.text });
-       } catch (err) {
-          console.error("AI Error:", err);
-       }
-    }
-    
-    // Fallback logic
-    if (type === 'fuses') {
-      return res.json({ result: `### ⚠️ SYSTEM ALERT: USING UNIVERSAL COMPATIBILITY PROTOCOL\n_Applying generic automotive diagnostics for ${year} ${make} ${modelStr}._\n\n#### Engine Bay Fuse Box (Typical Layout)\n| Fuse # | Amperage | Description |\n|---|---|---|\n| F01 | 40A | ABS Pump / Module |\n| F02 | 30A | Starter Relay |\n| F03 | 20A | Engine Control Module (ECM) |\n| F04 | 15A | Ignition Coils / Injectors |`});
-    }
-    
-    if (type === 'components') {
-      return res.json({ result: `### ⚠️ SYSTEM ALERT: USING UNIVERSAL COMPATIBILITY PROTOCOL\n_Applying generic component mapping for ${year} ${make} ${modelStr}._\n\n*   **OBD-II Port:** Usually located under the dashboard on the driver's side, near the steering column.\n*   **Battery:** Engine bay, typically covered by a black plastic shroud.\n*   **Engine Control Unit (ECU):** Often located near the battery or air intake box, sometimes mounted on the firewall.`});
-    }
-    
-    if (type === 'warning_lights') {
-      return res.json({ result: `### ⚠️ SYSTEM ALERT: USING UNIVERSAL COMPATIBILITY PROTOCOL\n_Displaying universal standardized warning lights guide._\n\n##### 🔴 CRITICAL (STOP AND INVESTIGATE)\n*   **Check Engine Light (Flashing):** Severe engine misfire. Pull over immediately to prevent catalytic converter damage.\n*   **Oil Pressure Warning:** Low oil pressure. Stop the engine immediately to prevent catastrophic internal damage.\n\n##### 🟡 WARNING (CHECK SOON)\n*   **Check Engine Light (Solid):** An emissions or sensor fault. Safe to drive, but needs scanning soon.`});
-    }
-    
-    return res.json({ result: "Unable to retrieve vehicle dataset." });
+    return res.json({
+      result: "Frontend AI fallback triggered. Please ensure Gemini API is configured in the browser."
+    });
   });
 
   // Component Locator Route
