@@ -1120,7 +1120,7 @@ function AdminDashboard({ h, user, store, onLogout, toast }: any) {
 
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && <OverviewTab key="adm-ov" user={user} store={store} />}
-          {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} />}
+          {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} user={user} toast={toast} />}
           {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
           {activeTab === 'warning_lights' && <DynamicResourceTab key="adm-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
           {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
@@ -2437,7 +2437,7 @@ function AIChatTab({ user, store, ...props }: any) {
   );
 }
 
-function MembersTab({ store, ...props }: any) {
+function MembersTab({ user, store, toast, ...props }: any) {
   return (
     <div className="glass-panel overflow-hidden p-0">
       <table className="w-full text-left border-collapse">

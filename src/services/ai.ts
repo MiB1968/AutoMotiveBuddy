@@ -33,7 +33,7 @@ Format entirely in clean, readable Markdown using tables, bolding for emphasis, 
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: `I need the ${type} data for a ${year} ${manufacturer} ${modelStr} with engine ${engine}.`,
       config: {
         systemInstruction: systemPrompt,
@@ -54,7 +54,7 @@ export async function askAutomotiveAssistant(prompt: string, vehicle: any, histo
     const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
     
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: `Vehicle Context: ${vStr}\n\nUser Query: ${prompt}`,
       config: {
         systemInstruction: `You are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant. Your goal is to help users identify engine codes (DTCs), explain symptoms, and suggest solutions. Be professional, technical yet accessible, and always prioritize safety. Owner: Ruben Llego. Greeting: "Hello! I'm your AutoMotive Buddy. How can I help with your vehicle today?" Do not use markdown headers larger than h3.`,
@@ -72,7 +72,7 @@ export async function performDeepDTCSearch(code: string) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: `Perform a deep technical search for the OBD2 fault code: ${code}. Identify the specific part, system affected, common symptoms, and repair protocol. Return ONLY a JSON object with: code, description, system, severity, symptoms (string array), solutions (string array).`,
       config: {
         tools: [{ googleSearch: {} }],
