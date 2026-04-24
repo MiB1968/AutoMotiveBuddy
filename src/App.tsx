@@ -17,7 +17,7 @@ import {
   Calendar, FileText, ChevronDown, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
-  Mic, MicOff
+  Mic, MicOff, Camera
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
@@ -201,8 +201,9 @@ function UnitManualsTab() {
   );
 }
 
-function UserAvatar({ user, size = "md", className = "" }: { user: any, size?: "xs" | "sm" | "md" | "lg" | "xl", className?: string }) {
+function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any, size?: "xs" | "sm" | "md" | "lg" | "xl", className?: string, onUpdate?: (url: string) => void }) {
   const [imageError, setImageError] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const sizeClasses = {
     xs: "w-6 h-6 text-[8px]",
@@ -214,21 +215,57 @@ function UserAvatar({ user, size = "md", className = "" }: { user: any, size?: "
 
   const currentSize = sizeClasses[size];
 
-  if (user.avatarUrl && !imageError) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onUpdate) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onUpdate(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const renderContent = () => {
+    if (user.avatarUrl && !imageError) {
+      return (
+        <img 
+          src={user.avatarUrl} 
+          alt={user.fullName} 
+          className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] object-cover shrink-0 ${className}`}
+          referrerPolicy="no-referrer"
+          onError={() => setImageError(true)}
+        />
+      );
+    }
+
     return (
-      <img 
-        src={user.avatarUrl} 
-        alt={user.fullName} 
-        className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] object-cover shrink-0 ${className}`}
-        referrerPolicy="no-referrer"
-        onError={() => setImageError(true)}
-      />
+      <div className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0 uppercase ${className}`}>
+        {user.fullName.charAt(0)}
+      </div>
     );
-  }
+  };
 
   return (
-    <div className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0 uppercase ${className}`}>
-      {user.fullName.charAt(0)}
+    <div className="relative group">
+      {renderContent()}
+      {onUpdate && (
+        <>
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+          >
+            <Camera size={size === 'xl' ? 32 : 16} className="text-white" />
+          </div>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleFileChange} 
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -352,6 +389,15 @@ export default function App() {
     store.addLog(user.id, user.username, 'Login', 'Encrypted connection initialized');
   };
 
+  const updateAvatar = (newUrl: string) => {
+    if (currentUser) {
+      const updated = { ...currentUser, avatarUrl: newUrl };
+      setCurrentUser(updated);
+      sessionStorage.setItem('ab_session', JSON.stringify(updated));
+      addToast('Profile avatar updated.', 'success');
+    }
+  };
+
   const logout = () => {
     if (currentUser) store.addLog(currentUser.id, currentUser.username, 'Logout', 'User session terminated');
     setCurrentUser(null);
@@ -375,10 +421,10 @@ export default function App() {
     }
 
     if (currentUser.role === 'admin') {
-      return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} />;
+      return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
     }
 
-    return <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} />;
+    return <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
   };
 
   return (
@@ -1187,7 +1233,7 @@ function ChatBot({ currentUser, store, toast }: any) {
 
 // --- Dashboard Layout Logic ---
 
-function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstall }: any) {
+function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstall, onUpdateAvatar }: any) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -1216,6 +1262,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
         <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
         <NavItem icon={Bell} label="Transmissions" active={activeTab === 'announcements'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('announcements')} />
         <NavItem icon={Activity} label="Audit Registry" active={activeTab === 'logs'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('logs')} />
+        <NavItem icon={User} label="Admin Profile" active={activeTab === 'profile'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('profile')} />
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
@@ -1234,7 +1281,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
-          <UserAvatar user={user} size="md" />
+          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
@@ -1317,6 +1364,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
           {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
           {activeTab === 'fuses' && <DynamicResourceTab key="adm-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
           {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
+          {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
           {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
         </AnimatePresence>
@@ -1326,7 +1374,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
   );
 }
 
-function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInstall }: any) {
+function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInstall, onUpdateAvatar }: any) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -1375,7 +1423,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
-          <UserAvatar user={user} size="md" />
+          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
@@ -1464,7 +1512,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
           {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
           {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
           {activeTab === 'admin' && <AdminNodeTab key="mbr-admin" />}
-          {activeTab === 'profile' && <ProfileTab user={user} store={store} />}
+          {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
         </AnimatePresence>
       </main>
@@ -1492,11 +1540,11 @@ const NavItem = ({ icon: Icon, label, active, collapsed, onClick }: any) => (
 
 // --- Sub-Tabs ---
 
-function ProfileTab({ user, store }: any) {
+function ProfileTab({ user, store, onUpdateAvatar }: any) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-8">
       <div className="glass-panel p-8 flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
-        <UserAvatar user={user} size="xl" className="w-32 h-32 md:w-48 md:h-48 border-4 border-primary-orange shadow-[0_0_30px_rgba(249,115,22,0.3)]" />
+        <UserAvatar user={user} size="xl" onUpdate={onUpdateAvatar} className="w-32 h-32 md:w-48 md:h-48 border-4 border-primary-orange shadow-[0_0_30px_rgba(249,115,22,0.3)]" />
         <div className="flex-1">
           <div className="flex flex-col md:flex-row md:items-end gap-3 mb-4">
             <h2 className="text-3xl md:text-4xl font-display font-bold uppercase tracking-tight">{user.fullName}</h2>
@@ -1896,13 +1944,46 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-2 mb-8">
-          <input
-            type="text"
-            placeholder="ENTER OBD-II FAULT CODE (E.G. P0101)..."
-            value={dtcInput}
-            onChange={(e) => setDtcInput(e.target.value)}
-            className="input-field flex-1 h-[52px] font-accent uppercase tracking-widest"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              list="dtc-suggestions"
+              placeholder="ENTER OBD-II FAULT CODE (E.G. P0101)..."
+              value={dtcInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDtcInput(val);
+                // Immediate search logic
+                if (val.length >= 2) {
+                  const query = val.toUpperCase().trim();
+                  const allLocalDTCs = [
+                    ...(fordDTCDatabase as unknown as DTC[]), 
+                    ...(otherMfrDTCs as unknown as DTC[]), 
+                    ...(genericDTCs as unknown as DTC[]),
+                    ...(komatsuDTCs as unknown as DTC[]),
+                    ...store.dtcs
+                  ];
+                  const results = allLocalDTCs.filter(dtc => 
+                    String(dtc?.code || '').toUpperCase().includes(query) || 
+                    (dtc?.title && String(dtc.title).toUpperCase().includes(query)) ||
+                    (dtc?.description && String(dtc.description).toUpperCase().includes(query))
+                  );
+                  setSearchResults(results.slice(0, 10));
+                } else if (val.length === 0) {
+                  setSearchResults([]);
+                }
+              }}
+              className="input-field w-full h-[52px] font-accent uppercase tracking-widest pl-12"
+            />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+            <datalist id="dtc-suggestions">
+               <option value="P0300" />
+               <option value="P0420" />
+               <option value="P1234" />
+               <option value="CA111" />
+               <option value="U0100" />
+            </datalist>
+          </div>
           <button 
             type="submit"
             className="btn-primary px-8 h-[52px] flex items-center justify-center min-w-[120px]"
@@ -1931,6 +2012,9 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                         <span className="font-accent text-xl text-primary-orange font-bold">{dtc.code}</span>
                         <span className={`badge ${String(dtc.severity || 'low').toLowerCase() === 'critical' ? 'badge-red' : String(dtc.severity || 'low').toLowerCase() === 'high' ? 'badge-orange' : 'badge-yellow'}`}>
                           {String(dtc.severity || 'low').toUpperCase()}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[7px] text-text-secondary uppercase font-bold">
+                          {dtc.manufacturer || (dtc.code?.startsWith('P') ? 'Generic OBD' : 'Unknown')}
                         </span>
                       </div>
                       <p className="text-sm text-text-primary font-display font-medium uppercase tracking-tight">
@@ -2304,7 +2388,10 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                 <div className="p-5 md:p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0">
-                      <div className="text-[9px] md:text-[10px] font-accent font-bold text-primary-orange uppercase mb-1 truncate">{u.yearRange} {u.make}</div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="text-[9px] md:text-[10px] font-accent font-bold text-primary-orange uppercase truncate">{u.yearRange} {u.make}</div>
+                        <span className="px-1.5 py-0.5 bg-white/10 rounded text-[7px] text-text-secondary uppercase font-bold">{u.category}</span>
+                      </div>
                       <div className="text-lg md:text-xl font-display font-bold text-text-primary uppercase tracking-tight truncate">{u.model}</div>
                     </div>
                     <div className="bg-white/5 p-2 rounded-lg shrink-0"><ChevronRight size={16} className="text-text-secondary group-hover:text-primary-orange group-hover:translate-x-1" /></div>
@@ -2346,7 +2433,19 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                 <label className="text-[9px] uppercase font-bold text-text-secondary ml-1">MANUFACTURER</label>
                 <div className="relative">
                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-                   <input type="text" className="input-field pl-10 h-[48px] text-xs font-medium" placeholder="E.g. Honda, Toyota..." value={filter.make} onChange={e => setFilter({ ...filter, make: e.target.value })} />
+                   <input 
+                     type="text" 
+                     list="manual-brand-suggestions"
+                     className="input-field pl-10 h-[48px] text-xs font-medium" 
+                     placeholder="E.g. Honda, Toyota..." 
+                     value={filter.make} 
+                     onChange={e => setFilter({ ...filter, make: e.target.value })} 
+                   />
+                   <datalist id="manual-brand-suggestions">
+                     {store.units.map((u: any) => u.make).filter((v: any, i: any, a: any) => a.indexOf(v) === i).map((brand: string) => (
+                       <option key={brand} value={brand} />
+                     ))}
+                   </datalist>
                 </div>
               </div>
               <div className="space-y-1.5 text-left">
@@ -2938,8 +3037,11 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${r.gType === 'DTC' ? 'border-red-500/30 text-red-500 bg-red-500/10' : 'border-blue-500/30 text-blue-500 bg-blue-500/10'}`}>
                           {r.gType === 'DTC' ? <Cpu size={20} /> : <Car size={20} />}
                        </div>
-                       <div>
-                          <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-[.2em] mb-1">{r.gType === 'DTC' ? 'FAULT PROTOCOL' : 'TECHNICAL UNIT'}</div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-[.2em]">{r.gType === 'DTC' ? 'FAULT PROTOCOL' : 'TECHNICAL UNIT'}</span>
+                            <span className="px-1.5 py-0.5 bg-white/10 rounded text-[7px] text-text-muted uppercase font-bold">{r.category || (r.gType === 'DTC' ? 'Diagnostics' : 'Vehicle')}</span>
+                          </div>
                           <div className="text-base font-display font-bold text-text-primary uppercase group-hover:text-primary-orange transition-colors">
                             {r.gType === 'DTC' ? `${r.code} - ${r.description}` : `${r.make} ${r.model}`}
                           </div>
