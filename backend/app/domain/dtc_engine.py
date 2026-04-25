@@ -1,50 +1,41 @@
 from app.ai.ranking_engine import AIRankingEngine
 
 class DTCEngine:
-    """
-    Core Domain Logic for identifying and manipulating DTC codes
-    and extracting heuristic logic based on vehicle type.
-    """
-    def __init__(self, dtc_database: list):
-        self.db = dtc_database
-        self.ai = AIRankingEngine()
+    def __init__(self, db=None):
+        self.db = db
 
-    def lookup_dtc(self, code: str) -> dict:
-        """Finds a DTC by code ignoring casing."""
-        for dtc in self.db:
-            if dtc.get('code', '').upper() == code.upper():
-                return dtc
-        return None
+    def rank_dtc(self, code_data, symptoms=None):
+        # Fallback to integer severity or mapping strings to ints if needed
+        severity_val = code_data.get("severity", 5)
+        if isinstance(severity_val, str):
+            mapping = {"low": 3, "medium": 5, "high": 8, "critical": 10}
+            base_score = mapping.get(severity_val.lower(), 5)
+        else:
+            base_score = severity_val
 
-    def analyze(self, code: str, data: dict):
-        dtc_entry = self.lookup_dtc(code)
+        symptom_bonus = 0
+        if symptoms:
+            matched = len(set(symptoms) & set(code_data.get("symptoms", [])))
+            symptom_bonus = matched * 2
 
-        if not dtc_entry:
-            return {"error": "DTC not found"}
+        frequency_weight = code_data.get("frequency", 1)
 
-        context = {
-            "symptoms": data.get("symptoms", []),
-            "severity": data.get("severity", "medium"),
-            "vehicle_type": data.get("vehicle_type", "car")
-        }
-
-        # Fallback handling for DB formats
-        raw_causes = dtc_entry.get("possible_causes", [])
-        if not raw_causes and "causes" in dtc_entry:
-            causes_val = dtc_entry["causes"]
-            if isinstance(causes_val, list) and len(causes_val) > 0 and isinstance(causes_val[0], str):
-                raw_causes = [{"cause": c, "symptoms": dtc_entry.get("symptoms", []), "frequency_score": 0.5} for c in causes_val]
-            else:
-                raw_causes = causes_val
-
-        ranked_causes = self.ai.rank_causes(
-            raw_causes,
-            context
-        )
+        confidence = min(100, (base_score * 10) + symptom_bonus + frequency_weight)
 
         return {
-            "code": code,
-            "description": dtc_entry.get("description"),
-            "ranked_causes": ranked_causes,
-            "confidence": ranked_causes[0]["ai_score"] if ranked_causes else 0
+            "code": code_data["code"],
+            "confidence": confidence,
+            "priority": self._priority(confidence),
+            "likely_causes": sorted(
+                code_data.get("causes", []),
+                key=lambda x: x.get("probability", 0) if isinstance(x, dict) else 0,
+                reverse=True
+            )
         }
+
+    def _priority(self, confidence):
+        if confidence > 80:
+            return "CRITICAL"
+        if confidence > 50:
+            return "HIGH"
+        return "MEDIUM"
