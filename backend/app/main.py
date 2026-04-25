@@ -51,8 +51,7 @@ def health_check():
 def analyze_dtc(request: DiagnosticRequest):
     response_data = execute_diagnostic_analysis(engine, request)
     
-    if not response_data:
-        # In a real app we might fallback to LLM generation here
+    if not response_data.get("success"):
         raise HTTPException(status_code=404, detail="DTC not found in local database")
         
-    return format_success_response(response_data.model_dump(), "Diagnostic analysis complete")
+    return format_success_response(response_data["data"], "Diagnostic analysis complete")
