@@ -1,5 +1,10 @@
 services:
   - type: web
+    name: automotive-buddy-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
+  - type: web
     name: automotive-frontend
     env: static
     buildCommand: npm install && npm run build

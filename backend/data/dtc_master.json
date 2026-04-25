@@ -1,0 +1,11 @@
+[
+  {
+    "code": "P0300",
+    "description": "Random/Multiple Cylinder Misfire Detected",
+    "causes": ["Bad fuel", "Vacuum leak", "Ignition issue", "Faulty spark plugs", "Ignition coils"],
+    "symptoms": ["Rough idle", "Engine shaking", "Loss of power", "Poor acceleration"],
+    "solutions": ["Check spark plugs", "Check fuel system", "Test ignition coils", "Inspect for vacuum leaks"],
+    "severity": "high",
+    "confidence_score": 0.85
+  }
+]
