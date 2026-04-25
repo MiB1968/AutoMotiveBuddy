@@ -28,9 +28,9 @@ app.add_middleware(
 
 # Load DTC Master Data
 try:
-    BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_PATH = os.path.join(BASE_DIR, 'data', 'dtc_master.json')
-    with open(DATA_PATH, 'r') as f:
+    with open(DATA_PATH, 'r', encoding='utf-8') as f:
         RAW_DTC_DATA = json.load(f)
     logger.info(f"Loaded {len(RAW_DTC_DATA)} DTCs from database.")
 except Exception as e:
