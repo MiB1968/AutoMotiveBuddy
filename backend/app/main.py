@@ -3,11 +3,11 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from models.schemas import DiagnosticRequest
-from domain.dtc_engine import DTCEngine
-from services.diagnostic_service import execute_diagnostic_analysis
-from utils.helpers import setup_logger, format_success_response, format_error_response
-from utils.config import settings
+from app.models.schemas import DiagnosticRequest
+from app.domain.dtc_engine import DTCEngine
+from app.services.diagnostic_service import execute_diagnostic_analysis
+from app.utils.helpers import setup_logger, format_success_response, format_error_response
+from app.utils.config import settings
 
 logger = setup_logger("automotive-buddy-api")
 
