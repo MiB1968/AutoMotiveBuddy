@@ -3,11 +3,11 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.models.schemas import DiagnosticRequest
-from backend.domain.dtc_engine import DTCEngine
-from backend.services.diagnostic_service import execute_diagnostic_analysis
-from backend.utils.helpers import setup_logger, format_success_response, format_error_response
-from backend.utils.config import settings
+from models.schemas import DiagnosticRequest
+from domain.dtc_engine import DTCEngine
+from services.diagnostic_service import execute_diagnostic_analysis
+from utils.helpers import setup_logger, format_success_response, format_error_response
+from utils.config import settings
 
 logger = setup_logger("automotive-buddy-api")
 
@@ -28,7 +28,8 @@ app.add_middleware(
 
 # Load DTC Master Data
 try:
-    DATA_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'lib', 'dtc_master.json')
+    BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+    DATA_PATH = os.path.join(BASE_DIR, 'data', 'dtc_master.json')
     with open(DATA_PATH, 'r') as f:
         RAW_DTC_DATA = json.load(f)
     logger.info(f"Loaded {len(RAW_DTC_DATA)} DTCs from database.")

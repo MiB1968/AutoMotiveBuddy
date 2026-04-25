@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { diagnoseDTC } from './api';
 
 const getAI = () => {
   if (!process.env.GEMINI_API_KEY) {
@@ -74,6 +75,25 @@ export async function askAutomotiveAssistant(prompt: string, vehicle: any, histo
 
 export async function performDeepDTCSearch(code: string) {
   try {
+    try {
+      const backendResult = await diagnoseDTC(code);
+      if (backendResult?.data) {
+        const d = backendResult.data;
+        return {
+          code: d.code || code,
+          description: d.description,
+          system: "Diagnostic System",
+          severity: d.severity,
+          causes: d.top_causes || [],
+          symptoms: d.symptoms || [],
+          solutions: d.fixes || [],
+          remediation: d.fixes || []
+        };
+      }
+    } catch (apiError) {
+      console.warn("Backend API not reachable/DTC not found, falling back to GenAI", apiError);
+    }
+    
     const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

@@ -1,6 +1,6 @@
 import logging
-from backend.domain.dtc_engine import DTCEngine
-from backend.models.schemas import DiagnosticRequest, DiagnosticResponse
+from domain.dtc_engine import DTCEngine
+from models.schemas import DiagnosticRequest, DiagnosticResponse
 
 logger = logging.getLogger("automotive-buddy-api")
 
