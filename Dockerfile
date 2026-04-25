@@ -1,14 +1,28 @@
-FROM node:20-alpine
+# Use stable Python (NO compilation surprises)
+FROM python:3.11-slim
 
+# Prevent interactive prompts
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set working directory
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm install
+# Install system dependencies (minimal)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+# Copy backend first (for caching)
+COPY backend/ backend/
 
-RUN npm run build
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r backend/requirements.txt
 
-EXPOSE 3000
+# Expose Render port
+EXPOSE 10000
 
-CMD ["npm", "run", "start"]
+# Start FastAPI
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "10000"]
