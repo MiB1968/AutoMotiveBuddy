@@ -55,4 +55,4 @@ def analyze_dtc(request: DiagnosticRequest):
         # In a real app we might fallback to LLM generation here
         raise HTTPException(status_code=404, detail="DTC not found in local database")
         
-    return format_success_response(response_data.model_dump(), "Diagnostic analysis complete")
+    return format_success_response(response_data.dict(), "Diagnostic analysis complete")
