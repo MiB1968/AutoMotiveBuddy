@@ -21,12 +21,16 @@ import {
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
+import dtcMasterDataRaw from './lib/dtc_master.json';
+const dtcMasterData: any = dtcMasterDataRaw;
+
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch } from './services/ai';
 
 import api from './services/api';
 import HUDPanel from './components/HUDPanel';
+import EnhancedDashboard from './components/Dashboard';
 import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
 import { syncData } from './sync/syncEngine';
 
@@ -207,7 +211,7 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
 
   useEffect(() => {
     setImageError(false);
-  }, [user.avatarUrl]);
+  }, [user?.avatarUrl]);
   
   const sizeClasses = {
     xs: "w-6 h-6 text-[8px]",
@@ -231,11 +235,11 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
   };
 
   const renderContent = () => {
-    if (user.avatarUrl && !imageError) {
+    if (user?.avatarUrl && !imageError) {
       return (
         <img 
           src={user.avatarUrl} 
-          alt={user.fullName} 
+          alt={user?.fullName || "Guest"} 
           className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] object-cover shrink-0 ${className}`}
           referrerPolicy="no-referrer"
           onError={() => setImageError(true)}
@@ -243,9 +247,11 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
       );
     }
 
+    const initial = user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'G';
+
     return (
       <div className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0 uppercase ${className}`}>
-        {user.fullName.charAt(0)}
+        {initial}
       </div>
     );
   };
@@ -398,6 +404,13 @@ export default function App() {
       const updated = { ...currentUser, avatarUrl: newUrl };
       setCurrentUser(updated);
       sessionStorage.setItem('ab_session', JSON.stringify(updated));
+      store.updateUser(updated.id, updated);
+      
+      // If Ruben updates his avatar, also save it specifically so the public page can easily see it if needed
+      if (updated.username === 'rubenllego' || updated.role === 'admin') {
+        localStorage.setItem('ab_admin_avatar', newUrl);
+      }
+      
       addToast('Profile avatar updated.', 'success');
     }
   };
@@ -627,12 +640,9 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
                 <div className="w-40 h-40 rounded-full border-4 border-orange/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-orange-glow)] relative group">
                   <div className="w-full h-full rounded-full bg-orange/10 flex items-center justify-center overflow-hidden">
                     <UserAvatar 
-                      user={user && user.fullName === "Ruben Llego O." ? user : { fullName: "Ruben Llego O.", avatarUrl: "/ruben_avatar.jpg" }} 
+                      user={user?.role === 'admin' ? user : { fullName: "Ruben Llego O.", avatarUrl: localStorage.getItem('ab_admin_avatar') || "/ruben_avatar.jpg" }} 
                       size="xl" 
-                      onUpdate={user && user.fullName === "Ruben Llego O." ? onUpdateAvatar : (url: string) => {
-                        // If not logged in as Ruben, we still want to show the change if the user is just "playing" with the UI
-                        // but normally this would be disabled if not admin.
-                      }}
+                      onUpdate={user?.role === 'admin' ? onUpdateAvatar : undefined}
                       className="border-none bg-transparent hover:scale-110 transition-transform duration-500" 
                     />
                   </div>
@@ -1675,76 +1685,7 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
 }
 
 function OverviewTab({ user, store }: any) {
-  const isAdmin = user.role === 'admin';
-  
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-      <div className="stats-grid">
-        <StatItem label={isAdmin ? "Active Members" : "DTC Lookups"} value={isAdmin ? "1,284" : "1,248"} />
-        <StatItem label={isAdmin ? "Pending Approval" : "Manuals Viewed"} value={isAdmin ? "18" : "342"} />
-        <StatItem label={isAdmin ? "AI Bot Queries" : "AI Sessions"} value={isAdmin ? "42.5k" : "89"} />
-        <StatItem label={isAdmin ? "Monthly Revenue" : "Fleet Units"} value={isAdmin ? "₱285k" : "12"} />
-      </div>
-
-      <div className="dashboard-body">
-        <section className="glass-panel">
-          <h2 className="text-xl mb-6">LATEST DIAGNOSTIC ACTIVITY</h2>
-          <div className="space-y-1 divide-y divide-border-glass">
-            {store.logs.slice(0, 5).map((l: any) => (
-              <div key={l.id} className="py-4 flex justify-between items-center group">
-                <div>
-                  <div className="font-accent text-primary-orange text-sm mb-1">{l.action}</div>
-                  <div className="text-xs text-text-secondary">{l.details}</div>
-                </div>
-                <span className={`badge ${(l.action || '').includes('Login') ? 'badge-blue' : 'badge-green'}`}>
-                  {(l.action || '').includes('Login') ? 'Session' : 'Audit'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="glass-panel border-primary-orange/20 bg-primary-orange/5 lg:col-span-1">
-          <h2 className="text-xl mb-6 text-primary-orange uppercase tracking-tight">Access Protocol</h2>
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-black/40 border border-white/5 hover:border-primary-orange/30 transition-all flex justify-between items-center group">
-              <div>
-                <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-widest">Single Phase</div>
-                <div className="text-[11px] text-text-muted leading-tight">1 Month Access</div>
-              </div>
-              <div className="text-primary-orange font-bold font-display">₱500</div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-black/40 border border-white/5 hover:border-primary-orange/30 transition-all flex justify-between items-center group">
-              <div>
-                <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-widest">Quarterly Sync</div>
-                <div className="text-[11px] text-text-muted leading-tight">3 Months Access</div>
-              </div>
-              <div className="text-primary-orange font-bold font-display">₱1,000</div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/30 hover:border-primary-orange/60 transition-all relative overflow-hidden flex justify-between items-center group">
-              <div className="absolute top-0 right-0 py-0.5 px-2 bg-primary-orange text-white text-[7px] font-bold uppercase tracking-widest transform">Value Choice</div>
-              <div>
-                <div className="text-[10px] font-accent font-bold text-primary-orange uppercase tracking-widest">Semi-Annual</div>
-                <div className="text-[11px] text-text-primary leading-tight font-medium">6 Months Access</div>
-              </div>
-              <div className="text-primary-orange font-bold font-display">₱1,500</div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-black/40 border border-white/5 hover:border-primary-orange/30 transition-all flex justify-between items-center group">
-              <div>
-                <div className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-widest">Infinite Cycle</div>
-                <div className="text-[11px] text-text-muted leading-tight">12 Months Access</div>
-              </div>
-              <div className="text-primary-orange font-bold font-display">₱2,000</div>
-            </div>
-          </div>
-          <button onClick={() => {}} className="btn-primary w-full mt-6 text-[11px] h-10">INITIALIZE UPGRADE</button>
-        </section>
-      </div>
-    </motion.div>
-  );
+  return <EnhancedDashboard user={user} store={store} />;
 }
 
 function StatItem({ label, value }: any) {
@@ -1959,6 +1900,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
           ...(otherMfrDTCs as unknown as DTC[]), 
           ...(genericDTCs as unknown as DTC[]),
           ...(komatsuDTCs as unknown as DTC[]),
+          ...(dtcMasterData as unknown as DTC[]),
           ...store.dtcs
         ];
         
@@ -2061,6 +2003,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                     ...(otherMfrDTCs as unknown as DTC[]), 
                     ...(genericDTCs as unknown as DTC[]),
                     ...(komatsuDTCs as unknown as DTC[]),
+                    ...(dtcMasterData as unknown as DTC[]),
                     ...store.dtcs
                   ];
                   const results = allLocalDTCs.filter(dtc => 

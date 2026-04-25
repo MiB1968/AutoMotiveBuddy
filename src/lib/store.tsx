@@ -133,7 +133,7 @@ const INITIAL_ADMIN: User = {
   role: 'admin',
   status: 'approved',
   createdAt: new Date().toISOString(),
-  avatarUrl: '/ruben_avatar.jpg',
+  avatarUrl: localStorage.getItem('ab_admin_avatar') || '/ruben_avatar.jpg',
 };
 
 // PRE-LOADED DTC DATABASE
