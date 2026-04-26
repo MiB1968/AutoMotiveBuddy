@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // This points to our backend API
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || "https://automotive-buddy-api-e5qr.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://automotive-buddy-api-e5qr.onrender.com";
 
 const api = axios.create({
   baseURL: API_BASE_URL

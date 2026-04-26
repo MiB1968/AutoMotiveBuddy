@@ -124,6 +124,11 @@ export interface SearchHistory {
   timestamp: string;
 }
 
+const getSafeAvatar = () => {
+  try { return localStorage.getItem('ab_admin_avatar') || '/ruben_avatar.jpg'; }
+  catch { return '/ruben_avatar.jpg'; }
+};
+
 // Initial Admin
 const INITIAL_ADMIN: User = {
   id: 'admin-001',
@@ -133,7 +138,7 @@ const INITIAL_ADMIN: User = {
   role: 'admin',
   status: 'approved',
   createdAt: new Date().toISOString(),
-  avatarUrl: localStorage.getItem('ab_admin_avatar') || '/ruben_avatar.jpg',
+  avatarUrl: getSafeAvatar(),
 };
 
 // PRE-LOADED DTC DATABASE
