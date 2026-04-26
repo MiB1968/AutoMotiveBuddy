@@ -339,11 +339,6 @@ export default function App() {
   const store = useStore();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hash, setHash] = useState(window.location.hash || '#home');
-  const getAdminAvatar = () => {
-    try { return localStorage.getItem('ab_admin_avatar') || '/ruben_avatar.jpg'; }
-    catch { return '/ruben_avatar.jpg'; }
-  };
-
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     try {
       const saved = sessionStorage.getItem('ab_session');
@@ -650,7 +645,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
                 <div className="w-40 h-40 rounded-full border-4 border-orange/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-orange-glow)] relative group">
                   <div className="w-full h-full rounded-full bg-orange/10 flex items-center justify-center overflow-hidden">
                     <UserAvatar 
-                      user={user?.role === 'admin' ? user : { fullName: "Ruben Llego O.", avatarUrl: getAdminAvatar() }} 
+                      user={user?.role === 'admin' ? user : { fullName: "Ruben Llego O.", avatarUrl: localStorage.getItem('ab_admin_avatar') || "/ruben_avatar.jpg" }} 
                       size="xl" 
                       onUpdate={user?.role === 'admin' ? onUpdateAvatar : undefined}
                       className="border-none bg-transparent hover:scale-110 transition-transform duration-500" 
