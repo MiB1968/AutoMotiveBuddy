@@ -142,31 +142,191 @@ function LiveDataTab() {
   );
 }
 
-function AdminNodeTab() {
-  const [logs, setLogs] = useState<{action: string, timestamp: string}[]>([]);
+function AIMaintenanceTab({ user, store }: any) {
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const [aiVoiceOn, setAiVoiceOn] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
-    api.get("/admin/logs").then((res) => setLogs(res.data)).catch(() => {});
+    synthRef.current = window.speechSynthesis;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setQuery(transcript);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+    };
   }, []);
+
+  const toggleListen = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      if (!recognitionRef.current) {
+        alert("Speech recognition is not supported in this browser.");
+        return;
+      }
+      setQuery('');
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  const handleSearch = async (e: React.FormEvent | string) => {
+    if (typeof e !== 'string') {
+      e.preventDefault();
+    }
+    const searchQuery = typeof e === 'string' ? e : query;
+    if (!searchQuery.trim()) return;
+    
+    setQuery(searchQuery);
+    setLoading(true);
+    setResult("");
+    
+    // Stop any ongoing speech
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+
+    try {
+      const { searchMaintenanceGuides } = await import('./services/ai');
+      const text = await searchMaintenanceGuides(searchQuery, store.vehicle);
+      setResult(text);
+      
+      if (aiVoiceOn && synthRef.current) {
+        const cleanText = text.replace(/[*#]/g, '').replace(/\[.*?\]\(.*?\)/g, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        synthRef.current.speak(utterance);
+      }
+    } catch (err: any) {
+      setResult("Error fetching guide: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3 mb-6">
-        <Shield size={24} className="text-primary-orange" />
-        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">ADMIN NODE: AUDIT REGISTRY</h2>
+      <GlobalVehicleSelector />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-orange/10 flex items-center justify-center border border-orange/20 shadow-[0_0_15px_rgba(255,107,0,0.2)]">
+            <Search className="text-orange" size={20} />
+          </div>
+          <div>
+            <h2 className="text-lg font-display font-medium text-white tracking-widest uppercase">Maintenance Guides</h2>
+            <p className="text-xs text-text-secondary font-accent uppercase tracking-widest">AI SEARCH ENGINE</p>
+          </div>
+        </div>
       </div>
-      
-      <HUDPanel className="p-0 overflow-hidden bg-black/40">
-        <div className="max-h-[600px] overflow-y-auto">
-          {logs.map((log, i) => (
-            <div key={i} className="p-4 border-b border-white/5 mx-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-              <div className="text-sm font-bold text-text-primary uppercase tracking-tight">{log.action}</div>
-              <div className="text-[10px] font-accent text-text-secondary">{new Date(log.timestamp).toLocaleString()}</div>
-            </div>
-          ))}
-          {logs.length === 0 && <div className="p-20 text-center opacity-30 uppercase tracking-widest text-[10px] font-bold">No Audit Logs Received</div>}
+
+      <HUDPanel className="p-6">
+        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+          <input
+            type="text"
+            className="flex-1 input-field"
+            placeholder={isListening ? "Listening..." : "e.g. How to change oil, Brake pad replacement tips..."}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={toggleListen}
+            className={`p-3 rounded-lg border flex items-center justify-center transition-all ${
+              isListening ? 'bg-red-500/20 border-red-500/50 text-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-white/5 border-white/10 text-text-secondary hover:text-white hover:bg-white/10'
+            }`}
+            title="Toggle Voice Input (Listen)"
+          >
+            {isListening ? <Mic size={18} /> : <MicOff size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (aiVoiceOn && isSpeaking) {
+                synthRef.current?.cancel();
+                setIsSpeaking(false);
+              }
+              setAiVoiceOn(!aiVoiceOn);
+            }}
+            className={`p-3 rounded-lg border flex items-center justify-center transition-all ${
+              aiVoiceOn ? (isSpeaking ? 'bg-orange/20 border-orange/50 text-orange animate-pulse shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-white/10 border-orange/50 text-orange') : 'bg-white/5 border-white/10 text-text-secondary hover:text-white hover:bg-white/10'
+            }`}
+            title="Toggle AI Voice Answer"
+          >
+            {aiVoiceOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
+          </button>
+          <button type="submit" disabled={loading} className="btn-primary py-2 px-6 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+            {loading ? <span className="animate-pulse">Searching...</span> : 'Search'}
+          </button>
+        </form>
+
+        
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="text-[10px] text-text-muted uppercase tracking-widest mb-3 font-bold">Suggested Searches:</div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Recommended oil type and capacity?",
+               "How to manually reset maintenance light?",
+               "What is the spark plug gap and torque?",
+               "Serpentine belt replacement procedure",
+               "Transmission fluid change interval"
+            ].map((q, i) => (
+              <button 
+                key={i}
+                onClick={() => handleSearch(q)}
+                className="text-xs border border-white/10 bg-white/5 hover:bg-orange/10 hover:border-orange/20 text-text-secondary hover:text-white px-3 py-1.5 rounded-full transition-all text-left"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </div>
       </HUDPanel>
+
+      {(loading || result) && (
+        <HUDPanel className="p-6">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12 opacity-50">
+               <div className="loader w-6 h-6 border-2 border-orange/20 border-t-orange rounded-full animate-spin mb-4" />
+               <div className="text-xs text-orange tracking-widest uppercase font-bold animate-pulse">Consulting Neural Network...</div>
+            </div>
+          ) : (
+            <div className="prose prose-invert prose-orange max-w-none prose-sm sm:prose-base font-accent prose-headings:font-display prose-headings:tracking-widest prose-headings:uppercase prose-a:text-orange">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
+            </div>
+          )}
+        </HUDPanel>
+      )}
     </div>
   );
 }
@@ -346,6 +506,55 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
+  const welcomePlayedRef = useRef(false);
+
+  useEffect(() => {
+    if (currentUser && !welcomePlayedRef.current) {
+      welcomePlayedRef.current = true;
+      const text = `Welcome to AutoMotive Buddy — your intelligent automotive diagnostic companion. Designed to simplify vehicle troubleshooting, AutoMotive Buddy uses advanced AI to analyze diagnostic trouble codes, identify issues, and guide you toward the right solution — faster and smarter. Whether you're a professional mechanic or a car owner, our system empowers you with real-time insights, accurate diagnostics, and a seamless user experience. AutoMotive Buddy is proudly developed and led by Ruben Llego, owner and lead web developer, with a vision to revolutionize automotive diagnostics through intelligent technology. Get ready to experience the future of vehicle diagnostics. AutoMotive Buddy — Diagnose smarter. Drive better.`;
+      
+      let voicePlayed = false;
+
+      const playWelcome = () => {
+        if (voicePlayed) return;
+        
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 0.9;
+        
+        const voices = window.speechSynthesis.getVoices();
+        const techVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Microsoft')));
+        if (techVoice) {
+          utterance.voice = techVoice;
+        }
+
+        utterance.onstart = () => {
+          voicePlayed = true;
+          // Remove listeners once it successfully starts
+          document.removeEventListener('click', playWelcome);
+          document.removeEventListener('keydown', playWelcome);
+          document.removeEventListener('touchstart', playWelcome);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      };
+
+      // Try speaking immediately. If blocked, the event listeners will catch a subsequent interaction.
+      setTimeout(playWelcome, 500);
+
+      document.addEventListener('click', playWelcome);
+      document.addEventListener('keydown', playWelcome);
+      document.addEventListener('touchstart', playWelcome);
+      
+      return () => {
+        window.speechSynthesis.cancel();
+        document.removeEventListener('click', playWelcome);
+        document.removeEventListener('keydown', playWelcome);
+        document.removeEventListener('touchstart', playWelcome);
+      };
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -1492,11 +1701,11 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
         <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={MessageSquare} label="AI Diagnostics" active={activeTab === 'chat'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('chat')} />
-        <NavItem icon={Activity} label="Live Telemetry" active={activeTab === 'live'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('live')} />
+        <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
         <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
         <NavItem icon={Map} label="Component Locator" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
         <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
-        <NavItem icon={Shield} label="Admin Node" active={activeTab === 'admin'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('admin')} />
+        <NavItem icon={BookOpen} label="Maintenance Guides" active={activeTab === 'admin'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('admin')} />
         <div className="border-t border-white/5 my-4 mx-4 pt-4" />
         <NavItem icon={User} label="Profile" active={activeTab === 'profile'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('profile')} />
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
@@ -1600,11 +1809,11 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
           {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
           {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
           {activeTab === 'chat' && <AIChatTab key="mbr-chat" user={user} store={store} />}
-          {activeTab === 'live' && <LiveDataTab key="mbr-live" />}
+          {activeTab === 'warning_lights' && <DynamicResourceTab key="mbr-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
           {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
           {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
           {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
-          {activeTab === 'admin' && <AdminNodeTab key="mbr-admin" />}
+          {activeTab === 'admin' && <AIMaintenanceTab key="mbr-admin" user={user} store={store} />}
           {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
         </AnimatePresence>

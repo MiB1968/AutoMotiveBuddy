@@ -45,10 +45,29 @@ Format entirely in clean, readable Markdown using tables, bolding for emphasis, 
     return response.text || "Dataset currently inaccessible. High-altitude network interference detected.";
   } catch (error: any) {
     console.error("Failed to generate dynamic vehicle data:", error);
-    return `### DATA TEMPORARILY UNAVAILABLE\n\nThe diagnostic uplink for this specific ${manufacturer} model is currently being recalibrated. \n\n**Common Advice:**\n- Verify battery voltage (12.6V engine off).\n- Inspect ground straps for corrosion.\n- Check for symptoms related to the specific fault code if applicable.`;
+    return `### DATA TEMPORARILY UNAVAILABLE\n\nThe diagnostic uplink for this specific ${manufacturer} model is currently being recalibrated.\n\n**Error details:** ${error.message}\n\n**Common Advice:**\n- Verify battery voltage (12.6V engine off).\n- Inspect ground straps for corrosion.\n- Check for symptoms related to the specific fault code if applicable.`;
   }
 }
 
+export async function searchMaintenanceGuides(query: string, vehicle: any) {
+  try {
+    const ai = getAI();
+    const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Vehicle: ${vStr}\n\nSearch Query: ${query}\n\nProvide a comprehensive, professional maintenance guide or tips for this specific query on this vehicle. Format your response in clean Markdown with clear headings and bullet points.`,
+      config: {
+        systemInstruction: `You are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant and master mechanic. Your goal is to provide step-by-step maintenance guides. Be professional and prioritize safety. Start your response by introducing yourself and mentioning that your owner and lead developer is Ruben Llego.`,
+      }
+    });
+    
+    return response.text || "Direct uplink failed. Please re-state your query.";
+  } catch (error: any) {
+    console.error("Maintenance Search Error:", error);
+    return `Maintenance guide search failed: ${error.message}`;
+  }
+}
 export async function askAutomotiveAssistant(prompt: string, vehicle: any, history: any[] = []) {
   try {
     const ai = getAI();
