@@ -352,9 +352,15 @@ export default function App() {
       setAuthLoading(true);
       if (fbUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+          const userDoc = await getDoc(doc(db, 'users', fbUser.uid)).catch(e => {
+             handleFirestoreError(e, OperationType.GET, `users/${fbUser.uid}`);
+             throw e;
+          });
+          
+          let uData: UserType;
           if (userDoc.exists()) {
-            setCurrentUser(userDoc.data() as UserType);
+            uData = userDoc.data() as UserType;
+            setCurrentUser(uData);
           } else {
             // New user via Google login
             const newUser: UserType = {
@@ -367,11 +373,22 @@ export default function App() {
               createdAt: new Date().toISOString(),
               avatarUrl: fbUser.photoURL || '',
             };
-            await setDoc(doc(db, 'users', fbUser.uid), newUser);
-            setCurrentUser(newUser);
+            await setDoc(doc(db, 'users', fbUser.uid), newUser).catch(e => {
+               handleFirestoreError(e, OperationType.CREATE, `users/${fbUser.uid}`);
+               throw e;
+            });
+            uData = newUser;
+            setCurrentUser(uData);
+          }
+          
+          // Redirect if currently on login/register view
+          if (window.location.hash === '#login' || window.location.hash === '#register') {
+            window.location.hash = uData.role === 'admin' ? '#admin-overview' : '#dashboard';
+            addToast(`Greetings, ${uData.fullName?.split(' ')[0] || 'User'}. Neural link established.`, 'success');
           }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${fbUser.uid}`);
+          console.error("Firestore getDoc error intercepted:", error);
+          addToast('Database connection error during login. Try again.', 'error');
         }
       } else {
         setCurrentUser(null);
@@ -946,12 +963,13 @@ function AuthPage({ mode, onBack, toast }: any) {
               type="button"
               onClick={async () => {
                 setLoading(true);
+                setError('');
                 try {
                   const { signInWithGoogle } = await import('./lib/firebase');
                   await signInWithGoogle();
                   // onAuthStateChanged in App.tsx takes care of the rest
-                } catch (e) {
-                  setError('Authorization Failed');
+                } catch (e: any) {
+                  setError(`Authorization Failed: ${e.message}`);
                   toast('Access Denied', 'error');
                 }
                 setLoading(false);
@@ -962,6 +980,11 @@ function AuthPage({ mode, onBack, toast }: any) {
               <Globe className="text-orange" size={20} />
               <span>{loading ? 'AUTHORIZING...' : 'CONTINUE WITH GOOGLE'}</span>
             </button>
+            {error && (
+              <div className="text-red-500 text-xs font-accent tracking-widest text-center mt-2 px-4 py-2 bg-red-500/10 rounded-md border border-red-500/20 shadow-inner">
+                {error}
+              </div>
+            )}
           </div>
 
           <footer className="mt-14 text-center flex flex-col gap-4 border-t border-white/10 pt-8">

@@ -12,14 +12,18 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isSignedIn() { 
-      return request.auth != null && request.auth.token.email_verified == true; 
+      return request.auth != null; 
+    }
+    
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
     
     // Verify an admin via an external document or specific email
     function isAdmin() { 
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'rubenlleg12@gmail.com'
+        (request.auth.token.email == 'rubenlleg12@gmail.com')
       ); 
     }
 
@@ -29,7 +33,7 @@ service cloud.firestore {
              data.id is string && data.id.size() <= 64 &&
              data.username is string && data.username.size() <= 64 &&
              data.role in ['admin', 'member'] &&
-             data.createdAt is timestamp &&
+             data.createdAt is string &&
              ( !('fullName' in data) || (data.fullName is string && data.fullName.size() <= 128) ) &&
              ( !('email' in data) || (data.email is string && data.email.size() <= 128) ) &&
              ( !('status' in data) || (data.status in ['pending', 'approved', 'rejected']) ) &&
@@ -39,19 +43,19 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       // Must be an admin or the owner
-      allow get: if isSignedIn() && isValidId(userId) && (isAdmin() || request.auth.uid == userId);
-      allow list: if isSignedIn() && (isAdmin() || resource.data.id == request.auth.uid);
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && (resource.data.id == request.auth.uid || isAdmin());
       
       // Allow user to create their own record
-      allow create: if isSignedIn() && 
+      allow create: if isVerified() && 
                        isValidId(userId) && 
                        userId == request.auth.uid &&
                        isValidUser(incoming()) &&
                        incoming().id == request.auth.uid &&
-                       incoming().role == 'member'; // Can't self-assign admin
+                       (incoming().role == 'member' || request.auth.token.email == 'rubenlleg12@gmail.com'); // Can't self-assign admin unless hardcoded
 
       // Allow users to update their own record, but not their role. Admin can update everything.
-      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
+      allow update: if isVerified() && isValidId(userId) && isValidUser(incoming()) && (
         isAdmin() ||
         (
           request.auth.uid == userId &&
@@ -80,7 +84,7 @@ service cloud.firestore {
       allow read: if isAdmin();
       
       // Any signed in user can create a log, but it must be their own log
-      allow create: if isSignedIn() && 
+      allow create: if isVerified() && 
                        isValidId(logId) && 
                        isValidLog(incoming()) &&
                        incoming().userId == request.auth.uid;
