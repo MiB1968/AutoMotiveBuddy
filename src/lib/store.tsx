@@ -14,7 +14,7 @@ export interface DTC {
   system?: string; // e.g. Engine
   severity: 'low' | 'medium' | 'high' | 'critical';
   symptoms: string[];
-  causes?: string[];
+  causes?: (string | { item: string; probability: number })[] | string;
   probableCauses?: string[];
   solutions?: string[]; // step-by-step
   remediation?: string[];
@@ -28,6 +28,7 @@ export interface DTC {
   estimatedCost?: string;
   dangerLevel?: string;
   title?: string;
+  confidence?: number;
 }
 
 export interface FuseEntry {

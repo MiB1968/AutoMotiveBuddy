@@ -17,7 +17,7 @@ import {
   Calendar, FileText, ChevronDown, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
-  Mic, MicOff, Camera, Loader2
+  Mic, MicOff, Camera, Loader2, Brain
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
@@ -31,6 +31,7 @@ import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearc
 import api from './services/api';
 import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
+import { Card, Badge, ProgressBar, Button } from './components/ui';
 import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
 import { syncData } from './sync/syncEngine';
 import { auth, db, signInWithGoogle, logOut } from './lib/firebase';
@@ -1871,7 +1872,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
       {/* Desktop Sidebar */}
       <motion.aside 
         animate={{ width: sidebarCollapsed ? 80 : 280 }} 
-        className="hidden lg:flex bg-[#0d1117] border-r border-border-glass flex-col z-20 shrink-0"
+        className="hidden lg:flex bg-[#0d1117] border-r border-border-glass flex-col z-20 shrink-0 relative overflow-hidden"
       >
         <SidebarContent />
       </motion.aside>
@@ -1891,7 +1892,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
               initial={{ x: -280 }} 
               animate={{ x: 0 }} 
               exit={{ x: -280 }}
-              className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0d1117] border-r border-border-glass flex flex-col z-[101] lg:hidden"
+              className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0d1117] border-r border-border-glass flex flex-col z-[101] lg:hidden relative overflow-hidden"
             >
               <SidebarContent />
             </motion.aside>
@@ -1900,36 +1901,41 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
       </AnimatePresence>
 
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
-        <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
-        <header className="mb-8 md:mb-12 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-brand transition-colors">
-              <Menu size={24} />
-            </button>
-            <div>
-              <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold">Admin Central</h1>
-              <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Fleet & Diagnostic Management</p>
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.08] mix-blend-screen">
+           <img src="/logo-horizontal.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
+        </div>
+        <div className="relative z-10 w-full">
+          <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
+          <header className="mb-8 md:mb-12 flex justify-between items-center bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-xl">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-text-secondary hover:text-brand hover:border-brand/30 transition-all">
+                <Menu size={24} />
+              </button>
+              <div>
+                <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold mix-blend-lighten shadow-brand">Admin Central</h1>
+                <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Fleet & Diagnostic Management</p>
+              </div>
             </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-4">
-            <div className="badge badge-red py-2 px-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-              Admin Node 01 - SECURE
+            <div className="hidden sm:flex items-center gap-4">
+              <div className="badge badge-red py-2 px-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                Admin Node 01 - SECURE
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <AnimatePresence mode="wait">
-          {activeTab === 'overview' && <OverviewTab key="adm-ov" user={user} store={store} />}
-          {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} user={user} toast={toast} />}
-          {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
-          {activeTab === 'warning_lights' && <DynamicResourceTab key="adm-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
-          {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
-          {activeTab === 'fuses' && <DynamicResourceTab key="adm-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
-          {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
-          {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
-          {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
-          {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
-        </AnimatePresence>
+          <AnimatePresence mode="wait">
+            {activeTab === 'overview' && <OverviewTab key="adm-ov" user={user} store={store} />}
+            {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} user={user} toast={toast} />}
+            {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
+            {activeTab === 'warning_lights' && <DynamicResourceTab key="adm-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
+            {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+            {activeTab === 'fuses' && <DynamicResourceTab key="adm-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
+            {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
+            {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
+            {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
+            {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
+          </AnimatePresence>
+        </div>
       </main>
       <GlobalSearchOverlay isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} store={store} user={user} />
     </div>
@@ -2042,24 +2048,28 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
       </AnimatePresence>
 
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.08] mix-blend-screen">
+           <img src="/logo-horizontal.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
+        </div>
+        <div className="relative z-10 w-full">
         <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
-        <header className="mb-8 md:mb-12 flex justify-between items-center">
+        <header className="mb-8 md:mb-12 flex justify-between items-center bg-black/20 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-xl">
           <div className="flex items-center gap-4">
-            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-brand transition-colors">
+            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-text-secondary hover:text-brand hover:border-brand/30 transition-all">
               <Menu size={24} />
             </button>
             <div>
-              <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold">AutoMotive Buddy</h1>
+              <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold shadow-brand">AutoMotive Buddy</h1>
               <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Your Smart Automotive Companion</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-4">
-            <button onClick={() => setGlobalSearchOpen(true)} className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-text-muted hover:text-brand hover:border-brand/30 transition-all group">
+            <button onClick={() => setGlobalSearchOpen(true)} className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-text-muted hover:text-brand hover:border-brand/30 transition-all group shadow-md hover:shadow-[0_0_15px_rgba(0,212,255,0.2)]">
               <Search size={16} />
               <span className="text-[10px] uppercase font-bold tracking-widest opacity-60 group-hover:opacity-100 italic">Neural Matrix Search</span>
-              <kbd className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded ml-2">⌘K</kbd>
+              <kbd className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded ml-2 text-white/50">⌘K</kbd>
             </button>
-            <div className="badge badge-blue py-2 px-4 shadow-[0_0_15px_rgba(59,130,246,0.1)] uppercase text-[10px] tracking-widest font-bold">
+            <div className="badge badge-blue py-2 px-4 shadow-[0_0_15px_rgba(59,130,246,0.1)] uppercase text-[10px] tracking-widest font-bold border-blue/30 bg-blue/10 text-blue border">
               Stable Link
             </div>
           </div>
@@ -2077,6 +2087,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
           {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
           {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
         </AnimatePresence>
+        </div>
       </main>
       <GlobalSearchOverlay isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} store={store} user={user} />
     </div>
@@ -2107,12 +2118,18 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-8">
       <div className="glass-panel p-8 flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
         <UserAvatar user={user} size="xl" onUpdate={onUpdateAvatar} className="w-32 h-32 md:w-48 md:h-48 border-4 border-brand shadow-[0_0_30px_rgba(0, 212, 255,0.3)]" />
-        <div className="flex-1">
-          <div className="flex flex-col md:flex-row md:items-end gap-3 mb-4">
+        <div className="flex-1 flex flex-col items-center md:items-start w-full">
+          <div className="flex flex-col items-center md:items-start gap-4 mb-6 w-full">
             <h2 className="text-3xl md:text-4xl font-display font-bold uppercase tracking-tight">{user.fullName}</h2>
-            <span className="badge badge-brand font-accent mb-1">{user.role.toUpperCase()} LEVEL 01</span>
+            <div className="w-full">
+              <div className="border border-white/20 rounded-full py-2 px-4 shadow-[0_0_15px_rgba(0,212,255,0.2)] text-center w-full bg-white/5 backdrop-blur-md">
+                <span className="font-accent font-bold tracking-[0.2em] uppercase text-white shadow-brand">
+                  {user.role.toUpperCase() === 'ADMIN' ? 'DEVELOPER / OWNER' : `${user.role.toUpperCase()} LEVEL 01`}
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="text-text-secondary uppercase text-xs tracking-widest mb-6">Neural Access Credential: <span className="text-brand font-accent">{user.id}</span></p>
+          <p className="text-text-secondary uppercase text-xs tracking-widest mb-6 text-center md:text-left w-full">Neural Access Credential:<br className="md:hidden"/> <span className="text-brand font-accent mt-1 block md:inline">{user.id}</span></p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
             <div className="px-4 py-2 bg-white/5 border border-border-glass rounded-lg text-[10px] font-bold uppercase tracking-widest">
               <span className="text-text-secondary">Joined:</span> {new Date(user.createdAt).toLocaleDateString()}
@@ -2283,6 +2300,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
   const [searchResults, setSearchResults] = useState<DTC[]>([]);
   const [selectedDTC, setSelectedDTC] = useState<DTC | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showFullProtocol, setShowFullProtocol] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2292,6 +2310,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
     setIsLoading(true);
     setSearchResults([]);
     setSelectedDTC(null);
+    setShowFullProtocol(false);
 
     let dtcData;
     let localMatches: any[] = [];
@@ -2550,8 +2569,8 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
               {searchResults.map((dtc, idx) => (
                 <button 
                   key={`${dtc.code}-${idx}`}
-                  className={`w-full text-left p-6 glass-panel border transition-all hover:-translate-y-1 ${selectedDTC?.code === dtc.code ? 'border-brand bg-brand/5' : 'border-border-glass hover:border-brand/50'}`}
-                  onClick={() => setSelectedDTC(dtc)}
+                  className={`w-full text-left p-6 glass-panel border transition-all hover:-translate-y-1 ${selectedDTC?.code === dtc.code ? 'border-brand bg-brand/5 shadow-[0_0_20px_rgba(0,212,255,0.1)]' : 'border-border-glass hover:border-brand/50 hover:shadow-lg'}`}
+                  onClick={() => { setSelectedDTC(dtc); setShowFullProtocol(false); }}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -2612,31 +2631,57 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                     {selectedDTC.title || selectedDTC.description}
                   </h2>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
                       <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock size={10} /> TIME BASE</div>
                       <div className="text-xs font-bold text-text-primary">{selectedDTC.timeEstimate || '30-45 MIN'}</div>
                     </div>
-                    <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
-                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><CreditCard size={10} /> UNIT COST</div>
+                    <div className="p-3 border border-border-glass rounded-lg bg-gradient-to-r from-white/5 to-transparent">
+                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Brain size={10} /> AI CONFIDENCE</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="text-xs font-bold text-brand">{selectedDTC.confidence ? `${(selectedDTC.confidence * 100).toFixed(0)}%` : '85%'}</div>
+                        <ProgressBar progress={selectedDTC.confidence ? selectedDTC.confidence * 100 : 85} className="flex-1 h-1" />
+                      </div>
+                    </div>
+                    <div className="col-span-2 md:col-span-1 p-3 bg-white/5 border border-border-glass rounded-lg">
+                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><CreditCard size={10} /> UNIT COST (EST)</div>
                       <div className="text-xs font-bold text-text-primary">{selectedDTC.estimatedCost || '₱1,500 - ₱4,000'}</div>
                     </div>
                   </div>
 
                   <div className="space-y-6">
                     <div>
-                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14} className="text-yellow-400" /> POTENTIAL CAUSES</h4>
-                      <div className="flex flex-wrap gap-2">
+                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14} className="text-yellow-400" /> PROBABLE ROOT CAUSES (RANKED)</h4>
+                      <div className="space-y-2">
                         {(() => {
-                          const causes = Array.isArray(selectedDTC?.causes) ? selectedDTC.causes : 
-                                        (typeof (selectedDTC as any)?.causes === 'string' ? (selectedDTC as any).causes.split(',') : []);
-                          return causes.length > 0 ? causes.map((c: string, i: number) => (
-                            <span key={i} className="px-2 py-1 bg-white/5 border border-border-glass rounded text-[10px] text-text-secondary">
-                              {c.trim()}
-                            </span>
-                          )) : (
-                            <span className="text-[10px] text-text-secondary italic">Information synchronization in progress...</span>
-                          );
+                           const rawCauses = selectedDTC?.causes;
+                           let processedCauses: { item: string; probability: number }[] = [];
+                           
+                           if (typeof rawCauses === 'string') {
+                             processedCauses = rawCauses.split(',').map(c => ({ item: c.trim(), probability: 0 }));
+                           } else if (Array.isArray(rawCauses)) {
+                             processedCauses = (rawCauses as any[]).map(c => {
+                               if (typeof c === 'string') return { item: c, probability: 0 };
+                               return c;
+                             });
+                           }
+                           
+                           // Sort by probability if it exists
+                           processedCauses.sort((a, b) => (b.probability || 0) - (a.probability || 0));
+
+                           return processedCauses.length > 0 ? processedCauses.map((c: any, i: number) => (
+                             <div key={i} className="flex flex-col gap-1 p-3 bg-black/20 border border-white/5 rounded-lg group hover:border-brand/30 transition-all">
+                               <div className="flex items-center justify-between">
+                                  <span className="text-xs text-text-primary capitalize font-medium">{c.item}</span>
+                                  {c.probability > 0 && <span className="text-[10px] text-brand font-bold bg-brand/10 px-2 py-0.5 rounded border border-brand/20">{(c.probability * 100).toFixed(0)}% MATCH</span>}
+                               </div>
+                               {c.probability > 0 && (
+                                 <ProgressBar progress={c.probability * 100} className="h-0.5 opacity-50 mt-1" />
+                               )}
+                             </div>
+                           )) : (
+                             <span className="text-[10px] text-text-secondary italic">Information synchronization in progress...</span>
+                           );
                         })()}
                       </div>
                     </div>
@@ -2667,13 +2712,29 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                           
                           return steps.length > 0 ? (
                             <>
-                              {steps.slice(0, 3).map((step: string, i: number) => (
-                                <div key={i} className="p-3 bg-black/30 border-l-2 border-brand rounded-r text-[11px] leading-relaxed text-text-primary italic">
-                                  {step}
+                              {(showFullProtocol ? steps : steps.slice(0, 3)).map((step: string, i: number) => (
+                                <div key={i} className="p-3 bg-black/30 border-l-2 border-brand rounded-r text-[11px] leading-relaxed text-text-primary italic hover:bg-white/5 transition-colors">
+                                  <div className="flex gap-3 items-start">
+                                    <span className="text-brand font-mono font-bold mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                                    <span>{step}</span>
+                                  </div>
                                 </div>
                               ))}
-                              {steps.length > 3 && (
-                                <button className="text-[9px] font-bold text-brand uppercase tracking-widest hover:underline">View Full 12-Step Protocol</button>
+                              {steps.length > 3 && !showFullProtocol && (
+                                <button 
+                                  onClick={() => setShowFullProtocol(true)}
+                                  className="text-[9px] font-bold text-brand uppercase tracking-widest hover:underline py-2 w-full text-center bg-brand/5 border border-brand/20 rounded-lg hover:bg-brand/10 transition-colors"
+                                >
+                                  View Full {steps.length}-Step Protocol
+                                </button>
+                              )}
+                              {showFullProtocol && (
+                                <button 
+                                  onClick={() => setShowFullProtocol(false)}
+                                  className="text-[9px] font-bold text-text-secondary uppercase tracking-widest hover:underline py-2 w-full text-center bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+                                >
+                                  Hide Extended Details
+                                </button>
                               )}
                             </>
                           ) : (
@@ -2690,9 +2751,9 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                       <button className="btn-secondary w-14 h-14 flex items-center justify-center p-0 rounded-lg"><Share2 size={18} /></button>
                     </div>
 
-                    <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
-                       <div className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-1">STRICT SAFETY PROTOCOL</div>
-                       <p className="text-[10px] text-red-300 opacity-80 uppercase leading-tight">THREAT LEVEL: {selectedDTC.dangerLevel || 'HIGH'}. PROCEED WITH CAUTION OR ENGAGE PROFESSIONAL SUPPORT.</p>
+                    <div className={`p-4 border rounded-lg ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'bg-red-500/5 border-red-500/20' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-brand/5 border-brand/20'}`}>
+                       <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-400' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-400' : 'text-brand'}`}>STRICT SAFETY PROTOCOL</div>
+                       <p className={`text-[10px] opacity-80 uppercase leading-tight ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-300' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-300' : 'text-white'}`}>THREAT LEVEL: {selectedDTC.dangerLevel || selectedDTC.severity || 'HIGH'}. {String(selectedDTC.severity).toLowerCase() === 'critical' ? 'IMMEDIATE ACTION REQUIRED. DO NOT OPERATE SYSTEM.' : 'PROCEED WITH CAUTION OR ENGAGE PROFESSIONAL SUPPORT.'}</p>
                     </div>
                   </div>
                 </motion.div>
