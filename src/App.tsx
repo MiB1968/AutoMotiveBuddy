@@ -220,13 +220,30 @@ function AIMaintenanceTab({ user, store }: any) {
       const text = await searchMaintenanceGuides(searchQuery, store.vehicle);
       setResult(text);
       
-      if (aiVoiceOn && synthRef.current) {
-        const cleanText = text.replace(/[*#]/g, '').replace(/\[.*?\]\(.*?\)/g, '');
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
-        synthRef.current.speak(utterance);
+      if (aiVoiceOn && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        setIsSpeaking(true);
+        
+        const cleanText = text.replace(/[*#`]/g, '').replace(/\[.*?\]\(.*?\)/g, '');
+        // Split by sentences (approximately) to avoid Chrome TTS length limit bug
+        const chunks = cleanText.match(/[^.!?]+[.!?]+/g) || [cleanText];
+        
+        const voices = window.speechSynthesis.getVoices();
+        const techVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Microsoft')));
+        
+        chunks.forEach((chunk, index) => {
+          if (!chunk.trim()) return;
+          const utterance = new SpeechSynthesisUtterance(chunk.trim());
+          utterance.rate = 0.9;
+          if (techVoice) {
+            utterance.voice = techVoice;
+          }
+          if (index === chunks.length - 1) {
+            utterance.onend = () => setIsSpeaking(false);
+          }
+          utterance.onerror = () => setIsSpeaking(false);
+          window.speechSynthesis.speak(utterance);
+        });
       }
     } catch (err: any) {
       setResult("Error fetching guide: " + err.message);
