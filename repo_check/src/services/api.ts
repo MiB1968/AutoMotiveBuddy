@@ -16,7 +16,7 @@ export const diagnoseDTC = async (code: string, vehicleInfo: any = {}) => {
     year: parseInt(vehicleInfo.year) || 2023
   };
   
-  const response = await api.post("/api/diagnose", payload);
+  const response = await api.post("/diagnose", payload);
   return response.data;
 };
 

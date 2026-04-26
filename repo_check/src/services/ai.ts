@@ -1,20 +1,22 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { diagnoseDTC } from './api';
 
 const getAI = () => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("VITE_GEMINI_API_KEY is not configured.");
   }
-  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return new GoogleGenerativeAI({ apiKey });
 };
 
 export async function generateDynamicVehicleData(type: 'fuses' | 'components' | 'warning_lights', manufacturer: string, modelStr: string, year: string, engine: string) {
   try {
-    const ai = getAI();
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     let systemPrompt = "";
 
     if (type === 'fuses') {
-      systemPrompt = `You are a top-tier automotive electrician and technical writer. Provide a highly detailed, comprehensive guide to the fuse boxes and relays for the ${year} ${manufacturer} ${modelStr} (${engine}), matching the detail level found in professional databases like StartMyCar or OEM service manuals.
+      systemPrompt = `You are a top-tier automotive electrician and technical writer. Provide a highly detailed, comprehensive guide to the fuse boxes and relays for the ${year} ${manufacturer} ${modelStr}.
 
 Your response MUST include:
 1. Exact locations of EVERY fuse box (Engine Compartment, Passenger Compartment, Trunk, etc.) with detailed instructions on how to access them.
@@ -28,41 +30,51 @@ Your response MUST include:
 
 Format entirely in clean, readable Markdown using tables, bolding for emphasis, and clear headings. Do NOT skip any fuses; provide as exhaustive a list as possible.`;
     } else if (type === 'components') {
-      systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${manufacturer} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, main engine computer (ECU/PCM), starter motor, alternator, oxygen sensors, mass airflow sensor, and oil/air/cabin filters. Format your response in clean Markdown.`;
+      systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${manufacturer} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, fuse boxes, relays, and major sensors. Format in Markdown.`;
     } else if (type === 'warning_lights') {
-      systemPrompt = `You are an expert automotive diagnostician. Provide a detailed guide on the dashboard warning lights for the ${year} ${manufacturer} ${modelStr}. Categorize them by severity (Red = Stop ASAP, Yellow = Check soon, Green/Blue = Informational). Describe what each light looks like, what it means, and recommended actions. Format your response in clean Markdown.`;
+      systemPrompt = `You are an expert automotive diagnostician. Provide a detailed guide on the dashboard warning lights for the ${year} ${manufacturer} ${modelStr}. Categorize them by severity (Red/Critical, Yellow/Warning, Green/Info). Explain what each light means and recommended actions.`;
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `I need the ${type} data for a ${year} ${manufacturer} ${modelStr} with engine ${engine}.`,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.3
-      }
+    const response = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `I need the ${type} data for a ${year} ${manufacturer} ${modelStr} with engine ${engine}. ${systemPrompt}`
+            }
+          ]
+        }
+      ]
     });
 
-    return response.text || "Dataset currently inaccessible. High-altitude network interference detected.";
+    return response.response.text() || "Dataset currently inaccessible. High-altitude network interference detected.";
   } catch (error: any) {
     console.error("Failed to generate dynamic vehicle data:", error);
-    return `### DATA TEMPORARILY UNAVAILABLE\n\nThe diagnostic uplink for this specific ${manufacturer} model is currently being recalibrated. \n\n**Common Advice:**\n- Verify battery voltage (12.6V engine off).\n- Inspect ground straps for corrosion.\n- Check for symptoms related to the specific fault code if applicable.`;
+    return `### DATA TEMPORARILY UNAVAILABLE\n\nThe diagnostic uplink for this specific ${manufacturer} model is currently being recalibrated. \n\n**Common Advice:**\n- Verify battery voltage (12.6V fully charged)\n- Check OBD2 scanner connectivity\n- Ensure stable internet connection`;
   }
 }
 
 export async function askAutomotiveAssistant(prompt: string, vehicle: any, history: any[] = []) {
   try {
-    const ai = getAI();
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
     
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Vehicle Context: ${vStr}\n\nUser Query: ${prompt}`,
-      config: {
-        systemInstruction: `You are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant. Your goal is to help users identify engine codes (DTCs), explain symptoms, and suggest solutions. You now officially support both English and Tagalog (Filipino) languages. Respond in the language used by the user, or as specifically requested. Be professional, technical yet accessible, and always prioritize safety. Owner: Ruben Llego. Greeting: "Hello! I'm your AutoMotive Buddy. How can I help with your vehicle today?" (or its Tagalog equivalent if the user speaks Tagalog). Do not use markdown headers larger than h3.`,
-      }
+    const response = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Vehicle Context: ${vStr}\n\nYou are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant. Your goal is to help users identify engine codes (DTCs), explain symptoms, and suggest solutions.\n\nUser Query: ${prompt}`
+            }
+          ]
+        }
+      ]
     });
     
-    return response.text || "Direct uplink failed. Please re-state your query.";
+    return response.response.text() || "Direct uplink failed. Please re-state your query.";
   } catch (error: any) {
     console.error("AI Generation Error:", error);
     const errDetail = error?.message || "Unknown error";
@@ -94,18 +106,24 @@ export async function performDeepDTCSearch(code: string) {
       console.warn("Backend API not reachable/DTC not found, falling back to GenAI", apiError);
     }
     
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Perform a deep technical search for the OBD2 fault code: ${code}. Identify the specific part, system affected, common causes, symptoms, and repair protocol. Return ONLY a JSON object with: code, description, system, severity, causes (string array), symptoms (string array), solutions (string array).`,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json"
-      }
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const response = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Perform a deep technical search for the OBD2 fault code: ${code}. Identify the specific part, system affected, common causes, symptoms, and repair protocol. Return as JSON with fields: code, description, system, severity, causes (array), symptoms (array), solutions (array).`
+            }
+          ]
+        }
+      ]
     });
     
-    if (response.text) {
-      let cleanText = response.text.trim();
+    if (response.response) {
+      let cleanText = response.response.text().trim();
       const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         cleanText = jsonMatch[0];
@@ -128,14 +146,14 @@ export async function performDeepDTCSearch(code: string) {
       }
     }
     throw new Error("Invalid AI response format");
-    } catch (error) {
+  } catch (error) {
     console.error("Deep Search Error:", error);
     
     // Hardcoded logic for common critical codes that might fail AI search
     if (code.toUpperCase() === 'P1000') {
       return {
         code: 'P1000',
-        description: "OBD-II Monitor Testing Incomplete. This indicates that the vehicle's engine computer has not completed its internal self-test cycle. This common on Ford vehicles after a battery disconnect or code clear.",
+        description: "OBD-II Monitor Testing Incomplete. This indicates that the vehicle's engine computer has not completed its internal self-test cycle. This is common on Ford vehicles after a battery disconnect or code clear.",
         system: "Engine Management / Emissions",
         severity: "low",
         causes: ["Battery disconnect", "Recently cleared codes", "Battery replacement", "Incomplete driving cycle"],
@@ -157,4 +175,3 @@ export async function performDeepDTCSearch(code: string) {
     };
   }
 }
-
