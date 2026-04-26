@@ -1879,23 +1879,32 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
     let localMatches: any[] = [];
     
     try {
-      // 1. Try exact match
-      const res = await api.get(`/dtc/${query}`);
+      // 1. Try exact match from Render API
+      const payload = {
+        code: query,
+        vehicle_type: selectedManufacturer ? 'light' : 'unknown',
+        brand: selectedManufacturer || 'Unknown',
+        model: selectedModel || 'Unknown',
+        year: parseInt(selectedYear) || 2023
+      };
+      const res = await api.post("/api/diagnose", payload);
       let dtcResult = res.data;
+      if (res.data.data) dtcResult = res.data.data;
 
-      // 2. Try keyword search for broader results
+      // 2. Try keyword search for broader results (disabled if unsupported by Render)
       let broadResults: any[] = [];
       try {
-        const searchRes = await api.get(`/dtc/search/${query}`);
-        if (Array.isArray(searchRes.data)) {
-          broadResults = searchRes.data.map((d: any) => ({
+        const searchRes = await api.post(`/api/diagnose/search`, { query }); 
+        // Fallback for search route if we add it later
+        if (Array.isArray(searchRes.data?.data)) {
+          broadResults = searchRes.data.data.map((d: any) => ({
             ...d,
             id: d.code,
             title: d.description
           }));
         }
       } catch (sErr) {
-        console.warn("Keyword search failed:", sErr);
+        // console.warn("Keyword search failed:", sErr);
       }
 
       // If the backend says search is required/pending AI, trigger frontend deep search
@@ -1914,9 +1923,25 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
 
       dtcData = {
         ...dtcResult,
-        id: dtcResult.code,
-        title: dtcResult.description,
+        id: dtcResult.code || query,
+        title: dtcResult.title || dtcResult.description,
       };
+      
+      // Temporary Heal: If API backend truncated the description, recover it from local db
+      if (!dtcData.title && !dtcData.description) {
+         const allLocalDTCs = [
+           ...(fordDTCDatabase as unknown as DTC[]), 
+           ...(otherMfrDTCs as unknown as DTC[]), 
+           ...(genericDTCs as unknown as DTC[]),
+           ...(komatsuDTCs as unknown as DTC[]),
+           ...(dtcMasterData as unknown as DTC[]),
+           ...store.dtcs
+         ];
+         const localMatch = allLocalDTCs.find(d => String(d?.code).toUpperCase() === query.toUpperCase());
+         if (localMatch) {
+            dtcData = { ...localMatch, ...dtcData, title: localMatch.title || localMatch.description || dtcData.title };
+         }
+      }
       
       // Save offline
       try {
@@ -1946,11 +1971,11 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
         console.warn("IndexedDB error:", dbErr);
       }
       
-      if (offlineData) {
+      if (offlineData && (offlineData.description || offlineData.title)) {
         dtcData = {
            ...offlineData,
            id: offlineData.code,
-           title: offlineData.description,
+           title: offlineData.title || offlineData.description,
            status: 'OFFLINE_CACHE'
         };
         localMatches.push(dtcData);
@@ -2122,7 +2147,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                         </span>
                       </div>
                       <p className="text-sm text-text-primary font-display font-medium uppercase tracking-tight">
-                        {dtc.title || dtc.description}
+                        {dtc.title || dtc.description || 'System Diagnostic Details Unavailable'}
                       </p>
                     </div>
                     <ChevronRight size={20} className={`text-text-secondary mt-1 transition-transform ${selectedDTC?.code === dtc.code ? 'rotate-90 text-primary-orange' : ''}`} />

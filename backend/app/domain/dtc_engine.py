@@ -22,8 +22,8 @@ class DTCEngine:
 
         confidence = min(100, (base_score * 10) + symptom_bonus + frequency_weight)
 
-        return {
-            "code": code_data["code"],
+        result = code_data.copy()
+        result.update({
             "confidence": confidence,
             "priority": self._priority(confidence),
             "likely_causes": sorted(
@@ -31,7 +31,8 @@ class DTCEngine:
                 key=lambda x: x.get("probability", 0) if isinstance(x, dict) else 0,
                 reverse=True
             )
-        }
+        })
+        return result
 
     def _priority(self, confidence):
         if confidence > 80:
