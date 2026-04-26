@@ -1258,6 +1258,70 @@ function ChatBot({ currentUser, store, toast }: any) {
   );
 }
 
+import { Download } from 'lucide-react';
+
+function InstallDrawer({ isOpen, onClose, onInstall, hasPrompt }: { isOpen: boolean, onClose: () => void, onInstall: () => void, hasPrompt: boolean }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex justify-end">
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
+      <motion.div 
+        initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="w-full max-w-sm h-full bg-background-glass border-l border-border-glass shadow-2xl relative z-10 flex flex-col"
+      >
+        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
+          <div className="flex items-center gap-3">
+            <Download className="text-orange" size={24} />
+            <h2 className="text-xl font-display font-medium uppercase tracking-widest text-[#E0E0E0]">Install WebApp</h2>
+          </div>
+          <button onClick={onClose} className="p-2 text-text-muted hover:text-white transition-colors bg-white/5 rounded-lg border border-white/5 hover:border-white/20"><X size={20} /></button>
+        </div>
+        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+          
+          <div className="bg-orange/10 border border-orange/20 rounded-xl p-4">
+            <h3 className="text-sm font-bold text-orange tracking-widest uppercase mb-2">Automotive Buddy App</h3>
+            <p className="text-xs text-text-secondary leading-relaxed font-accent">
+              Install the Progressive Web App (PWA) to your device for offline support, fast loading, and an immersive native-like experience.
+            </p>
+          </div>
+
+          {hasPrompt ? (
+             <button onClick={onInstall} className="btn-primary w-full py-4 text-sm flex items-center justify-center gap-2">
+               <Download size={18} /> INSTALL APP NOW
+             </button>
+          ) : (
+             <div className="space-y-6">
+                <div>
+                   <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-3 flex items-center gap-2"><Globe size={14}/> iOS / Safari</h4>
+                   <ol className="text-xs text-text-secondary space-y-2 list-decimal list-inside font-accent">
+                     <li>Tap the <strong>Share</strong> button at the bottom of the screen.</li>
+                     <li>Scroll down and select <strong>Add to Home Screen</strong>.</li>
+                     <li>Confirm by tapping <strong>Add</strong>.</li>
+                   </ol>
+                </div>
+                <div>
+                   <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-3 flex items-center gap-2"><Globe size={14}/> Android / Chrome</h4>
+                   <ol className="text-xs text-text-secondary space-y-2 list-decimal list-inside font-accent">
+                     <li>Tap the <strong>Menu (3 dots)</strong> at the top right.</li>
+                     <li>Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+                     <li>Follow the prompts to install.</li>
+                   </ol>
+                </div>
+                <div>
+                   <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-3 flex items-center gap-2"><Globe size={14}/> Desktop</h4>
+                   <p className="text-xs text-text-secondary font-accent">
+                     Look for the installation icon (monitor with a down arrow) in the right side of your browser's address bar.
+                   </p>
+                </div>
+             </div>
+          )}
+
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // --- Removed Mock AI Assistant Logic ---
 
 // --- Dashboard Layout Logic ---
@@ -1266,6 +1330,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [installDrawerOpen, setInstallDrawerOpen] = useState(false);
   const activeTab = h.startsWith('#admin-') ? h.replace('#admin-', '') : (h === '#admin' ? 'overview' : (h.replace('#', '') || 'overview'));
 
   const navigateTo = (tab: string) => {
@@ -1295,18 +1360,16 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
-      {showInstall && (
-        <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
-          <button 
-            onClick={onInstall} 
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
-            title="Install Application"
-          >
-            <Download size={18} />
-            {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[10px] font-bold uppercase tracking-widest">Install App</span>}
-          </button>
-        </div>
-      )}
+      <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
+        <button 
+          onClick={() => setInstallDrawerOpen(true)} 
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
+          title="Install Application"
+        >
+          <Download size={18} />
+          {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[10px] font-bold uppercase tracking-widest">Install App</span>}
+        </button>
+      </div>
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
@@ -1368,6 +1431,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
       </AnimatePresence>
 
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
+        <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
         <header className="mb-8 md:mb-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-orange transition-colors">
@@ -1407,6 +1471,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [installDrawerOpen, setInstallDrawerOpen] = useState(false);
   const activeTab = h.replace('#', '') || 'dashboard';
 
   const navigateTo = (tab: string) => {
@@ -1437,18 +1502,16 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
-      {showInstall && (
-        <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
-          <button 
-            onClick={onInstall} 
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
-            title="Install Application"
-          >
-            <Download size={18} />
-            {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[10px] font-bold uppercase tracking-widest">Install App</span>}
-          </button>
-        </div>
-      )}
+      <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
+        <button 
+          onClick={() => setInstallDrawerOpen(true)} 
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
+          title="Install Application"
+        >
+          <Download size={18} />
+          {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[10px] font-bold uppercase tracking-widest">Install App</span>}
+        </button>
+      </div>
 
       <div className="p-4 border-t border-border-glass space-y-4">
         <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
@@ -1510,6 +1573,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
       </AnimatePresence>
 
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
+        <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
         <header className="mb-8 md:mb-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-orange transition-colors">
