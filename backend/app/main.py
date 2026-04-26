@@ -21,7 +21,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -55,3 +55,13 @@ def analyze_dtc(request: DiagnosticRequest):
         raise HTTPException(status_code=404, detail="DTC not found in local database")
         
     return format_success_response(response_data["data"], "Diagnostic analysis complete")
+
+@app.post("/sync/upload")
+def sync_upload(data: dict):
+    # Stub for syncing logs
+    return {"status": "ok", "uploaded": len(data.get("logs", []))}
+
+@app.get("/sync/download")
+def sync_download():
+    # Stub for syncing latest DTCs
+    return {"status": "ok", "dtc": []}

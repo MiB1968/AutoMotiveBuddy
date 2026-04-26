@@ -944,10 +944,66 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
           <header className={`mb-10 ${mode === 'login' ? 'text-center' : ''}`}>
             {mode === 'login' && <Logo className="justify-center mb-8" size="normal" />}
             <h2 className="text-2xl font-display font-bold tracking-widest uppercase">{mode === 'login' ? 'System Authorization' : 'Member Registration'}</h2>
-            <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">{mode === 'login' ? 'Input credentials to establish link' : 'Complete the following fields to join'}</p>
+            <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">{mode === 'login' ? 'Select provider to establish link' : 'Complete the following fields to join'}</p>
           </header>
 
           <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+            {mode === 'login' && (
+              <div className="md:col-span-2 mb-8">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      const { signInWithGoogle } = await import('./lib/firebase');
+                      const fbUser = await signInWithGoogle();
+                      
+                      const allUsers = store.users;
+                      let sysUser = allUsers.find((u: any) => u.email === fbUser?.email);
+                      
+                      if (!sysUser && fbUser) {
+                        sysUser = {
+                          id: fbUser.uid,
+                          username: fbUser.email?.split('@')[0] || 'user',
+                          fullName: fbUser.displayName || 'Guest User',
+                          email: fbUser.email || '',
+                          phone: fbUser.phoneNumber || '',
+                          role: 'member',
+                          status: 'pending',
+                          createdAt: new Date().toISOString(),
+                          avatarUrl: fbUser.photoURL || '',
+                          subscription: {
+                            plan: 'Basic',
+                            startDate: new Date().toISOString(),
+                            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                          }
+                        };
+                        store.addUser(sysUser);
+                      }
+                      
+                      if (sysUser) {
+                        onLogin(sysUser);
+                      }
+                    } catch (e) {
+                      setError('Authorization Failed');
+                      toast('Access Denied', 'error');
+                    }
+                    setLoading(false);
+                  }}
+                  disabled={loading}
+                  className="btn-secondary w-full py-4 text-sm flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-orange/50 hover:bg-orange/10"
+                >
+                  <Globe className="text-orange" size={20} />
+                  <span>SIGN IN WITH GOOGLE</span>
+                </button>
+                <div className="my-6 flex items-center gap-4 text-text-muted text-[10px] font-bold uppercase tracking-widest">
+                  <div className="flex-1 h-px bg-white/10"></div>
+                  <span>OR MANUAL LOGIN</span>
+                  <div className="flex-1 h-px bg-white/10"></div>
+                </div>
+              </div>
+            )}
+
             {mode === 'register' && (
               <div className="input-group md:col-span-2">
                 <input type="text" placeholder=" " className="input-field" required value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
