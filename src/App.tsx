@@ -17,7 +17,7 @@ import {
   Calendar, FileText, ChevronDown, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
-  Mic, MicOff, Camera
+  Mic, MicOff, Camera, Loader2
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
@@ -33,6 +33,10 @@ import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
 import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
 import { syncData } from './sync/syncEngine';
+import { auth, db, signInWithGoogle, logOut } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
 
 // --- UI Helper Components ---
 
@@ -339,15 +343,43 @@ export default function App() {
   const store = useStore();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hash, setHash] = useState(window.location.hash || '#home');
-  const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
-    try {
-      const saved = sessionStorage.getItem('ab_session');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setAuthLoading(true);
+      if (fbUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+          if (userDoc.exists()) {
+            setCurrentUser(userDoc.data() as UserType);
+          } else {
+            // New user via Google login
+            const newUser: UserType = {
+              id: fbUser.uid,
+              username: fbUser.email?.split('@')[0] || 'user',
+              fullName: fbUser.displayName || 'Guest User',
+              email: fbUser.email || '',
+              role: fbUser.email === 'rubenlleg12@gmail.com' ? 'admin' : 'member',
+              status: fbUser.email === 'rubenlleg12@gmail.com' ? 'approved' : 'pending',
+              createdAt: new Date().toISOString(),
+              avatarUrl: fbUser.photoURL || '',
+            };
+            await setDoc(doc(db, 'users', fbUser.uid), newUser);
+            setCurrentUser(newUser);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${fbUser.uid}`);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     // Register Service Worker
@@ -396,34 +428,45 @@ export default function App() {
   };
 
   const login = (user: UserType) => {
-    setCurrentUser(user);
-    sessionStorage.setItem('ab_session', JSON.stringify(user));
+    // With Firebase, onAuthStateChanged sets the user, but we can do local nav stuff here
     window.location.hash = user.role === 'admin' ? '#admin-overview' : '#dashboard';
-    addToast(`Greetings, ${user.fullName.split(' ')[0]}. Neural link established.`, 'success');
-    store.addLog(user.id, user.username, 'Login', 'Encrypted connection initialized');
+    addToast(`Greetings, ${user.fullName?.split(' ')[0] || 'User'}. Neural link established.`, 'success');
   };
 
-  const updateAvatar = (newUrl: string) => {
+  const updateAvatar = async (newUrl: string) => {
     if (currentUser) {
-      const updated = { ...currentUser, avatarUrl: newUrl };
-      setCurrentUser(updated);
-      sessionStorage.setItem('ab_session', JSON.stringify(updated));
-      store.updateUser(updated.id, updated);
-      
-      // If Ruben updates his avatar, also save it specifically so the public page can easily see it if needed
-      if (updated.username === 'rubenllego' || updated.role === 'admin') {
-        localStorage.setItem('ab_admin_avatar', newUrl);
+      try {
+        const updated = { ...currentUser, avatarUrl: newUrl };
+        await setDoc(doc(db, 'users', currentUser.id), { avatarUrl: newUrl }, { merge: true });
+        setCurrentUser(updated);
+        
+        // If Ruben updates his avatar, also save it specifically so the public page can easily see it if needed
+        if (updated.username === 'rubenllego' || updated.role === 'admin') {
+          localStorage.setItem('ab_admin_avatar', newUrl);
+        }
+        
+        addToast('Profile avatar updated.', 'success');
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.id}`);
       }
-      
-      addToast('Profile avatar updated.', 'success');
     }
   };
 
-  const logout = () => {
-    if (currentUser) store.addLog(currentUser.id, currentUser.username, 'Logout', 'User session terminated');
-    setCurrentUser(null);
-    sessionStorage.removeItem('ab_session');
-    window.location.hash = '#home';
+  const logout = async () => {
+    try {
+      if (currentUser) {
+        await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
+          id: Math.random().toString(36).substr(2, 9),
+          userId: currentUser.id, username: currentUser.username,
+          action: 'Logout', details: 'User session terminated',
+          timestamp: new Date().toISOString()
+        });
+      }
+      await logOut();
+      window.location.hash = '#home';
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   // Simplified Router
@@ -432,8 +475,11 @@ export default function App() {
 
     // Public
     if (h === '#home') return <LandingPage onNavigate={setHash} user={currentUser} onUpdateAvatar={updateAvatar} />;
-    if (h === '#login') return <AuthPage mode="login" onLogin={login} onBack={() => window.location.hash = '#home'} store={store} toast={addToast} />;
-    if (h === '#register') return <AuthPage mode="register" onLogin={login} onBack={() => window.location.hash = '#home'} store={store} toast={addToast} />;
+    if (h === '#login') return <AuthPage mode="login" onBack={() => window.location.hash = '#home'} toast={addToast} />;
+    if (h === '#register') return <AuthPage mode="register" onBack={() => window.location.hash = '#home'} toast={addToast} />;
+
+    // Wait until firebase auth is initialized before deciding what protected view to show
+    if (authLoading) return <div className="h-screen w-full flex items-center justify-center font-display uppercase tracking-widest text-text-secondary animate-pulse gap-3"><Loader2 className="animate-spin" size={24}/> Establishing Neural Link...</div>;
 
     // Protected
     if (!currentUser) {
@@ -845,66 +891,9 @@ function PricingCard({ title, price, duration, icon: Icon, benefits, featured, a
 
 // --- Authentication Page ---
 
-function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
-  const [formData, setFormData] = useState({ username: '', password: '', fullName: '', plan: 'Basic', email: '', phone: '' });
-  const [showPassword, setShowPassword] = useState(false);
+function AuthPage({ mode, onBack, toast }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const submit = (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    setTimeout(() => {
-      const allUsers = store.users;
-      if (mode === 'login') {
-        const u = allUsers.find((u: any) => u.username === formData.username && u.password === formData.password);
-        if (u) {
-          onLogin(u);
-        } else {
-          setError('Authorization Failed: Invalid Credentials');
-          toast('Access Denied: Check username/password', 'error');
-        }
-      } else {
-        const exists = allUsers.find((u: any) => u.username === formData.username);
-        if (exists) {
-          setError('Registration Failed: ID already in use');
-          toast('User ID already exists in the matrix', 'error');
-        } else {
-          const newUser = {
-            id: Math.random().toString(36).substr(2, 9),
-            username: formData.username,
-            password: formData.password,
-            fullName: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            role: 'member',
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-            subscription: {
-              plan: formData.plan,
-              startDate: new Date().toISOString(),
-              expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          };
-          store.addUser(newUser);
-          toast('Protocol Initialized: Account pending admin approval', 'success');
-          window.location.hash = '#login';
-        }
-      }
-      setLoading(false);
-    }, 1500);
-  };
-
-  const getPassStrength = () => {
-    if (!formData.password) return { val: 0, label: 'NONE', color: 'bg-text-muted' };
-    if (formData.password.length < 6) return { val: 33, label: 'WEAK', color: 'bg-red' };
-    if (formData.password.length < 10) return { val: 66, label: 'FAIR', color: 'bg-yellow' };
-    return { val: 100, label: 'STRONG', color: 'bg-green text-shadow-glow' };
-  };
-
-  const strength = getPassStrength();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
@@ -949,160 +938,33 @@ function AuthPage({ mode, onLogin, onBack, store, toast, users }: any) {
           <header className={`mb-10 ${mode === 'login' ? 'text-center' : ''}`}>
             {mode === 'login' && <Logo className="justify-center mb-8" size="normal" />}
             <h2 className="text-2xl font-display font-bold tracking-widest uppercase">{mode === 'login' ? 'System Authorization' : 'Member Registration'}</h2>
-            <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">{mode === 'login' ? 'Select provider to establish link' : 'Complete the following fields to join'}</p>
+            <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">Select provider to establish link</p>
           </header>
 
-          <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-            {mode === 'login' && (
-              <div className="md:col-span-2 mb-8">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    try {
-                      const { signInWithGoogle } = await import('./lib/firebase');
-                      const fbUser = await signInWithGoogle();
-                      
-                      const allUsers = store.users;
-                      let sysUser = allUsers.find((u: any) => u.email === fbUser?.email);
-                      
-                      if (!sysUser && fbUser) {
-                        sysUser = {
-                          id: fbUser.uid,
-                          username: fbUser.email?.split('@')[0] || 'user',
-                          fullName: fbUser.displayName || 'Guest User',
-                          email: fbUser.email || '',
-                          phone: fbUser.phoneNumber || '',
-                          role: 'member',
-                          status: 'pending',
-                          createdAt: new Date().toISOString(),
-                          avatarUrl: fbUser.photoURL || '',
-                          subscription: {
-                            plan: 'Basic',
-                            startDate: new Date().toISOString(),
-                            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                          }
-                        };
-                        store.addUser(sysUser);
-                      }
-                      
-                      if (sysUser) {
-                        onLogin(sysUser);
-                      }
-                    } catch (e) {
-                      setError('Authorization Failed');
-                      toast('Access Denied', 'error');
-                    }
-                    setLoading(false);
-                  }}
-                  disabled={loading}
-                  className="btn-secondary w-full py-4 text-sm flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-orange/50 hover:bg-orange/10"
-                >
-                  <Globe className="text-orange" size={20} />
-                  <span>SIGN IN WITH GOOGLE</span>
-                </button>
-                <div className="my-6 flex items-center gap-4 text-text-muted text-[10px] font-bold uppercase tracking-widest">
-                  <div className="flex-1 h-px bg-white/10"></div>
-                  <span>OR MANUAL LOGIN</span>
-                  <div className="flex-1 h-px bg-white/10"></div>
-                </div>
-              </div>
-            )}
-
-            {mode === 'register' && (
-              <div className="input-group md:col-span-2">
-                <input type="text" placeholder=" " className="input-field" required value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
-                <label className="input-label">Full Name</label>
-                <User className="input-icon" size={18} />
-              </div>
-            )}
-            
-            <div className={`input-group ${mode === 'login' ? 'md:col-span-1' : ''}`}>
-              <input type="text" placeholder=" " className="input-field" required value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} />
-              <label className="input-label">Username / Member ID</label>
-              <Cpu className="input-icon" size={18} />
-            </div>
-
-            {mode === 'register' && (
-              <div className="input-group">
-                <input type="email" placeholder=" " className="input-field" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-                <label className="input-label">Email Address</label>
-                <Mail className="input-icon" size={18} />
-              </div>
-            )}
-
-            <div className="input-group group relative">
-              <input type={showPassword ? "text" : "password"} placeholder=" " className="input-field" required value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-              <label className="input-label">Access Passcode</label>
-              <Lock className="input-icon" size={18} />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-orange transition-colors">
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-              {mode === 'register' && (
-                <div className="mt-4 flex items-center justify-between gap-4 px-1">
-                  <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
-                    <div className={`h-full ${strength.color} transition-all duration-500`} style={{ width: `${strength.val}%` }} />
-                  </div>
-                  <span className={`text-[8px] font-accent font-bold tracking-widest ${strength.val > 0 ? strength.color.replace('bg-', 'text-') : 'text-text-muted'}`}>{strength.label}</span>
-                </div>
-              )}
-            </div>
-
-            {mode === 'register' && (
-              <div className="input-group">
-                <input type="tel" placeholder=" " className="input-field" required value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-                <label className="input-label">Phone Number</label>
-                <Phone className="input-icon" size={18} />
-              </div>
-            )}
-
-            {mode === 'register' && (
-              <div className="md:col-span-2 mb-8">
-                 <label className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-[0.3em] mb-4 block ml-1">Subscription Selection</label>
-                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                   {[
-                     { id: 'Basic', price: '1k', label: 'Basic' },
-                     { id: 'Standard', price: '3k', label: 'Standard' },
-                     { id: 'Premium', price: '5k', label: 'Premium' }
-                   ].map(p => (
-                     <button 
-                       key={p.id} type="button" 
-                       onClick={() => setFormData({ ...formData, plan: p.id })}
-                       className={`flex flex-col items-center gap-1 p-4 rounded-xl border transition-all duration-300 ${formData.plan === p.id ? 'border-orange bg-orange/10 shadow-[0_0_15px_var(--color-orange-glow)] scale-105' : 'border-white/5 hover:border-white/10'}`}
-                     >
-                        <span className="text-[9px] font-accent font-bold uppercase tracking-widest text-text-secondary">{p.label}</span>
-                        <span className="text-xl font-display font-bold text-orange">₱{p.price}</span>
-                     </button>
-                   ))}
-                 </div>
-              </div>
-            )}
-
-            {mode === 'login' && (
-              <div className="flex items-center justify-between mb-2 md:col-span-2">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                   <div className="w-4 h-4 rounded border border-white/10 group-hover:border-orange transition-colors flex items-center justify-center">
-                     <div className="w-2 h-2 rounded-sm bg-orange scale-0 group-hover:scale-100 transition-transform" />
-                   </div>
-                   <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Remember Member Link</span>
-                </label>
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} className="btn-primary w-full md:col-span-2 py-5 text-sm shadow-2xl ripple mt-8 group relative overflow-hidden">
-              <div className="absolute inset-0 bg-white/10 -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
-              {loading ? (
-                <div className="flex items-center justify-center gap-3 relative z-10">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span className="animate-pulse">Authorizing...</span>
-                </div>
-              ) : (
-                <span className="flex items-center justify-center gap-2 relative z-10">{mode === 'login' ? 'Establish Secure Link' : 'Initialize Account Protocol'} <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" /></span>
-              )}
+          <div className="flex flex-col gap-6">
+            <button
+              type="button"
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const { signInWithGoogle } = await import('./lib/firebase');
+                  await signInWithGoogle();
+                  // onAuthStateChanged in App.tsx takes care of the rest
+                } catch (e) {
+                  setError('Authorization Failed');
+                  toast('Access Denied', 'error');
+                }
+                setLoading(false);
+              }}
+              disabled={loading}
+              className="btn-secondary w-full py-5 text-sm flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-orange/50 hover:bg-orange/10"
+            >
+              <Globe className="text-orange" size={20} />
+              <span>{loading ? 'AUTHORIZING...' : 'CONTINUE WITH GOOGLE'}</span>
             </button>
-          </form>
+          </div>
 
-          <footer className="mt-10 text-center flex flex-col gap-4">
+          <footer className="mt-14 text-center flex flex-col gap-4 border-t border-white/10 pt-8">
             <button onClick={onBack} className="text-[10px] font-accent font-bold uppercase tracking-[0.2em] text-text-muted hover:text-orange transition-colors">Return to External Interface</button>
             <div className="text-[11px] text-text-secondary">
               {mode === 'login' ? (
@@ -2938,7 +2800,21 @@ function AIChatTab({ user, store, ...props }: any) {
   );
 }
 
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+
 function MembersTab({ user, store, toast, ...props }: any) {
+  const [users, setUsers] = useState<UserType[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const uDocs: UserType[] = [];
+      snapshot.forEach(d => uDocs.push(d.data() as UserType));
+      setUsers(uDocs);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'users'));
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="glass-panel overflow-hidden p-0">
       <table className="w-full text-left border-collapse">
@@ -2952,7 +2828,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border-glass">
-          {store.users.map((u: UserType) => (
+          {users.map((u: UserType) => (
             <tr key={u.id} className="hover:bg-white/2 transition-colors">
               <td className="p-6">
                 <div className="flex items-center gap-3">
@@ -2971,10 +2847,19 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <div className="flex gap-2">
                   {u.status === 'pending' && (
                     <button 
-                      onClick={() => {
-                        store.updateUser(u.id, { status: 'approved' });
-                        store.addLog(user.id, user.username, 'Approval', `Approved user ${u.fullName} (@${u.username})`);
-                        toast(`Member ${u.username} has been approved. Access granted.`, 'success');
+                      onClick={async () => {
+                        try {
+                           await setDoc(doc(db, 'users', u.id), { status: 'approved' }, { merge: true });
+                           toast(`Member ${u.username} has been approved. Access granted.`, 'success');
+                           await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
+                             id: Math.random().toString(36).substr(2, 9),
+                             userId: user.id, username: user.username,
+                             action: 'Approval', details: `Approved user ${u.fullName} (@${u.username})`,
+                             timestamp: new Date().toISOString()
+                           });
+                        } catch (error) {
+                           handleFirestoreError(error, OperationType.UPDATE, `users/${u.id}`);
+                        }
                       }} 
                       className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"
                       title="Approve Member"
@@ -2983,7 +2868,6 @@ function MembersTab({ user, store, toast, ...props }: any) {
                     </button>
                   )}
                   <button className="p-2 bg-blue-500/20 text-blue-400 rounded hover:scale-110 transition-all cursor-pointer"><Edit size={14} /></button>
-                  {u.role !== 'admin' && <button onClick={() => store.deleteUser(u.id)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer"><Trash2 size={14} /></button>}
                 </div>
               </td>
             </tr>
@@ -3192,11 +3076,23 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
 }
 
 function LogsTab({ store, ...props }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs: any[] = [];
+      snapshot.forEach(d => docs.push(d.data()));
+      setLogs(docs);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'logs'));
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="glass-panel max-h-[600px] overflow-y-auto p-0">
       <div className="p-4 border-b border-border-glass bg-white/5 uppercase text-[9px] font-bold tracking-widest text-text-secondary">Protocol Log Feed</div>
       <div className="p-6 space-y-4">
-        {store.logs.map((l: any) => (
+        {logs.map((l: any) => (
           <div key={l.id} className="flex gap-4 items-start border-b border-border-glass/50 pb-4 last:border-0 group">
              <div className="w-1 h-8 bg-primary-orange/50 group-hover:bg-primary-orange transition-colors" />
              <div>
