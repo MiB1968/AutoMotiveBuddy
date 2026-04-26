@@ -28,7 +28,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch } from './services/ai';
 
-import api from './services/api';
+import api, { diagnoseDTC } from './services/api';
 import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
 import { Card, Badge, ProgressBar, Button } from './components/ui';
@@ -652,6 +652,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 
 export default function App() {
   const store = useStore();
+  const [flowStep, setFlowStep] = useState<'landing' | 'app'>('landing');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hash, setHash] = useState(window.location.hash || '#home');
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
@@ -2013,83 +2014,103 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
       </div>
     </>
   );
-
+  
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0e1a]">
-      {/* Desktop Sidebar */}
-      <motion.aside 
-        animate={{ width: sidebarCollapsed ? 80 : 280 }} 
-        className="hidden lg:flex bg-[#0d1117] border-r border-border-glass flex-col z-20 shrink-0"
-      >
-        <SidebarContent />
-      </motion.aside>
+    <>
+      {flowStep === 'landing' ? (
+        <LandingScreen onEnter={() => setFlowStep('app')} />
+        ) : (
+        <div className="flex h-screen overflow-hidden bg-[#0a0e1a]">
+          {/* Desktop Sidebar */}
+          <motion.aside 
+            animate={{ width: sidebarCollapsed ? 80 : 280 }} 
+            className="hidden lg:flex bg-[#0d1117] border-r border-border-glass flex-col z-20 shrink-0"
+          >
+            <SidebarContent />
+          </motion.aside>
+...
 
-      {/* Mobile Drawer */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }}
-              onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] lg:hidden"
-            />
-            <motion.aside 
-              initial={{ x: -280 }} 
-              animate={{ x: 0 }} 
-              exit={{ x: -280 }}
-              className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0d1117] border-r border-border-glass flex flex-col z-[101] lg:hidden"
-            >
-              <SidebarContent />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+          {/* Mobile Drawer */}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <>
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] lg:hidden"
+                />
+                <motion.aside 
+                  initial={{ x: -280 }} 
+                  animate={{ x: 0 }} 
+                  exit={{ x: -280 }}
+                  className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0d1117] border-r border-border-glass flex flex-col z-[101] lg:hidden"
+                >
+                  <SidebarContent />
+                </motion.aside>
+              </>
+            )}
+          </AnimatePresence>
 
-      <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
-        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.08] mix-blend-screen">
-           <img src="/logo-horizontal.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
-        </div>
-        <div className="relative z-10 w-full">
-        <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
-        <header className="mb-8 md:mb-12 flex justify-between items-center bg-black/20 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-xl">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-text-secondary hover:text-brand hover:border-brand/30 transition-all">
-              <Menu size={24} />
-            </button>
-            <div>
-              <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold shadow-brand">AutoMotive Buddy</h1>
-              <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Your Smart Automotive Companion</p>
+          <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
+            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.08] mix-blend-screen">
+              <img src="/logo-horizontal.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
             </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-4">
-            <button onClick={() => setGlobalSearchOpen(true)} className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-text-muted hover:text-brand hover:border-brand/30 transition-all group shadow-md hover:shadow-[0_0_15px_rgba(0,212,255,0.2)]">
-              <Search size={16} />
-              <span className="text-[10px] uppercase font-bold tracking-widest opacity-60 group-hover:opacity-100 italic">Neural Matrix Search</span>
-              <kbd className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded ml-2 text-white/50">⌘K</kbd>
-            </button>
-            <div className="badge badge-blue py-2 px-4 shadow-[0_0_15px_rgba(59,130,246,0.1)] uppercase text-[10px] tracking-widest font-bold border-blue/30 bg-blue/10 text-blue border">
-              Stable Link
-            </div>
-          </div>
-        </header>
+            <div className="relative z-10 w-full">
+            <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
+            <header className="mb-8 md:mb-12 flex justify-between items-center bg-black/20 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-xl">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-text-secondary hover:text-brand hover:border-brand/30 transition-all">
+                  <Menu size={24} />
+                </button>
+                <div>
+                  <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold shadow-brand">AutoMotive Buddy</h1>
+                  <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Your Smart Automotive Companion</p>
+                </div>
+              </div>
+              <div className="hidden sm:flex items-center gap-4">
+                <button onClick={() => setGlobalSearchOpen(true)} className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-text-muted hover:text-brand hover:border-brand/30 transition-all group shadow-md hover:shadow-[0_0_15px_rgba(0,212,255,0.2)]">
+                  <Search size={16} />
+                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-60 group-hover:opacity-100 italic">Neural Matrix Search</span>
+                  <kbd className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded ml-2 text-white/50">⌘K</kbd>
+                </button>
+                <div className="badge badge-blue py-2 px-4 shadow-[0_0_15px_rgba(59,130,246,0.1)] uppercase text-[10px] tracking-widest font-bold border-blue/30 bg-blue/10 text-blue border">
+                  Stable Link
+                </div>
+              </div>
+            </header>
 
-        <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
-          {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
-          {activeTab === 'chat' && <AIChatTab key="mbr-chat" user={user} store={store} />}
-          {activeTab === 'warning_lights' && <DynamicResourceTab key="mbr-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
-          {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
-          {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
-          {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
-          {activeTab === 'admin' && <AIMaintenanceTab key="mbr-admin" user={user} store={store} />}
-          {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
-          {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
-        </AnimatePresence>
+            <AnimatePresence mode="wait">
+              {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
+              {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
+              {activeTab === 'chat' && <AIChatTab key="mbr-chat" user={user} store={store} />}
+              {activeTab === 'warning_lights' && <DynamicResourceTab key="mbr-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
+              {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
+              {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+              {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
+              {activeTab === 'admin' && <AIMaintenanceTab key="mbr-admin" user={user} store={store} />}
+              {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
+              {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
+            </AnimatePresence>
+            </div>
+          </main>
+          <GlobalSearchOverlay isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} store={store} user={user} />
         </div>
-      </main>
-      <GlobalSearchOverlay isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} store={store} user={user} />
+      )}
+    </>
+  );
+}
+
+function LandingScreen({ onEnter }: { onEnter: () => void }) {
+  return (
+    <div className="h-screen w-screen bg-[#0a0e1a] flex flex-col items-center justify-center p-8 text-center">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-6">
+        <div className="text-brand w-24 h-24 mx-auto"><LogoHex /></div>
+        <h1 className="text-5xl font-display font-bold text-white uppercase tracking-tighter">AutoMotive Buddy</h1>
+        <p className="text-text-secondary text-lg font-accent uppercase tracking-widest">Intelligent Diagnostics. Automated Repair.</p>
+        <button onClick={onEnter} className="btn-primary py-4 px-12 text-lg shadow-[0_0_30px_rgba(0,212,255,0.3)]">Enter Diagnostic Matrix</button>
+      </motion.div>
     </div>
   );
 }
@@ -2319,27 +2340,19 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
     
     try {
       // 1. Try exact match from Render API
-      const payload = {
-        code: query,
-        vehicle_type: selectedManufacturer ? 'light' : 'unknown',
-        brand: selectedManufacturer || 'Unknown',
-        model: selectedModel || 'Unknown',
-        year: parseInt(selectedYear) || 2023
-      };
-      const res = await api.post("/api/diagnose", payload);
-      let dtcResult = res.data;
-      if (res.data.data) dtcResult = res.data.data;
+      let dtcResult = await diagnoseDTC(query);
 
       // 2. Try keyword search for broader results (disabled if unsupported by Render)
       let broadResults: any[] = [];
       try {
-        const searchRes = await api.post(`/api/diagnose/search`, { query }); 
+        const searchRes = await api.get(`/api/dtc/search/${query}`); 
         // Fallback for search route if we add it later
-        if (Array.isArray(searchRes.data?.data)) {
-          broadResults = searchRes.data.data.map((d: any) => ({
+        if (Array.isArray(searchRes.data)) {
+          broadResults = searchRes.data.map((d: any) => ({
             ...d,
             id: d.code,
-            title: d.description
+            title: d.code,
+            description: d.description
           }));
         }
       } catch (sErr) {
