@@ -1,6 +1,0 @@
-{
-  "name": "Remix: AutoMotive Buddy",
-  "description": "Premium smart automotive companion with DTC lookup, AI diagnostics, and subscription management.",
-  "requestFramePermissions": ["microphone"],
-  "majorCapabilities": []
-}
