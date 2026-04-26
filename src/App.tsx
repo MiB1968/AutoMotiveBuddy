@@ -113,7 +113,7 @@ function LiveDataTab() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-3 mb-6">
-        <Activity size={24} className="text-primary-orange" />
+        <Activity size={24} className="text-brand" />
         <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">LIVE TELEMETRY STREAM</h2>
       </div>
 
@@ -121,7 +121,7 @@ function LiveDataTab() {
         <HUDPanel>
           <div className="flex flex-col items-center justify-center py-6">
              <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold mb-2">Engine RPM</div>
-             <div className="text-5xl md:text-6xl text-primary-orange font-accent font-bold tracking-tighter">
+             <div className="text-5xl md:text-6xl text-brand font-accent font-bold tracking-tighter">
                 {data.rpm}
              </div>
              <div className="text-[9px] uppercase mt-2 text-text-muted">Revolutions Per Minute</div>
@@ -265,8 +265,8 @@ function AIMaintenanceTab({ user, store }: any) {
       <GlobalVehicleSelector />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange/10 flex items-center justify-center border border-orange/20 shadow-[0_0_15px_rgba(255,107,0,0.2)]">
-            <Search className="text-orange" size={20} />
+          <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center border border-brand/20 shadow-[0_0_15px_rgba(0, 212, 255,0.2)]">
+            <Search className="text-brand" size={20} />
           </div>
           <div>
             <h2 className="text-lg font-display font-medium text-white tracking-widest uppercase">Maintenance Guides</h2>
@@ -304,13 +304,13 @@ function AIMaintenanceTab({ user, store }: any) {
               setAiVoiceOn(!aiVoiceOn);
             }}
             className={`p-3 rounded-lg border flex items-center justify-center transition-all ${
-              aiVoiceOn ? (isSpeaking ? 'bg-orange/20 border-orange/50 text-orange animate-pulse shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-white/10 border-orange/50 text-orange') : 'bg-white/5 border-white/10 text-text-secondary hover:text-white hover:bg-white/10'
+              aiVoiceOn ? (isSpeaking ? 'bg-brand/20 border-brand/50 text-brand animate-pulse shadow-[0_0_15px_rgba(0, 212, 255,0.3)]' : 'bg-white/10 border-brand/50 text-brand') : 'bg-white/5 border-white/10 text-text-secondary hover:text-white hover:bg-white/10'
             }`}
             title="Toggle AI Voice Answer"
           >
             {aiVoiceOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
-          <button type="submit" disabled={loading} className="btn-primary py-2 px-6 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+          <button type="submit" disabled={loading} className="btn-primary py-2 px-6 shadow-[0_0_15px_rgba(0, 212, 255,0.3)]">
             {loading ? <span className="animate-pulse">Searching...</span> : 'Search'}
           </button>
         </form>
@@ -329,7 +329,7 @@ function AIMaintenanceTab({ user, store }: any) {
               <button 
                 key={i}
                 onClick={() => handleSearch(q)}
-                className="text-xs border border-white/10 bg-white/5 hover:bg-orange/10 hover:border-orange/20 text-text-secondary hover:text-white px-3 py-1.5 rounded-full transition-all text-left"
+                className="text-xs border border-white/10 bg-white/5 hover:bg-brand/10 hover:border-brand/20 text-text-secondary hover:text-white px-3 py-1.5 rounded-full transition-all text-left"
               >
                 {q}
               </button>
@@ -342,11 +342,11 @@ function AIMaintenanceTab({ user, store }: any) {
         <HUDPanel className="p-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 opacity-50">
-               <div className="loader w-6 h-6 border-2 border-orange/20 border-t-orange rounded-full animate-spin mb-4" />
-               <div className="text-xs text-orange tracking-widest uppercase font-bold animate-pulse">Consulting Neural Network...</div>
+               <div className="loader w-6 h-6 border-2 border-brand/20 border-t-brand rounded-full animate-spin mb-4" />
+               <div className="text-xs text-brand tracking-widest uppercase font-bold animate-pulse">Consulting Neural Network...</div>
             </div>
           ) : (
-            <div className="prose prose-invert prose-orange max-w-none prose-sm sm:prose-base font-accent prose-headings:font-display prose-headings:tracking-widest prose-headings:uppercase prose-a:text-orange">
+            <div className="prose prose-invert prose-brand max-w-none prose-sm sm:prose-base font-accent prose-headings:font-display prose-headings:tracking-widest prose-headings:uppercase prose-a:text-brand">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
             </div>
           )}
@@ -375,7 +375,7 @@ function UnitManualsTab() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-3 mb-6">
-        <BookOpen size={24} className="text-primary-orange" />
+        <BookOpen size={24} className="text-brand" />
         <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">GENERIC TECHNICAL MANUALS</h2>
       </div>
 
@@ -415,9 +415,32 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onUpdate) {
+      if (!file.type.startsWith('image/')) return;
       const reader = new FileReader();
       reader.onloadend = () => {
-        onUpdate(reader.result as string);
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 250;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6); // Compress aggressive
+          onUpdate(compressedBase64);
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -429,7 +452,7 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
         <img 
           src={user.avatarUrl} 
           alt={user?.fullName || "Guest"} 
-          className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] object-cover shrink-0 ${className}`}
+          className={`${currentSize} rounded-full border-2 border-brand bg-[#0A1224] object-cover shrink-0 ${className}`}
           referrerPolicy="no-referrer"
           onError={() => setImageError(true)}
         />
@@ -439,7 +462,7 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
     const initial = user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'G';
 
     return (
-      <div className={`${currentSize} rounded-full border-2 border-primary-orange bg-[#1e293b] flex items-center justify-center font-bold text-white shrink-0 uppercase ${className}`}>
+      <div className={`${currentSize} rounded-full border-2 border-brand bg-[#0A1224] flex items-center justify-center font-bold text-white shrink-0 uppercase ${className}`}>
         {initial}
       </div>
     );
@@ -524,7 +547,7 @@ const Logo = ({ className = "", size = "normal" }: { className?: string, size?: 
           <img 
             src="/logo-icon.png" 
             alt="AutoMotive Buddy" 
-            className="w-10 h-10 object-contain" 
+            className="w-10 h-10 object-contain mix-blend-screen brightness-110 drop-shadow-[0_0_10px_rgba(0,212,255,0.2)]" 
             onError={() => setImgError(true)} 
           />
         )}
@@ -582,7 +605,7 @@ const Logo = ({ className = "", size = "normal" }: { className?: string, size?: 
         <img 
           src={size === 'large' ? "/logo-vertical.png" : "/logo-horizontal.png"} 
           alt="AutoMotive Buddy" 
-          className={size === 'large' ? 'h-48 object-contain' : 'h-16 object-contain'}
+          className={size === 'large' ? 'w-full max-w-[280px] object-contain px-4 mix-blend-screen drop-shadow-md' : 'w-full max-w-[200px] h-auto max-h-[60px] object-contain mix-blend-screen drop-shadow-md'}
           onError={() => setImgError(true)} 
         />
       )}
@@ -780,6 +803,32 @@ export default function App() {
     setToasts(prev => [...prev, { id, message, type }]);
   };
 
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const error = event.reason;
+      if (!error) return;
+      
+      let errMsg = typeof error === 'string' ? error : (error.message || String(error));
+      
+      try {
+        if (errMsg.startsWith('{') && errMsg.includes('operationType')) {
+          const parsed = JSON.parse(errMsg);
+          errMsg = parsed.error;
+        }
+      } catch(e) {}
+      
+      if (errMsg.includes('exceeds the maximum allowed size')) {
+        addToast('Error: Data payload is too large. Document exceeds 1MB limit. Try a smaller file.', 'error');
+        // We don't necessarily call preventDefault() here because we want it to still appear in dev tools if needed, but we could.
+      } else if (errMsg.includes('Missing or insufficient permissions')) {
+        addToast('Error: Permission Denied. You do not have the clearance for this operation. Wait for Admin approval or check your access.', 'error');
+      }
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  }, []);
+
   const login = (user: UserType) => {
     // With Firebase, onAuthStateChanged sets the user, but we can do local nav stuff here
     window.location.hash = user.role === 'admin' ? '#admin-overview' : '#dashboard';
@@ -799,8 +848,26 @@ export default function App() {
         }
         
         addToast('Profile avatar updated.', 'success');
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.id}`);
+      } catch (error: any) {
+        try {
+          handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.id}`);
+        } catch (wrappedError: any) {
+          let errMsg = wrappedError.message || String(wrappedError);
+          try {
+            if (errMsg.startsWith('{') && errMsg.includes('operationType')) {
+              const parsed = JSON.parse(errMsg);
+              errMsg = parsed.error;
+            }
+          } catch (e) {}
+
+          if (errMsg.includes('exceeds the maximum allowed size')) {
+            addToast('Error: Image file is too large (exceeds 1MB limit). Please try a smaller file.', 'error');
+          } else if (errMsg.includes('Missing or insufficient permissions')) {
+            addToast('Error: Permission Denied. You do not have the clearance to modify this profile data. Wait for Admin approval or try again.', 'error');
+          } else {
+            addToast(`Error updating profile: ${errMsg}`, 'error');
+          }
+        }
       }
     }
   };
@@ -888,13 +955,13 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
         <Logo size="small" />
         <div className="hidden md:flex items-center gap-8">
           {['Home', 'Features', 'Pricing', 'About'].map(item => (
-            <a key={item} href={`#${item.toLowerCase()}`} className="text-[11px] font-accent font-bold uppercase tracking-[0.2em] text-text-secondary hover:text-orange transition-colors">{item}</a>
+            <a key={item} href={`#${item.toLowerCase()}`} className="text-[11px] font-accent font-bold uppercase tracking-[0.2em] text-text-secondary hover:text-brand transition-colors">{item}</a>
           ))}
           <div className="h-4 w-px bg-white/10" />
           <button onClick={() => window.location.hash = '#login'} className="btn-secondary min-h-[40px] px-5">Operator Login</button>
           <button onClick={() => window.location.hash = '#register'} className="btn-primary min-h-[40px] px-5 ripple">Protocol Register</button>
         </div>
-        <button className="md:hidden text-orange p-2"><Menu /></button>
+        <button className="md:hidden text-brand p-2"><Menu /></button>
       </nav>
 
       {/* Hero Section */}
@@ -902,13 +969,13 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
         <div className="container max-w-7xl mx-auto flex flex-col items-center text-center relative z-10">
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.8 }}>
             <div className="mb-4 flex items-center gap-2 justify-center">
-              <div className="h-px w-8 bg-orange" />
-              <span className="text-[11px] font-accent font-bold text-orange uppercase tracking-[0.5em]">Automotive Intelligence</span>
-              <div className="h-px w-8 bg-orange" />
+              <div className="h-px w-8 bg-brand" />
+              <span className="text-[11px] font-accent font-bold text-brand uppercase tracking-[0.5em]">Automotive Intelligence</span>
+              <div className="h-px w-8 bg-brand" />
             </div>
             <h1 className="text-5xl md:text-[72px] font-display font-bold leading-[1.05] tracking-tight mb-8">
               DIAGNOSE. REPAIR. <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange to-orange-dark">MASTER YOUR VEHICLE.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand to-brand-dark">MASTER YOUR VEHICLE.</span>
             </h1>
             <p className="text-text-secondary text-lg md:text-xl max-w-3xl mx-auto mb-10 leading-relaxed font-light">
               The most complete automotive diagnostic and repair guidance platform. <br className="hidden md:block" />
@@ -943,7 +1010,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
 
         {/* Floating Car Silhouette */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] -z-10 opacity-5 pointer-events-none animate-drift">
-          <Car size={800} className="text-orange" strokeWidth={0.5} />
+          <Car size={800} className="text-brand" strokeWidth={0.5} />
         </div>
       </section>
 
@@ -954,7 +1021,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
         <div className="container max-w-7xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-display font-bold mb-4">EVERYTHING YOU NEED. IN ONE PLATFORM.</h2>
-            <div className="w-20 h-1 bg-orange mx-auto" />
+            <div className="w-20 h-1 bg-brand mx-auto" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -987,12 +1054,12 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
               { icon: Truck, label: 'Heavy Equipment', count: '600+' }
             ].map((cat, i) => (
               <div key={i} className="glass-card flex flex-col items-center gap-4 group cursor-pointer">
-                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center group-hover:bg-orange/20 group-hover:scale-110 transition-all duration-300">
-                  <cat.icon size={32} className="text-orange" />
+                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center group-hover:bg-brand/20 group-hover:scale-110 transition-all duration-300">
+                  <cat.icon size={32} className="text-brand" />
                 </div>
                 <div className="space-y-1">
                   <div className="text-[11px] font-accent font-bold text-text-primary uppercase tracking-widest">{cat.label}</div>
-                  <div className="text-[9px] font-accent text-orange bg-orange/10 rounded-full px-2 py-0.5">{cat.count} Models</div>
+                  <div className="text-[9px] font-accent text-brand bg-brand/10 rounded-full px-2 py-0.5">{cat.count} Models</div>
                 </div>
               </div>
             ))}
@@ -1037,12 +1104,12 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
       {/* About Section */}
       <section id="about" className="py-32 px-6 relative">
         <div className="container max-w-5xl mx-auto">
-          <div className="glass-card overflow-hidden flex flex-col lg:flex-row shadow-[0_0_50px_rgba(249,115,22,0.1)] border-white/5">
+          <div className="glass-card overflow-hidden flex flex-col lg:flex-row shadow-[0_0_50px_rgba(0, 212, 255,0.1)] border-white/5">
             {/* Left: Ruben's Profile */}
             <div className="lg:w-1/2 p-8 md:p-12 border-b lg:border-b-0 lg:border-r border-white/5">
               <div className="flex flex-col items-center lg:items-start gap-8 text-center lg:text-left">
-                <div className="w-40 h-40 rounded-full border-4 border-orange/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-orange-glow)] relative group">
-                  <div className="w-full h-full rounded-full bg-orange/10 flex items-center justify-center overflow-hidden">
+                <div className="w-40 h-40 rounded-full border-4 border-brand/20 p-2 shrink-0 shadow-[0_0_40px_var(--color-brand-glow)] relative group">
+                  <div className="w-full h-full rounded-full bg-brand/10 flex items-center justify-center overflow-hidden">
                     <UserAvatar 
                       user={user?.role === 'admin' ? user : { fullName: "Ruben Llego O.", avatarUrl: localStorage.getItem('ab_admin_avatar') || "/ruben_avatar.jpg" }} 
                       size="xl" 
@@ -1050,7 +1117,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
                       className="border-none bg-transparent hover:scale-110 transition-transform duration-500" 
                     />
                   </div>
-                  <div className="absolute -bottom-1 -right-1 bg-orange text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-4 border-bg-card">
+                  <div className="absolute -bottom-1 -right-1 bg-brand text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-4 border-bg-card">
                     <Award size={18} />
                   </div>
                 </div>
@@ -1059,7 +1126,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
                   <div className="space-y-2">
                     <h3 className="text-4xl font-display font-bold tracking-tight">RUBEN LLEGO O.</h3>
                     <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
-                      <span className="badge badge-high bg-orange/20 text-orange border-orange/30">OWNER & FOUNDER</span>
+                      <span className="badge badge-high bg-brand/20 text-brand border-brand/30">OWNER & FOUNDER</span>
                       <span className="badge badge-medium">LEAD DEVELOPER</span>
                       <span className="badge badge-low">AUTOMOTIVE EXPERT</span>
                     </div>
@@ -1070,19 +1137,19 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                    <div className="flex items-center gap-3 text-text-muted hover:text-brand transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Mail size={16} /></div>
                       <span className="text-xs font-bold uppercase tracking-widest">info@automotivebuddy.io</span>
                     </div>
-                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                    <div className="flex items-center gap-3 text-text-muted hover:text-brand transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Globe size={16} /></div>
                       <span className="text-xs font-bold uppercase tracking-widest">automotivebuddy.io</span>
                     </div>
-                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                    <div className="flex items-center gap-3 text-text-muted hover:text-brand transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Award size={16} /></div>
                       <span className="text-xs font-bold uppercase tracking-widest">Ruben Llego Management</span>
                     </div>
-                    <div className="flex items-center gap-3 text-text-muted hover:text-orange transition-colors">
+                    <div className="flex items-center gap-3 text-text-muted hover:text-brand transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><Phone size={16} /></div>
                       <span className="text-xs font-bold uppercase tracking-widest">@ruben.llego.ben</span>
                     </div>
@@ -1095,7 +1162,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
             <div className="lg:w-1/2 bg-white/5 p-8 md:p-12 flex flex-col items-center justify-center text-center">
               <div className="space-y-8 max-w-sm">
                 <div className="space-y-2">
-                  <h4 className="text-xl font-display font-bold uppercase tracking-widest text-primary-orange">Direct Connection</h4>
+                  <h4 className="text-xl font-display font-bold uppercase tracking-widest text-brand">Direct Connection</h4>
                   <p className="text-text-secondary text-xs font-bold uppercase tracking-widest">Scan to Message or Call Ruben Llego</p>
                 </div>
                 
@@ -1110,7 +1177,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
                       }}
                     />
                   </div>
-                  <div className="absolute -inset-2 rounded-[2rem] border-2 border-orange/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  <div className="absolute -inset-2 rounded-[2rem] border-2 border-brand/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
                 
                 <div className="space-y-4">
@@ -1138,10 +1205,10 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
           <div>
             <h4 className="font-accent font-bold text-[11px] text-text-primary tracking-widest mb-6">QUICK NAVIGATION</h4>
             <ul className="space-y-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">
-              <li><a href="#home" className="hover:text-orange transition-colors">Home Terminal</a></li>
-              <li><a href="#features" className="hover:text-orange transition-colors">Tool Modules</a></li>
-              <li><a href="#pricing" className="hover:text-orange transition-colors">Pricing Protocol</a></li>
-              <li><button onClick={() => window.location.hash = '#login'} className="hover:text-orange transition-colors">Auth Access</button></li>
+              <li><a href="#home" className="hover:text-brand transition-colors">Home Terminal</a></li>
+              <li><a href="#features" className="hover:text-brand transition-colors">Tool Modules</a></li>
+              <li><a href="#pricing" className="hover:text-brand transition-colors">Pricing Protocol</a></li>
+              <li><button onClick={() => window.location.hash = '#login'} className="hover:text-brand transition-colors">Auth Access</button></li>
             </ul>
           </div>
           <div>
@@ -1181,10 +1248,10 @@ function FeatureCard({ icon: Icon, title, desc, delay }: any) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5, delay }}
-      className="glass-card group hover:bg-orange/5 border-white/5 hover:border-orange/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+      className="glass-card group hover:bg-brand/5 border-white/5 hover:border-brand/30 shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
     >
-      <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-orange/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-xl">
-        <Icon size={24} className="text-orange" />
+      <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-brand/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-xl">
+        <Icon size={24} className="text-brand" />
       </div>
       <h3 className="text-xl font-display font-bold text-text-primary mb-3 uppercase tracking-wider">{title}</h3>
       <p className="text-text-secondary text-sm leading-relaxed">{desc}</p>
@@ -1198,30 +1265,30 @@ function PricingCard({ title, price, duration, icon: Icon, benefits, featured, a
       whileHover={{ y: featured ? -12 : -8 }}
       className={`
         glass-card flex flex-col p-9 relative rounded-[2rem] border transition-all duration-500
-        ${featured ? 'scale-105 z-10 border-orange/40 shadow-[0_20px_60px_rgba(249,115,22,0.2)] bg-orange/5' : 'opacity-90 hover:opacity-100 hover:border-white/20'}
+        ${featured ? 'scale-105 z-10 border-brand/40 shadow-[0_20px_60px_rgba(0, 212, 255,0.2)] bg-brand/5' : 'opacity-90 hover:opacity-100 hover:border-white/20'}
         ${active && !featured ? 'border-blue/40 shadow-[0_15px_40px_rgba(59,130,246,0.15)] bg-blue/5' : ''}
       `}
     >
       {featured && (
-        <div className="absolute -top-4 -right-4 bg-orange text-white px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-xl animate-pulse flex items-center gap-2">
+        <div className="absolute -top-4 -right-4 bg-brand text-white px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-xl animate-pulse flex items-center gap-2">
           <Star size={10} fill="currentColor" /> Best Value <Star size={10} fill="currentColor" />
         </div>
       )}
       
       <div className="flex items-center justify-between mb-8">
         <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center">
-          <Icon size={32} className={featured ? 'text-orange' : 'text-text-primary'} />
+          <Icon size={32} className={featured ? 'text-brand' : 'text-text-primary'} />
         </div>
         {active && !featured && <span className="text-[9px] font-accent text-blue uppercase tracking-widest border border-blue/30 px-3 py-1 rounded-full bg-blue/10">Most Popular</span>}
       </div>
 
       <h3 className="text-2xl font-display font-bold mb-1 tracking-widest">{title}</h3>
       <div className="flex items-baseline gap-2 mb-2">
-        <span className="text-5xl font-accent font-bold text-orange">₱{price}</span>
+        <span className="text-5xl font-accent font-bold text-brand">₱{price}</span>
         <span className="text-text-muted text-xs uppercase font-bold tracking-widest">/ {duration}</span>
       </div>
       
-      <div className="w-full h-px bg-gradient-to-r from-orange/50 to-transparent my-8" />
+      <div className="w-full h-px bg-gradient-to-r from-brand/50 to-transparent my-8" />
 
       <ul className="space-y-4 mb-12 flex-1">
         {benefits.map((b: string, i: number) => (
@@ -1293,7 +1360,7 @@ function AuthPage({ mode, onBack, toast }: any) {
           <div className="hidden md:flex flex-col justify-between w-2/5 bg-sidebar-bg/50 p-12 border-r border-white/5 relative">
             <div className="space-y-8 relative z-10">
                <Logo size="small" />
-               <h2 className="text-3xl font-display font-bold leading-tight">JOIN THE <br /><span className="text-orange">DIAGNOSTIC ELITE</span></h2>
+               <h2 className="text-3xl font-display font-bold leading-tight">JOIN THE <br /><span className="text-brand">DIAGNOSTIC ELITE</span></h2>
                <div className="space-y-4">
                  {[
                    'Full DTC Lookup Access',
@@ -1303,7 +1370,7 @@ function AuthPage({ mode, onBack, toast }: any) {
                    '24/7 AI Troubleshooting'
                  ].map(f => (
                    <div key={f} className="flex items-center gap-3 text-[11px] font-accent font-bold uppercase tracking-widest text-text-secondary italic">
-                     <CheckCircle2 size={14} className="text-orange" /> {f}
+                     <CheckCircle2 size={14} className="text-brand" /> {f}
                    </div>
                  ))}
                </div>
@@ -1311,8 +1378,8 @@ function AuthPage({ mode, onBack, toast }: any) {
             <div className="space-y-4 relative z-10 pt-12 border-t border-white/5 mt-auto">
                <p className="text-[10px] text-text-muted uppercase tracking-[0.2em]">Verified by</p>
                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-orange/10 flex items-center justify-center text-orange"><Award size={20} /></div>
-                  <div className="text-[11px] font-bold">RUBEN LLEGO <br /><span className="text-orange/60">Lead Developer</span></div>
+                  <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand"><Award size={20} /></div>
+                  <div className="text-[11px] font-bold">RUBEN LLEGO <br /><span className="text-brand/60">Lead Developer</span></div>
                </div>
             </div>
             <div className="absolute top-0 right-0 p-8 opacity-5 -mr-10 -mt-10"><Wrench size={260} /></div>
@@ -1379,9 +1446,9 @@ function AuthPage({ mode, onBack, toast }: any) {
                 setLoading(false);
               }}
               disabled={loading}
-              className="btn-secondary w-full py-4 text-xs flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-orange/50 hover:bg-orange/10"
+              className="btn-secondary w-full py-4 text-xs flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-brand/50 hover:bg-brand/10"
             >
-              <Globe className="text-orange" size={16} />
+              <Globe className="text-brand" size={16} />
               <span>CONTINUE WITH GOOGLE</span>
             </button>
             {error && (
@@ -1392,12 +1459,12 @@ function AuthPage({ mode, onBack, toast }: any) {
           </div>
 
           <footer className="mt-14 text-center flex flex-col gap-4 border-t border-white/10 pt-8">
-            <button onClick={onBack} className="text-[10px] font-accent font-bold uppercase tracking-[0.2em] text-text-muted hover:text-orange transition-colors">Return to External Interface</button>
+            <button onClick={onBack} className="text-[10px] font-accent font-bold uppercase tracking-[0.2em] text-text-muted hover:text-brand transition-colors">Return to External Interface</button>
             <div className="text-[11px] text-text-secondary">
               {mode === 'login' ? (
-                <>New to the framework? <button onClick={() => window.location.hash = '#register'} className="text-orange font-bold hover:underline ml-1">Register Service Access</button></>
+                <>New to the framework? <button onClick={() => window.location.hash = '#register'} className="text-brand font-bold hover:underline ml-1">Register Service Access</button></>
               ) : (
-                <>Already in the matrix? <button onClick={() => window.location.hash = '#login'} className="text-orange font-bold hover:underline ml-1">Member Authorize</button></>
+                <>Already in the matrix? <button onClick={() => window.location.hash = '#login'} className="text-brand font-bold hover:underline ml-1">Member Authorize</button></>
               )}
             </div>
           </footer>
@@ -1545,7 +1612,7 @@ function ChatBot({ currentUser, store, toast }: any) {
     <>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-orange to-orange-dark text-white shadow-[0_0_30px_var(--color-orange-glow)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-transform group"
+        className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-brand to-brand-dark text-white shadow-[0_0_30px_var(--color-brand-glow)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-transform group"
       >
         <Wrench className="w-7 h-7 group-hover:rotate-45 transition-transform duration-500" />
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-red rounded-full border-2 border-bg-base-end" />
@@ -1557,12 +1624,12 @@ function ChatBot({ currentUser, store, toast }: any) {
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-28 right-8 w-[90%] max-w-[400px] h-[560px] glass-card p-0 shadow-2xl z-[500] flex flex-col border-orange/20 overflow-hidden"
+            className="fixed bottom-28 right-8 w-[90%] max-w-[400px] h-[560px] glass-card p-0 shadow-2xl z-[500] flex flex-col border-brand/20 overflow-hidden"
           >
              <header className="p-5 bg-sidebar-bg/50 border-b border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-full bg-orange/10 flex items-center justify-center relative">
-                      <Cpu size={20} className="text-orange" />
+                   <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center relative">
+                      <Cpu size={20} className="text-brand" />
                       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green rounded-full border-2 border-bg-card" />
                    </div>
                    <div>
@@ -1578,12 +1645,12 @@ function ChatBot({ currentUser, store, toast }: any) {
                         if (!newState) window.speechSynthesis.cancel();
                         toast(newState ? "AI Voice established" : "AI Voice deactivated", newState ? "success" : "info");
                      }} 
-                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 ${autoSpeak ? 'bg-orange/10 border-orange/40 text-orange shadow-[0_0_10px_rgba(249,115,22,0.2)]' : 'bg-white/5 border-white/10 text-text-muted hover:text-white'}`}
+                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 ${autoSpeak ? 'bg-brand/10 border-brand/40 text-brand shadow-[0_0_10px_rgba(0, 212, 255,0.2)]' : 'bg-white/5 border-white/10 text-text-muted hover:text-white'}`}
                    >
                      {autoSpeak ? <Volume2 size={14} className="animate-pulse" /> : <VolumeX size={14} />}
                      <span className="text-[9px] font-bold uppercase tracking-wider">{autoSpeak ? 'Voice On' : 'Voice Off'}</span>
                    </button>
-                   <button onClick={() => setIsOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-orange hover:bg-orange/10 transition-all"><X size={18} /></button>
+                   <button onClick={() => setIsOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-brand hover:bg-brand/10 transition-all"><X size={18} /></button>
                 </div>
              </header>
 
@@ -1596,7 +1663,7 @@ function ChatBot({ currentUser, store, toast }: any) {
                 )}
                 {currentChats.map((m: any) => (
                   <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] p-3.5 rounded-2xl text-[12px] leading-relaxed ${m.role === 'user' ? 'bg-orange text-white rounded-tr-none' : 'glass-card bg-bg-card border-white/5 rounded-tl-none'} shadow-xl`}>
+                    <div className={`max-w-[80%] p-3.5 rounded-2xl text-[12px] leading-relaxed ${m.role === 'user' ? 'bg-brand text-white rounded-tr-none' : 'glass-card bg-bg-card border-white/5 rounded-tl-none'} shadow-xl`}>
                       {m.content}
                       <div className={`text-[8px] mt-1.5 font-bold uppercase tracking-widest opacity-40 text-right`}>
                         {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1620,13 +1687,13 @@ function ChatBot({ currentUser, store, toast }: any) {
                 <div className="flex justify-between items-center mb-3">
                    <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth">
                       {['🔍 Search DTC', '🚗 Guide', '💳 Pricing', '🆘 Support', '🇵🇭 Tagalog Help'].map(chip => (
-                         <button key={chip} onClick={() => setInput(chip.replace(/[^a-zA-Z\s]/g, '').trim())} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-white/5 text-[9px] font-accent font-bold uppercase tracking-widest text-text-muted hover:border-orange hover:text-orange transition-all cursor-pointer">
+                         <button key={chip} onClick={() => setInput(chip.replace(/[^a-zA-Z\s]/g, '').trim())} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-white/5 text-[9px] font-accent font-bold uppercase tracking-widest text-text-muted hover:border-brand hover:text-brand transition-all cursor-pointer">
                            {chip}
                          </button>
                       ))}
                    </div>
                    {autoSpeak && (
-                     <div className="flex items-center gap-1.5 text-orange animate-pulse ml-2 px-2 py-1 bg-orange/5 rounded-md border border-orange/20">
+                     <div className="flex items-center gap-1.5 text-brand animate-pulse ml-2 px-2 py-1 bg-brand/5 rounded-md border border-brand/20">
                         <Volume2 size={10} />
                         <span className="text-[8px] font-bold uppercase tracking-tighter">AI Voice</span>
                      </div>
@@ -1637,7 +1704,7 @@ function ChatBot({ currentUser, store, toast }: any) {
                       <input 
                         type="text" 
                         placeholder="Inquire the matrix..." 
-                        className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 text-[11px] text-text-primary focus:outline-none focus:border-orange/50 transition-all pr-10"
+                        className="w-full bg-[#0A1224] border border-white/10 rounded-xl px-4 py-3 text-[11px] text-text-primary focus:outline-none focus:border-brand/50 transition-all pr-10"
                         value={input}
                         onChange={e => setInput(e.target.value.slice(0, 500))}
                         maxLength={500}
@@ -1650,7 +1717,7 @@ function ChatBot({ currentUser, store, toast }: any) {
                         {isListening ? <Mic size={14} /> : <Mic size={14} />}
                       </button>
                    </div>
-                   <button type="submit" className="w-10 h-10 shrink-0 rounded-xl bg-orange text-white flex items-center justify-center hover:bg-orange-dark transition-colors ripple shadow-lg shadow-orange/20">
+                   <button type="submit" className="w-10 h-10 shrink-0 rounded-xl bg-brand text-white flex items-center justify-center hover:bg-brand-dark transition-colors ripple shadow-lg shadow-brand/20">
                      <ArrowRight size={18} />
                    </button>
                 </form>
@@ -1661,8 +1728,6 @@ function ChatBot({ currentUser, store, toast }: any) {
     </>
   );
 }
-
-import { Download } from 'lucide-react';
 
 function InstallDrawer({ isOpen, onClose, onInstall, hasPrompt }: { isOpen: boolean, onClose: () => void, onInstall: () => void, hasPrompt: boolean }) {
   if (!isOpen) return null;
@@ -1675,15 +1740,15 @@ function InstallDrawer({ isOpen, onClose, onInstall, hasPrompt }: { isOpen: bool
       >
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
           <div className="flex items-center gap-3">
-            <Download className="text-orange" size={24} />
+            <Download className="text-brand" size={24} />
             <h2 className="text-xl font-display font-medium uppercase tracking-widest text-[#E0E0E0]">Install WebApp</h2>
           </div>
           <button onClick={onClose} className="p-2 text-text-muted hover:text-white transition-colors bg-white/5 rounded-lg border border-white/5 hover:border-white/20"><X size={20} /></button>
         </div>
         <div className="p-6 flex-1 overflow-y-auto space-y-6">
           
-          <div className="bg-orange/10 border border-orange/20 rounded-xl p-4">
-            <h3 className="text-sm font-bold text-orange tracking-widest uppercase mb-2">Automotive Buddy App</h3>
+          <div className="bg-brand/10 border border-brand/20 rounded-xl p-4">
+            <h3 className="text-sm font-bold text-brand tracking-widest uppercase mb-2">Automotive Buddy App</h3>
             <p className="text-xs text-text-secondary leading-relaxed font-accent">
               Install the Progressive Web App (PWA) to your device for offline support, fast loading, and an immersive native-like experience.
             </p>
@@ -1746,7 +1811,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
     <>
       <div className="p-6 mb-8 flex items-center justify-between">
         {(!sidebarCollapsed || mobileMenuOpen) && <Logo />}
-        <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : setSidebarCollapsed(!sidebarCollapsed)} className="text-text-muted hover:text-primary-orange transition-colors cursor-pointer hidden lg:block">
+        <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : setSidebarCollapsed(!sidebarCollapsed)} className="text-text-muted hover:text-brand transition-colors cursor-pointer hidden lg:block">
           <Menu size={20} />
         </button>
       </div>
@@ -1764,10 +1829,10 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
-      <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
+      <div className="px-4 py-2 border-t border-white/5 bg-brand/5">
         <button 
           onClick={() => setInstallDrawerOpen(true)} 
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-brand/10 border border-brand/20 text-brand hover:bg-brand/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
           title="Install Application"
         >
           <Download size={18} />
@@ -1781,7 +1846,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
               <div className="font-sans font-semibold text-sm truncate">{user.fullName}</div>
-              <div className="text-[11px] text-orange font-bold uppercase tracking-widest">Master Admin</div>
+              <div className="text-[11px] text-brand font-bold uppercase tracking-widest">Master Admin</div>
             </div>
           )}
           {(!sidebarCollapsed || mobileMenuOpen) && (
@@ -1838,11 +1903,11 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
         <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
         <header className="mb-8 md:mb-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-orange transition-colors">
+            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-brand transition-colors">
               <Menu size={24} />
             </button>
             <div>
-              <h1 className="text-2xl md:text-3xl text-primary-orange mb-1 uppercase tracking-tighter font-display font-bold">Admin Central</h1>
+              <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold">Admin Central</h1>
               <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Fleet & Diagnostic Management</p>
             </div>
           </div>
@@ -1887,7 +1952,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
     <>
       <div className="p-6 mb-8 flex items-center justify-between">
         {(!sidebarCollapsed || mobileMenuOpen) && <Logo />}
-        <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : setSidebarCollapsed(!sidebarCollapsed)} className="text-text-muted hover:text-primary-orange transition-colors cursor-pointer hidden lg:block">
+        <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : setSidebarCollapsed(!sidebarCollapsed)} className="text-text-muted hover:text-brand transition-colors cursor-pointer hidden lg:block">
           <Menu size={20} />
         </button>
       </div>
@@ -1906,10 +1971,10 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
       </nav>
 
-      <div className="px-4 py-2 border-t border-white/5 bg-orange/5">
+      <div className="px-4 py-2 border-t border-white/5 bg-brand/5">
         <button 
           onClick={() => setInstallDrawerOpen(true)} 
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-orange/10 border border-orange/20 text-orange hover:bg-orange/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-brand/10 border border-brand/20 text-brand hover:bg-brand/20 transition-all ${sidebarCollapsed && !mobileMenuOpen ? 'justify-center px-0' : ''}`}
           title="Install Application"
         >
           <Download size={18} />
@@ -1980,16 +2045,16 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
         <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
         <header className="mb-8 md:mb-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-orange transition-colors">
+            <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 text-text-secondary hover:text-brand transition-colors">
               <Menu size={24} />
             </button>
             <div>
-              <h1 className="text-2xl md:text-3xl text-primary-orange mb-1 uppercase tracking-tighter font-display font-bold">AutoMotive Buddy</h1>
+              <h1 className="text-2xl md:text-3xl text-brand mb-1 uppercase tracking-tighter font-display font-bold">AutoMotive Buddy</h1>
               <p className="text-text-secondary text-[10px] md:text-sm font-accent tracking-widest uppercase opacity-70">Your Smart Automotive Companion</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-4">
-            <button onClick={() => setGlobalSearchOpen(true)} className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-text-muted hover:text-primary-orange hover:border-primary-orange/30 transition-all group">
+            <button onClick={() => setGlobalSearchOpen(true)} className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-text-muted hover:text-brand hover:border-brand/30 transition-all group">
               <Search size={16} />
               <span className="text-[10px] uppercase font-bold tracking-widest opacity-60 group-hover:opacity-100 italic">Neural Matrix Search</span>
               <kbd className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded ml-2">⌘K</kbd>
@@ -2024,7 +2089,7 @@ const NavItem = ({ icon: Icon, label, active, collapsed, onClick }: any) => (
     className={`nav-item-styled ${active ? 'active' : ''} ${collapsed ? 'justify-center px-4' : ''} group relative`}
     title={collapsed ? label : ''}
   >
-    <Icon size={18} className={`shrink-0 ${active ? 'text-orange' : 'text-text-secondary group-hover:text-text-primary'}`} />
+    <Icon size={18} className={`shrink-0 ${active ? 'text-brand' : 'text-text-secondary group-hover:text-text-primary'}`} />
     {!collapsed && <span className="font-sans font-medium whitespace-nowrap overflow-hidden transition-all duration-200">{label}</span>}
     
     {collapsed && (
@@ -2041,13 +2106,13 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-8">
       <div className="glass-panel p-8 flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
-        <UserAvatar user={user} size="xl" onUpdate={onUpdateAvatar} className="w-32 h-32 md:w-48 md:h-48 border-4 border-primary-orange shadow-[0_0_30px_rgba(249,115,22,0.3)]" />
+        <UserAvatar user={user} size="xl" onUpdate={onUpdateAvatar} className="w-32 h-32 md:w-48 md:h-48 border-4 border-brand shadow-[0_0_30px_rgba(0, 212, 255,0.3)]" />
         <div className="flex-1">
           <div className="flex flex-col md:flex-row md:items-end gap-3 mb-4">
             <h2 className="text-3xl md:text-4xl font-display font-bold uppercase tracking-tight">{user.fullName}</h2>
-            <span className="badge badge-orange font-accent mb-1">{user.role.toUpperCase()} LEVEL 01</span>
+            <span className="badge badge-brand font-accent mb-1">{user.role.toUpperCase()} LEVEL 01</span>
           </div>
-          <p className="text-text-secondary uppercase text-xs tracking-widest mb-6">Neural Access Credential: <span className="text-primary-orange font-accent">{user.id}</span></p>
+          <p className="text-text-secondary uppercase text-xs tracking-widest mb-6">Neural Access Credential: <span className="text-brand font-accent">{user.id}</span></p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
             <div className="px-4 py-2 bg-white/5 border border-border-glass rounded-lg text-[10px] font-bold uppercase tracking-widest">
               <span className="text-text-secondary">Joined:</span> {new Date(user.createdAt).toLocaleDateString()}
@@ -2062,7 +2127,7 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="glass-panel space-y-6">
           <h3 className="text-sm font-bold uppercase tracking-widest border-b border-border-glass pb-4 flex items-center gap-2">
-             <Shield size={16} className="text-primary-orange" /> Security Protocols
+             <Shield size={16} className="text-brand" /> Security Protocols
           </h3>
           <div className="space-y-4">
              <div>
@@ -2078,12 +2143,12 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
 
         <div className="glass-panel space-y-6">
           <h3 className="text-sm font-bold uppercase tracking-widest border-b border-border-glass pb-4 flex items-center gap-2">
-             <Activity size={16} className="text-primary-orange" /> Recent Telemetry
+             <Activity size={16} className="text-brand" /> Recent Telemetry
           </h3>
           <div className="space-y-3">
              {store.logs.filter((l: any) => l.username === user.username).slice(0, 3).map((l: any) => (
                <div key={l.id} className="flex gap-3 items-center text-[10px] border-b border-white/5 pb-2 last:border-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary-orange" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand" />
                   <div className="flex-1 text-text-primary uppercase tracking-tight">{l.action}</div>
                   <div className="text-text-secondary font-accent">{new Date(l.timestamp).toLocaleDateString()}</div>
                </div>
@@ -2118,9 +2183,9 @@ function GlobalVehicleSelector() {
   const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
 
   return (
-    <div className="glass-panel border-primary-orange/20 bg-primary-orange/5 p-6 md:p-8 mb-8">
+    <div className="glass-panel border-brand/20 bg-brand/5 p-6 md:p-8 mb-8">
       <div className="flex items-center gap-3 mb-6">
-        <Car size={24} className="text-primary-orange" />
+        <Car size={24} className="text-brand" />
         <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 1: DYNAMIC MATRIX SELECTOR</h2>
       </div>
 
@@ -2194,8 +2259,8 @@ function GlobalVehicleSelector() {
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-white/5 border border-primary-orange/20 rounded-lg flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-primary-orange/20 flex items-center justify-center text-primary-orange shrink-0">
+      <div className="mt-6 p-4 bg-white/5 border border-brand/20 rounded-lg flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center text-brand shrink-0">
            <Shield size={24} />
         </div>
         <div className="flex-1">
@@ -2203,7 +2268,7 @@ function GlobalVehicleSelector() {
             {make || 'UNKNOWN'} {model} — {year || 'ANY'} SERIES
           </div>
           <div className="text-[10px] text-text-secondary uppercase tracking-widest">
-            DEPLOYED POWERPLANT: <span className="text-primary-orange font-accent">{engine || 'ANY IDENTIFIED CONSTRUCT'}</span>
+            DEPLOYED POWERPLANT: <span className="text-brand font-accent">{engine || 'ANY IDENTIFIED CONSTRUCT'}</span>
           </div>
         </div>
       </div>
@@ -2420,7 +2485,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
       {/* DTC Search Section */}
       <div className="glass-panel p-6 md:p-8">
         <div className="flex items-center gap-3 mb-6">
-          <Search size={24} className="text-primary-orange" />
+          <Search size={24} className="text-brand" />
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 2: NEURAL FAULT SCAN</h2>
         </div>
 
@@ -2485,14 +2550,14 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
               {searchResults.map((dtc, idx) => (
                 <button 
                   key={`${dtc.code}-${idx}`}
-                  className={`w-full text-left p-6 glass-panel border transition-all hover:-translate-y-1 ${selectedDTC?.code === dtc.code ? 'border-primary-orange bg-primary-orange/5' : 'border-border-glass hover:border-primary-orange/50'}`}
+                  className={`w-full text-left p-6 glass-panel border transition-all hover:-translate-y-1 ${selectedDTC?.code === dtc.code ? 'border-brand bg-brand/5' : 'border-border-glass hover:border-brand/50'}`}
                   onClick={() => setSelectedDTC(dtc)}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="font-accent text-xl text-primary-orange font-bold">{dtc.code}</span>
-                        <span className={`badge ${String(dtc.severity || 'low').toLowerCase() === 'critical' ? 'badge-red' : String(dtc.severity || 'low').toLowerCase() === 'high' ? 'badge-orange' : 'badge-yellow'}`}>
+                        <span className="font-accent text-xl text-brand font-bold">{dtc.code}</span>
+                        <span className={`badge ${String(dtc.severity || 'low').toLowerCase() === 'critical' ? 'badge-red' : String(dtc.severity || 'low').toLowerCase() === 'high' ? 'badge-brand' : 'badge-yellow'}`}>
                           {String(dtc.severity || 'low').toUpperCase()}
                         </span>
                         <span className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[7px] text-text-secondary uppercase font-bold">
@@ -2503,7 +2568,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                         {dtc.title || dtc.description || 'System Diagnostic Details Unavailable'}
                       </p>
                     </div>
-                    <ChevronRight size={20} className={`text-text-secondary mt-1 transition-transform ${selectedDTC?.code === dtc.code ? 'rotate-90 text-primary-orange' : ''}`} />
+                    <ChevronRight size={20} className={`text-text-secondary mt-1 transition-transform ${selectedDTC?.code === dtc.code ? 'rotate-90 text-brand' : ''}`} />
                   </div>
                 </button>
               ))}
@@ -2534,11 +2599,11 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="glass-panel border-t-4 border-t-primary-orange space-y-6"
+                  className="glass-panel border-t-4 border-t-brand space-y-6"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="font-accent text-4xl text-primary-orange font-bold tracking-tighter">{selectedDTC.code}</div>
-                    <button onClick={() => handleSave(selectedDTC)} className="w-10 h-10 rounded-full bg-white/5 border border-border-glass flex items-center justify-center text-text-secondary hover:text-primary-orange transition-colors">
+                    <div className="font-accent text-4xl text-brand font-bold tracking-tighter">{selectedDTC.code}</div>
+                    <button onClick={() => handleSave(selectedDTC)} className="w-10 h-10 rounded-full bg-white/5 border border-border-glass flex items-center justify-center text-text-secondary hover:text-brand transition-colors">
                       <Star size={18} />
                     </button>
                   </div>
@@ -2583,7 +2648,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                           const symps = Array.isArray(selectedDTC?.symptoms) ? selectedDTC.symptoms : [];
                           return symps.length > 0 ? symps.map((s: string, i: number) => (
                             <li key={i} className="text-xs text-text-secondary flex gap-2">
-                              <span className="text-primary-orange select-none">•</span> {s}
+                              <span className="text-brand select-none">•</span> {s}
                             </li>
                           )) : (
                             <li className="text-[10px] text-text-secondary italic">Standard performance irregularities or warning indicator active.</li>
@@ -2603,12 +2668,12 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                           return steps.length > 0 ? (
                             <>
                               {steps.slice(0, 3).map((step: string, i: number) => (
-                                <div key={i} className="p-3 bg-black/30 border-l-2 border-primary-orange rounded-r text-[11px] leading-relaxed text-text-primary italic">
+                                <div key={i} className="p-3 bg-black/30 border-l-2 border-brand rounded-r text-[11px] leading-relaxed text-text-primary italic">
                                   {step}
                                 </div>
                               ))}
                               {steps.length > 3 && (
-                                <button className="text-[9px] font-bold text-primary-orange uppercase tracking-widest hover:underline">View Full 12-Step Protocol</button>
+                                <button className="text-[9px] font-bold text-brand uppercase tracking-widest hover:underline">View Full 12-Step Protocol</button>
                               )}
                             </>
                           ) : (
@@ -2675,7 +2740,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
       
       <div className="glass-panel p-6 md:p-8">
         <div className="flex items-center gap-3 mb-6">
-          <Icon size={24} className="text-primary-orange" />
+          <Icon size={24} className="text-brand" />
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">VEHICLE SELECT: {title}</h2>
         </div>
 
@@ -2693,7 +2758,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
 
       {isLoading && (
         <div className="glass-panel p-12 text-center space-y-4">
-           <div className="animate-spin text-primary-orange flex justify-center"><CloudDownload size={32} /></div>
+           <div className="animate-spin text-brand flex justify-center"><CloudDownload size={32} /></div>
            <p className="text-text-secondary uppercase tracking-[0.2em] text-xs">Querying neural matrix and compiling structural vehicle report</p>
         </div>
       )}
@@ -2701,7 +2766,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
       {result && !isLoading && (
         <div className="glass-panel p-6 md:p-10 space-y-6">
           <div className="border-b border-white/10 pb-4 mb-4 flex items-center justify-between">
-             <h3 className="text-lg text-primary-orange font-bold uppercase">{year} {make} {model} - {title}</h3>
+             <h3 className="text-lg text-brand font-bold uppercase">{year} {make} {model} - {title}</h3>
              <button onClick={() => {
                 store.addSavedItem({
                   userId: user.id,
@@ -2801,9 +2866,9 @@ function ManualsTab({ store, toast, user, ...props }: any) {
     if (isRetrieving) {
       return (
         <div className="flex flex-col items-center justify-center py-20 gap-6">
-           <div className="w-16 h-16 border-4 border-primary-orange/20 border-t-primary-orange rounded-full animate-spin" />
+           <div className="w-16 h-16 border-4 border-brand/20 border-t-brand rounded-full animate-spin" />
            <div className="flex flex-col items-center gap-2">
-             <div className="text-[11px] font-accent font-bold text-primary-orange uppercase tracking-[.3em] animate-pulse">Establishing Satellite Link...</div>
+             <div className="text-[11px] font-accent font-bold text-brand uppercase tracking-[.3em] animate-pulse">Establishing Satellite Link...</div>
              <div className="text-[9px] text-text-secondary uppercase tracking-widest font-medium">Downloading Encrypted Repair Guide</div>
            </div>
         </div>
@@ -2820,7 +2885,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
            </p>
            <button 
              onClick={() => handleRetrieve(unitId)}
-             className="btn-primary px-8 py-4 flex items-center gap-3 text-[10px] shadow-[0_0_20px_rgba(249,115,22,0.3)]"
+             className="btn-primary px-8 py-4 flex items-center gap-3 text-[10px] shadow-[0_0_20px_rgba(0, 212, 255,0.3)]"
            >
              <Zap size={16} /> ACTIVATE RETRIEVAL PROTOCOL
            </button>
@@ -2839,9 +2904,9 @@ function ManualsTab({ store, toast, user, ...props }: any) {
           <button 
             key={cat} 
             onClick={() => setFilter({ ...filter, category: filter.category === cat ? '' : cat })}
-            className={`glass-panel flex flex-col items-center gap-2 md:gap-3 p-4 md:p-6 transition-all cursor-pointer ${filter.category === cat ? 'border-primary-orange bg-primary-orange/10 shadow-[0_0_20px_rgba(249,115,22,0.15)]' : 'hover:bg-white/5'}`}
+            className={`glass-panel flex flex-col items-center gap-2 md:gap-3 p-4 md:p-6 transition-all cursor-pointer ${filter.category === cat ? 'border-brand bg-brand/10 shadow-[0_0_20px_rgba(0, 212, 255,0.15)]' : 'hover:bg-white/5'}`}
           >
-            <div className={`p-2 rounded-lg ${filter.category === cat ? 'bg-primary-orange text-white' : 'bg-white/5 text-text-secondary'}`}>
+            <div className={`p-2 rounded-lg ${filter.category === cat ? 'bg-brand text-white' : 'bg-white/5 text-text-secondary'}`}>
               {cat === 'Car' && <Car size={20} />}
               {cat === 'Heavy Equipment' && <Truck size={20} />}
               {cat === 'Motorcycle' && <Bike size={20} />}
@@ -2864,19 +2929,19 @@ function ManualsTab({ store, toast, user, ...props }: any) {
               <motion.div 
                 layoutId={u.id}
                 key={u.id} 
-                className="glass-panel group hover:border-primary-orange/50 transition-all cursor-pointer p-0 overflow-hidden"
+                className="glass-panel group hover:border-brand/50 transition-all cursor-pointer p-0 overflow-hidden"
                 onClick={() => setSelectedUnit(u)}
               >
                 <div className="p-5 md:p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="text-[9px] md:text-[10px] font-accent font-bold text-primary-orange uppercase truncate">{u.yearRange} {u.make}</div>
+                        <div className="text-[9px] md:text-[10px] font-accent font-bold text-brand uppercase truncate">{u.yearRange} {u.make}</div>
                         <span className="px-1.5 py-0.5 bg-white/10 rounded text-[7px] text-text-secondary uppercase font-bold">{u.category}</span>
                       </div>
                       <div className="text-lg md:text-xl font-display font-bold text-text-primary uppercase tracking-tight truncate">{u.model}</div>
                     </div>
-                    <div className="bg-white/5 p-2 rounded-lg shrink-0"><ChevronRight size={16} className="text-text-secondary group-hover:text-primary-orange group-hover:translate-x-1" /></div>
+                    <div className="bg-white/5 p-2 rounded-lg shrink-0"><ChevronRight size={16} className="text-text-secondary group-hover:text-brand group-hover:translate-x-1" /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div className="bg-black/20 p-2 rounded border border-border-glass">
@@ -2889,9 +2954,9 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                     </div>
                   </div>
                 </div>
-                <div className="bg-white/5 px-6 py-2.5 border-t border-border-glass flex justify-between items-center group-hover:bg-primary-orange/10">
-                  <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-text-secondary group-hover:text-primary-orange">Access Catalog</span>
-                  <BookOpen size={12} className="text-text-secondary group-hover:text-primary-orange" />
+                <div className="bg-white/5 px-6 py-2.5 border-t border-border-glass flex justify-between items-center group-hover:bg-brand/10">
+                  <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-text-secondary group-hover:text-brand">Access Catalog</span>
+                  <BookOpen size={12} className="text-text-secondary group-hover:text-brand" />
                 </div>
               </motion.div>
             )) : (
@@ -2907,7 +2972,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
         <div className="space-y-6 order-first lg:order-last">
           <div className="glass-panel sticky top-4">
             <h4 className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-text-primary mb-6 flex items-center gap-2">
-              <Filter size={14} className="text-primary-orange" /> 
+              <Filter size={14} className="text-brand" /> 
               FILTER CATALOG
             </h4>
             <div className="space-y-5">
@@ -2935,7 +3000,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                 <div className="relative">
                   <Calendar size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
                   <select 
-                    className="input-field pl-10 h-[48px] text-xs px-2 appearance-none font-medium w-full bg-[#1e293b]"
+                    className="input-field pl-10 h-[48px] text-xs px-2 appearance-none font-medium w-full bg-[#0A1224]"
                     value={filter.year}
                     onChange={e => setFilter({...filter, year: e.target.value})}
                   >
@@ -2959,18 +3024,18 @@ function ManualsTab({ store, toast, user, ...props }: any) {
       <AnimatePresence>
         {selectedUnit && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-full max-w-5xl h-[90vh] flex flex-col p-0 relative overflow-y-auto md:overflow-hidden bg-[#0a0e1a] border-primary-orange/30">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-full max-w-5xl h-[90vh] flex flex-col p-0 relative overflow-y-auto md:overflow-hidden bg-[#0a0e1a] border-brand/30">
               <div className="flex-none md:flex-1 flex flex-col md:flex-row min-h-full md:min-h-0">
                 {/* Left Sidebar Info */}
                 <div className="flex-none md:w-72 bg-black/40 border-b md:border-b-0 md:border-r border-border-glass p-6 md:p-8 flex flex-col">
                   <button onClick={() => setSelectedUnit(null)} className="md:hidden absolute top-4 right-4 text-text-secondary z-10"><X size={20} /></button>
                   
-                  <div className="w-14 h-14 bg-primary-orange/20 rounded-xl flex items-center justify-center mb-6 border border-primary-orange/30">
-                    <Wrench className="text-primary-orange" size={28} />
+                  <div className="w-14 h-14 bg-brand/20 rounded-xl flex items-center justify-center mb-6 border border-brand/30">
+                    <Wrench className="text-brand" size={28} />
                   </div>
                   
                   <div className="mb-8">
-                    <div className="text-[10px] font-accent font-bold text-primary-orange uppercase tracking-[0.2em] mb-1">{selectedUnit.category} UNIT</div>
+                    <div className="text-[10px] font-accent font-bold text-brand uppercase tracking-[0.2em] mb-1">{selectedUnit.category} UNIT</div>
                     <h3 className="text-2xl font-display font-bold text-white uppercase leading-tight">{selectedUnit.make} {selectedUnit.model}</h3>
                     <div className="text-xs font-bold text-text-secondary mt-1">{selectedUnit.yearRange} PRODUCTION</div>
                   </div>
@@ -2987,7 +3052,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                       <button 
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${activeTab === tab.id ? 'bg-primary-orange text-white shadow-lg shadow-primary-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${activeTab === tab.id ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-text-secondary hover:bg-white/5'}`}
                       >
                         {tab.icon}
                         {tab.label}
@@ -2995,7 +3060,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                     ))}
                     <button 
                       onClick={() => handleSave(selectedUnit)}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all text-text-secondary hover:bg-star/10 hover:text-orange border border-dashed border-white/10 mt-4"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all text-text-secondary hover:bg-star/10 hover:text-brand border border-dashed border-white/10 mt-4"
                     >
                       <Star size={16} /> SAVE TO LIBRARY
                     </button>
@@ -3010,12 +3075,12 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                 <div className="flex-1 flex flex-col">
                   <header className="p-6 md:px-10 md:py-8 border-b border-border-glass flex justify-between items-center bg-[#0a0e1a] sticky top-0 z-10">
                     <div className="text-xs font-bold text-text-primary uppercase tracking-widest flex items-center gap-2">
-                      {activeTab === 'specs' && <><Cpu size={16} className="text-primary-orange"/> UNIT SPECIFICATIONS</>}
-                      {activeTab === 'service' && <><ToolIcon size={16} className="text-primary-orange"/> STEP-BY-STEP SERVICE GUIDE</>}
-                      {activeTab === 'wiring' && <><Activity size={16} className="text-primary-orange"/> ELECTRICAL SCHEMATICS</>}
-                      {activeTab === 'fuses' && <><Zap size={16} className="text-primary-orange"/> FUSE BOX MAPPING</>}
-                      {activeTab === 'fluids' && <><Globe size={16} className="text-primary-orange"/> FLUID SPECIFICATIONS</>}
-                      {activeTab === 'torque' && <><Settings size={16} className="text-primary-orange"/> TIGHTENING TORQUE DATA</>}
+                      {activeTab === 'specs' && <><Cpu size={16} className="text-brand"/> UNIT SPECIFICATIONS</>}
+                      {activeTab === 'service' && <><ToolIcon size={16} className="text-brand"/> STEP-BY-STEP SERVICE GUIDE</>}
+                      {activeTab === 'wiring' && <><Activity size={16} className="text-brand"/> ELECTRICAL SCHEMATICS</>}
+                      {activeTab === 'fuses' && <><Zap size={16} className="text-brand"/> FUSE BOX MAPPING</>}
+                      {activeTab === 'fluids' && <><Globe size={16} className="text-brand"/> FLUID SPECIFICATIONS</>}
+                      {activeTab === 'torque' && <><Settings size={16} className="text-brand"/> TIGHTENING TORQUE DATA</>}
                     </div>
                     <button onClick={() => setSelectedUnit(null)} className="hidden md:block text-text-secondary hover:text-white transition-colors cursor-pointer"><X size={24} /></button>
                   </header>
@@ -3039,14 +3104,14 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                         <div className="space-y-8">
                           {(Array.isArray(selectedUnit.serviceManual) ? selectedUnit.serviceManual : []).map((chap: any, idx: number) => (
                             <div key={idx} className="space-y-4">
-                              <h4 className="text-sm font-bold text-primary-orange uppercase tracking-widest flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-full bg-primary-orange/20 flex items-center justify-center text-[10px]">{idx + 1}</span>
+                              <h4 className="text-sm font-bold text-brand uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center text-[10px]">{idx + 1}</span>
                                 {chap.title}
                               </h4>
                               <div className="space-y-3 pl-8">
                                 {(Array.isArray(chap.steps) ? chap.steps : []).map((step: string, sIdx: number) => (
                                   <div key={sIdx} className="flex gap-3 text-xs text-text-secondary group">
-                                    <span className="text-primary-orange font-bold font-accent">•</span>
+                                    <span className="text-brand font-bold font-accent">•</span>
                                     <span className="group-hover:text-text-primary transition-colors">{step}</span>
                                   </div>
                                 ))}
@@ -3086,8 +3151,8 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.3, delay: boxIdx * 0.1 }}
                             >
-                              <h5 className="text-xs font-bold text-primary-orange uppercase tracking-widest border-b border-primary-orange/20 pb-2">{boxName} FUSE BOX</h5>
-                              <div className="overflow-x-auto glass-panel p-0 hover:border-primary-orange/50 transition-colors duration-300">
+                              <h5 className="text-xs font-bold text-brand uppercase tracking-widest border-b border-brand/20 pb-2">{boxName} FUSE BOX</h5>
+                              <div className="overflow-x-auto glass-panel p-0 hover:border-brand/50 transition-colors duration-300">
                                 <table className="w-full text-left text-[10px]">
                                   <thead className="bg-white/5 text-text-secondary uppercase font-accent">
                                     <tr>
@@ -3101,12 +3166,12 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                                     {(Array.isArray(fuses) ? fuses : []).map((f: any, idx: number) => (
                                       <motion.tr 
                                         key={f.id} 
-                                        className="hover:bg-primary-orange/10 transition-colors"
+                                        className="hover:bg-brand/10 transition-colors"
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ duration: 0.2, delay: 0.1 + (idx * 0.05) }}
                                       >
-                                        <td className="p-3 font-bold text-primary-orange">{f.number}</td>
+                                        <td className="p-3 font-bold text-brand">{f.number}</td>
                                         <td className="p-3 font-accent">
                                           <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold bg-white/10 text-white shadow-sm border border-white/5">{f.amperage}</span>
                                         </td>
@@ -3129,12 +3194,12 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                           {(Array.isArray(selectedUnit.fluids) ? selectedUnit.fluids : []).map((fluid: any, idx: number) => (
                             <motion.div 
                               key={idx} 
-                              className="glass-panel p-6 bg-black/20 hover:bg-black/30 transition-all hover:border-primary-orange/30"
+                              className="glass-panel p-6 bg-black/20 hover:bg-black/30 transition-all hover:border-brand/30"
                               initial={{ opacity: 0, scale: 0.95 }}
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ duration: 0.3, delay: idx * 0.05 }}
                             >
-                              <h6 className="text-[10px] font-bold text-primary-orange uppercase mb-3 tracking-widest">{fluid.name}</h6>
+                              <h6 className="text-[10px] font-bold text-brand uppercase mb-3 tracking-widest">{fluid.name}</h6>
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center text-[10px] border-b border-white/5 pb-2">
                                   <span className="text-text-secondary uppercase">Spec</span>
@@ -3170,7 +3235,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
                               {(Array.isArray(selectedUnit.torqueSpecs) ? selectedUnit.torqueSpecs : []).map((t: any, idx: number) => (
                                 <tr key={idx} className="hover:bg-white/2">
                                   <td className="p-4 text-text-primary uppercase font-bold">{t.component}</td>
-                                  <td className="p-4 text-primary-orange font-bold">{t.nm} Nm</td>
+                                  <td className="p-4 text-brand font-bold">{t.nm} Nm</td>
                                   <td className="p-4 text-text-secondary">{t.ftlb} Ft-Lb</td>
                                 </tr>
                               ))}
@@ -3232,7 +3297,7 @@ function AIChatTab({ user, store, ...props }: any) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 md:space-y-6">
         {myMessages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 md:p-12 opacity-40">
-            <Cpu size={48} className="text-primary-orange mb-6" />
+            <Cpu size={48} className="text-brand mb-6" />
             <h4 className="text-base md:text-lg font-display font-bold mb-2 text-text-primary uppercase tracking-tight">Neural Matrix Standby</h4>
             <p className="text-[9px] md:text-xs uppercase tracking-widest max-w-xs text-text-secondary">AI Assistant ready for mechanical diagnostics, code analysis, and maintenance guidance.</p>
           </div>
@@ -3241,13 +3306,13 @@ function AIChatTab({ user, store, ...props }: any) {
           <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[90%] md:max-w-[80%] flex gap-3 md:gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {m.role === 'user' ? (
-                <UserAvatar user={user} size="sm" className="w-7 h-7 md:w-8 md:h-8 border-primary-orange" />
+                <UserAvatar user={user} size="sm" className="w-7 h-7 md:w-8 md:h-8 border-brand" />
               ) : (
                 <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center shrink-0 font-bold border border-blue-500/30 text-blue-400 bg-blue-500/20 text-[10px] md:text-xs font-accent">
                    AI
                 </div>
               )}
-              <div className={`p-3 md:p-4 rounded-2xl text-xs md:text-sm leading-relaxed ${m.role === 'user' ? 'bg-primary-orange/10 border border-primary-orange/20 text-white rounded-tr-none' : 'bg-white/5 border border-border-glass text-text-primary rounded-tl-none'}`}>
+              <div className={`p-3 md:p-4 rounded-2xl text-xs md:text-sm leading-relaxed ${m.role === 'user' ? 'bg-brand/10 border border-brand/20 text-white rounded-tr-none' : 'bg-white/5 border border-border-glass text-text-primary rounded-tl-none'}`}>
                 {m.content}
               </div>
             </div>
@@ -3281,7 +3346,7 @@ function AIChatTab({ user, store, ...props }: any) {
             >
               {autoSpeak ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
-            <button type="submit" disabled={!input.trim() || loading} className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-primary-orange text-white flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+            <button type="submit" disabled={!input.trim() || loading} className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-brand text-white flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
               <Send size={18} />
             </button>
           </div>
@@ -3323,7 +3388,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
             <tr key={u.id} className="hover:bg-white/2 transition-colors">
               <td className="p-6">
                 <div className="flex items-center gap-3">
-                  <UserAvatar user={u} size="sm" className="border-border-glass bg-slate-800" />
+                  <UserAvatar user={u} size="sm" className="border-border-glass bg-[#0A1224]" />
                   <div><div className="text-sm font-bold text-text-primary uppercase">{u.fullName}</div><div className="text-[9px] text-text-secondary uppercase">@{u.username}</div></div>
                 </div>
               </td>
@@ -3331,7 +3396,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <span className={`badge ${u.status === 'approved' ? 'badge-green' : 'animate-pulse'}`}>{u.status}</span>
               </td>
               <td className="p-6">
-                {u.subscription && <div className="text-[10px]"><span className="text-primary-orange font-bold uppercase">{u.subscription.plan}</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.subscription.expiryDate).toLocaleDateString()}</div></div>}
+                {u.subscription && <div className="text-[10px]"><span className="text-brand font-bold uppercase">{u.subscription.plan}</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.subscription.expiryDate).toLocaleDateString()}</div></div>}
               </td>
               <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{new Date(u.createdAt).toLocaleDateString()}</td>
               <td className="p-6">
@@ -3374,8 +3439,8 @@ function SavedItemsTab({ user, store }: any) {
 
   return (
     <div className="space-y-6">
-      <div className="glass-panel py-8 text-center border-b-2 border-primary-orange/20">
-        <Star className="mx-auto mb-4 text-primary-orange animate-pulse" size={32} />
+      <div className="glass-panel py-8 text-center border-b-2 border-brand/20">
+        <Star className="mx-auto mb-4 text-brand animate-pulse" size={32} />
         <h2 className="text-2xl font-display font-bold uppercase tracking-tight">Saved Neural Records</h2>
         <p className="text-[10px] text-text-secondary uppercase tracking-[0.3em] mt-2">Personal diagnostic archive for quick retrieval</p>
       </div>
@@ -3386,7 +3451,7 @@ function SavedItemsTab({ user, store }: any) {
             <motion.div 
               layoutId={item.id}
               key={item.id} 
-              className="glass-panel group hover:border-primary-orange/50 transition-all p-0 overflow-hidden"
+              className="glass-panel group hover:border-brand/50 transition-all p-0 overflow-hidden"
             >
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
@@ -3410,7 +3475,7 @@ function SavedItemsTab({ user, store }: any) {
                   if (item.type === 'DTC') window.location.hash = `#dtc?id=${item.itemId}`;
                   else if (item.type === 'Vehicle') window.location.hash = `#manuals?id=${item.itemId}`;
                 }}
-                className="w-full bg-white/5 py-3 border-t border-border-glass text-[9px] font-bold uppercase tracking-widest text-text-secondary group-hover:text-primary-orange group-hover:bg-primary-orange/10 transition-all"
+                className="w-full bg-white/5 py-3 border-t border-border-glass text-[9px] font-bold uppercase tracking-widest text-text-secondary group-hover:text-brand group-hover:bg-brand/10 transition-all"
               >
                 Restore Entry Access
               </button>
@@ -3450,7 +3515,7 @@ function SearchHistoryTab({ user, store }: any) {
           {myHistory.length > 0 ? myHistory.map((h: any) => (
             <div key={h.id} className="p-4 md:p-6 flex items-center justify-between hover:bg-white/2 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-primary-orange">
+                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-brand">
                   {h.type === 'DTC' ? <Search size={18} /> : <BookOpen size={18} />}
                 </div>
                 <div>
@@ -3463,7 +3528,7 @@ function SearchHistoryTab({ user, store }: any) {
                    if (h.type === 'DTC') window.location.hash = `#dtc?q=${encodeURIComponent(h.query)}`;
                    else window.location.hash = `#manuals?q=${encodeURIComponent(h.query)}`;
                  }}
-                 className="text-text-muted hover:text-primary-orange p-2 transition-colors"
+                 className="text-text-muted hover:text-brand p-2 transition-colors"
               >
                 <ArrowRight size={16} />
               </button>
@@ -3506,14 +3571,14 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
       <motion.div 
         initial={{ opacity: 0, y: -20 }} 
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl glass-panel p-0 overflow-hidden border-primary-orange/40 shadow-[0_40px_100px_rgba(0,0,0,0.8)]"
+        className="w-full max-w-2xl glass-panel p-0 overflow-hidden border-brand/40 shadow-[0_40px_100px_rgba(0,0,0,0.8)]"
       >
         <div className="p-6 border-b border-border-glass relative">
-           <Search size={24} className="absolute left-10 top-1/2 -translate-y-1/2 text-primary-orange" />
+           <Search size={24} className="absolute left-10 top-1/2 -translate-y-1/2 text-brand" />
            <input 
              autoFocus
              type="text" 
-             className="w-full bg-transparent pl-16 pr-12 py-4 text-lg font-display uppercase tracking-widest focus:outline-none" 
+             className="w-full bg-transparent pl-16 pr-12 py-4 text-lg font-display uppercase tracking-widest focus:outline-none text-text-primary placeholder-text-muted" 
              placeholder="CROSS-DATABASE INQUIRY..." 
              value={query}
              onChange={e => setQuery(e.target.value)}
@@ -3529,7 +3594,7 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
                 {results.map((r: any) => (
                   <button 
                     key={r.id} 
-                    className="w-full p-6 text-left hover:bg-primary-orange/5 flex items-center justify-between group transition-all"
+                    className="w-full p-6 text-left hover:bg-brand/5 flex items-center justify-between group transition-all"
                     onClick={() => {
                       if (r.gType === 'DTC') window.location.hash = `#dtc?id=${r.id}`;
                       else window.location.hash = `#manuals?id=${r.id}`;
@@ -3546,12 +3611,12 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
                             <span className="text-[10px] font-accent font-bold text-text-secondary uppercase tracking-[.2em]">{r.gType === 'DTC' ? 'FAULT PROTOCOL' : 'TECHNICAL UNIT'}</span>
                             <span className="px-1.5 py-0.5 bg-white/10 rounded text-[7px] text-text-muted uppercase font-bold">{r.category || (r.gType === 'DTC' ? 'Diagnostics' : 'Vehicle')}</span>
                           </div>
-                          <div className="text-base font-display font-bold text-text-primary uppercase group-hover:text-primary-orange transition-colors">
+                          <div className="text-base font-display font-bold text-text-primary uppercase group-hover:text-brand transition-colors">
                             {r.gType === 'DTC' ? `${r.code} - ${r.description}` : `${r.make} ${r.model}`}
                           </div>
                        </div>
                     </div>
-                    <ArrowRight size={20} className="text-text-muted group-hover:translate-x-1 transition-all group-hover:text-primary-orange" />
+                    <ArrowRight size={20} className="text-text-muted group-hover:translate-x-1 transition-all group-hover:text-brand" />
                   </button>
                 ))}
              </div>
@@ -3585,10 +3650,10 @@ function LogsTab({ store, ...props }: any) {
       <div className="p-6 space-y-4">
         {logs.map((l: any) => (
           <div key={l.id} className="flex gap-4 items-start border-b border-border-glass/50 pb-4 last:border-0 group">
-             <div className="w-1 h-8 bg-primary-orange/50 group-hover:bg-primary-orange transition-colors" />
+             <div className="w-1 h-8 bg-brand/50 group-hover:bg-brand transition-colors" />
              <div>
                <div className="flex items-center gap-3 mb-1">
-                 <span className="text-[10px] font-accent text-primary-orange font-bold uppercase tracking-widest">{l.action}</span>
+                 <span className="text-[10px] font-accent text-brand font-bold uppercase tracking-widest">{l.action}</span>
                  <span className="text-[9px] text-text-secondary font-accent">{new Date(l.timestamp).toLocaleString()}</span>
                </div>
                <div className="text-xs text-text-primary uppercase tracking-tight mb-1 font-medium">{l.details}</div>

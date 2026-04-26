@@ -14,9 +14,9 @@ export const EnhancedDashboard = ({ user, store, stats }: any) => {
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat Cards */}
-        <Card className="p-4 flex flex-col gap-2 hover:border-orange-500/30 transition-colors">
+        <Card className="p-4 flex flex-col gap-2 hover:border-brand/30 transition-colors">
           <div className="flex justify-between items-start">
-            <div className="p-2 bg-orange-500/10 rounded-lg text-orange-500">
+            <div className="p-2 bg-brand/10 rounded-lg text-brand">
               <Users size={20} />
             </div>
             {isAdmin && <Badge variant="success">+12%</Badge>}
@@ -69,14 +69,14 @@ export const EnhancedDashboard = ({ user, store, stats }: any) => {
         {/* Logs / Recent Activity */}
         <Card className="p-6 lg:col-span-2 flex flex-col">
           <div className="flex items-center gap-2 border-b border-white/10 pb-4 mb-4">
-            <Terminal size={18} className="text-orange-500" />
+            <Terminal size={18} className="text-brand" />
             <h3 className="text-sm font-bold uppercase tracking-widest text-white">Recent System Telemetry</h3>
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3">
              {store?.logs?.slice(0, 6).map((l: any) => (
                 <div key={l.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 gap-2">
                    <div>
-                     <div className="text-xs font-bold text-orange-400 uppercase tracking-widest">{l.action}</div>
+                     <div className="text-xs font-bold text-brand uppercase tracking-widest">{l.action}</div>
                      <div className="text-xs text-slate-300 mt-0.5">{l.details}</div>
                    </div>
                    <div className="text-xs font-mono text-slate-500 whitespace-nowrap">
@@ -114,7 +114,7 @@ export const EnhancedDashboard = ({ user, store, stats }: any) => {
              
              <div className="pt-4 border-t border-white/10 mt-auto">
                <div className="text-[10px] font-mono text-slate-500 uppercase">Neural Key</div>
-               <div className="text-xs font-mono text-orange-400 truncate mt-1 bg-black/30 p-2 rounded border border-white/5 select-all">
+               <div className="text-xs font-mono text-brand truncate mt-1 bg-black/30 p-2 rounded border border-white/5 select-all">
                  {user?.id || 'AUTH_REQUIRED'}
                </div>
              </div>

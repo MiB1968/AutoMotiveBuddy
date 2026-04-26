@@ -13,8 +13,8 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
         ref={ref}
         className={cn(
           "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200",
-          "disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-orange-500/50",
-          variant === 'primary' && "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md hover:shadow-lg hover:from-orange-400 hover:to-orange-500",
+          "disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-brand/50",
+          variant === 'primary' && "bg-gradient-to-r from-brand to-brand-dark text-white shadow-[0_4px_15px_var(--color-brand-glow)] hover:shadow-[0_8px_25px_var(--color-brand-glow)] hover:scale-[1.02]",
           variant === 'secondary' && "bg-slate-800 text-white border border-slate-700 hover:bg-slate-700",
           variant === 'ghost' && "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800/50",
           className
@@ -47,7 +47,7 @@ export const Badge = ({ className, children, variant = "info", ...props }: React
 };
 
 export const ProgressBar = ({ progress, className }: { progress: number, className?: string }) => (
-  <div className={cn("w-full bg-slate-800 rounded-full h-2.5 overflow-hidden", className)}>
-    <div className="bg-orange-500 h-2.5 rounded-full transition-all duration-500 ease-out" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}></div>
+  <div className={cn("w-full bg-[#0A1224] border border-white/10 rounded-full h-2.5 overflow-hidden shadow-inner", className)}>
+    <div className="bg-brand h-2.5 rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_var(--color-brand-glow)]" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}></div>
   </div>
 );

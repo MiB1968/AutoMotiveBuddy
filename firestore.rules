@@ -37,7 +37,7 @@ service cloud.firestore {
              ( !('fullName' in data) || (data.fullName is string && data.fullName.size() <= 128) ) &&
              ( !('email' in data) || (data.email is string && data.email.size() <= 128) ) &&
              ( !('status' in data) || (data.status in ['pending', 'approved', 'rejected']) ) &&
-             ( !('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 2048) );
+             ( !('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 200000) );
     }
 
     // Users Collection

@@ -67,7 +67,7 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.3);
+  --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.3);
 
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
@@ -161,8 +161,8 @@ body {
 }
 
 @keyframes pulse-glow {
-  0% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.3); }
-  100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.6); }
+  0% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
+  100% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.6); }
 }
 
 /* Modern Button Styles */
@@ -276,7 +276,7 @@ body {
 .form-input:focus {
   outline: none;
   border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
 }
 
 /* Status Badges */
