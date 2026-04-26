@@ -14,10 +14,16 @@ export interface DTC {
   system?: string; // e.g. Engine
   severity: 'low' | 'medium' | 'high' | 'critical';
   symptoms: string[];
+  // Richer causes structure
   causes?: (string | { item: string; probability: number })[] | string;
   probableCauses?: string[];
+  // Richer repair content
+  diagnostic_steps?: string[];
   solutions?: string[]; // step-by-step
   remediation?: string[];
+  // Vehicle specific notes
+  vehicle_specific_notes?: { [make: string]: string };
+  // Meta
   tools?: string[];
   costPrefix?: string;
   costRange?: string;

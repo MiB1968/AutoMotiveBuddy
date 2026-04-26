@@ -2301,6 +2301,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
   const [selectedDTC, setSelectedDTC] = useState<DTC | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showFullProtocol, setShowFullProtocol] = useState(false);
+  const [activeTab, setActiveTab] = useState<'summary' | 'causes' | 'repair'>('summary'); 
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2311,6 +2312,7 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
     setSearchResults([]);
     setSelectedDTC(null);
     setShowFullProtocol(false);
+    setActiveTab('summary');
 
     let dtcData;
     let localMatches: any[] = [];
@@ -2630,131 +2632,172 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
                   <h2 className="text-xl font-display font-bold uppercase tracking-tight text-text-primary">
                     {selectedDTC.title || selectedDTC.description}
                   </h2>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
-                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock size={10} /> TIME BASE</div>
-                      <div className="text-xs font-bold text-text-primary">{selectedDTC.timeEstimate || '30-45 MIN'}</div>
-                    </div>
-                    <div className="p-3 border border-border-glass rounded-lg bg-gradient-to-r from-white/5 to-transparent">
-                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Brain size={10} /> AI CONFIDENCE</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="text-xs font-bold text-brand">{selectedDTC.confidence ? `${(selectedDTC.confidence * 100).toFixed(0)}%` : '85%'}</div>
-                        <ProgressBar progress={selectedDTC.confidence ? selectedDTC.confidence * 100 : 85} className="flex-1 h-1" />
-                      </div>
-                    </div>
-                    <div className="col-span-2 md:col-span-1 p-3 bg-white/5 border border-border-glass rounded-lg">
-                      <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><CreditCard size={10} /> UNIT COST (EST)</div>
-                      <div className="text-xs font-bold text-text-primary">{selectedDTC.estimatedCost || '₱1,500 - ₱4,000'}</div>
-                    </div>
+                  
+                  {/* Tabs */}
+                  <div className="flex border-b border-border-glass">
+                    {['summary', 'causes', 'repair'].map(tab => (
+                      <button 
+                        key={tab}
+                        onClick={() => setActiveTab(tab as any)}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest border-b-2 transition-colors ${activeTab === tab ? 'border-brand text-brand' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
                   </div>
 
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14} className="text-yellow-400" /> PROBABLE ROOT CAUSES (RANKED)</h4>
-                      <div className="space-y-2">
-                        {(() => {
-                           const rawCauses = selectedDTC?.causes;
-                           let processedCauses: { item: string; probability: number }[] = [];
-                           
-                           if (typeof rawCauses === 'string') {
-                             processedCauses = rawCauses.split(',').map(c => ({ item: c.trim(), probability: 0 }));
-                           } else if (Array.isArray(rawCauses)) {
-                             processedCauses = (rawCauses as any[]).map(c => {
-                               if (typeof c === 'string') return { item: c, probability: 0 };
-                               return c;
-                             });
-                           }
-                           
-                           // Sort by probability if it exists
-                           processedCauses.sort((a, b) => (b.probability || 0) - (a.probability || 0));
-
-                           return processedCauses.length > 0 ? processedCauses.map((c: any, i: number) => (
-                             <div key={i} className="flex flex-col gap-1 p-3 bg-black/20 border border-white/5 rounded-lg group hover:border-brand/30 transition-all">
-                               <div className="flex items-center justify-between">
-                                  <span className="text-xs text-text-primary capitalize font-medium">{c.item}</span>
-                                  {c.probability > 0 && <span className="text-[10px] text-brand font-bold bg-brand/10 px-2 py-0.5 rounded border border-brand/20">{(c.probability * 100).toFixed(0)}% MATCH</span>}
-                               </div>
-                               {c.probability > 0 && (
-                                 <ProgressBar progress={c.probability * 100} className="h-0.5 opacity-50 mt-1" />
-                               )}
-                             </div>
-                           )) : (
-                             <span className="text-[10px] text-text-secondary italic">Information synchronization in progress...</span>
-                           );
-                        })()}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14} className="text-red-400" /> ALERT SYMPTOMS</h4>
-                      <ul className="space-y-2">
-                        {(() => {
-                          const symps = Array.isArray(selectedDTC?.symptoms) ? selectedDTC.symptoms : [];
-                          return symps.length > 0 ? symps.map((s: string, i: number) => (
-                            <li key={i} className="text-xs text-text-secondary flex gap-2">
-                              <span className="text-brand select-none">•</span> {s}
-                            </li>
-                          )) : (
-                            <li className="text-[10px] text-text-secondary italic">Standard performance irregularities or warning indicator active.</li>
-                          );
-                        })()}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 size={14} className="text-green-400" /> REPAIR PROTOCOL</h4>
-                      <div className="space-y-3">
-                        {(() => {
-                          const steps = Array.isArray(selectedDTC?.remediation) ? selectedDTC.remediation : 
-                                        Array.isArray(selectedDTC?.solutions) ? selectedDTC.solutions : 
-                                        typeof selectedDTC?.solutions === 'string' ? [selectedDTC.solutions] : [];
-                          
-                          return steps.length > 0 ? (
-                            <>
-                              {(showFullProtocol ? steps : steps.slice(0, 3)).map((step: string, i: number) => (
-                                <div key={i} className="p-3 bg-black/30 border-l-2 border-brand rounded-r text-[11px] leading-relaxed text-text-primary italic hover:bg-white/5 transition-colors">
-                                  <div className="flex gap-3 items-start">
-                                    <span className="text-brand font-mono font-bold mt-0.5">{String(i + 1).padStart(2, '0')}</span>
-                                    <span>{step}</span>
-                                  </div>
-                                </div>
-                              ))}
-                              {steps.length > 3 && !showFullProtocol && (
-                                <button 
-                                  onClick={() => setShowFullProtocol(true)}
-                                  className="text-[9px] font-bold text-brand uppercase tracking-widest hover:underline py-2 w-full text-center bg-brand/5 border border-brand/20 rounded-lg hover:bg-brand/10 transition-colors"
-                                >
-                                  View Full {steps.length}-Step Protocol
-                                </button>
-                              )}
-                              {showFullProtocol && (
-                                <button 
-                                  onClick={() => setShowFullProtocol(false)}
-                                  className="text-[9px] font-bold text-text-secondary uppercase tracking-widest hover:underline py-2 w-full text-center bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                                >
-                                  Hide Extended Details
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <div className="p-3 bg-black/30 border-l-2 border-gray-600 rounded-r text-[11px] leading-relaxed text-text-secondary italic">
-                              Comprehensive repair guide pending cloud synchronization. Inspect associated wiring and sensors.
+                  <div className="space-y-6 pt-2">
+                    {activeTab === 'summary' && (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
+                            <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock size={10} /> TIME BASE</div>
+                            <div className="text-xs font-bold text-text-primary">{selectedDTC.timeEstimate || '30-45 MIN'}</div>
+                          </div>
+                          <div className="p-3 border border-border-glass rounded-lg bg-gradient-to-r from-white/5 to-transparent">
+                            <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Brain size={10} /> AI CONFIDENCE</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="text-xs font-bold text-brand">{selectedDTC.confidence ? `${(selectedDTC.confidence * 100).toFixed(0)}%` : '85%'}</div>
+                              <ProgressBar progress={selectedDTC.confidence ? selectedDTC.confidence * 100 : 85} className="flex-1 h-1" />
                             </div>
-                          );
-                        })()}
+                          </div>
+                          <div className="col-span-2 md:col-span-1 p-3 bg-white/5 border border-border-glass rounded-lg">
+                            <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><CreditCard size={10} /> UNIT COST (EST)</div>
+                            <div className="text-xs font-bold text-text-primary">{selectedDTC.estimatedCost || '₱1,500 - ₱4,000'}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Vehicle Specific Notes */}
+                        {selectedDTC.vehicle_specific_notes && Object.keys(selectedDTC.vehicle_specific_notes).length > 0 && (
+                          <div className="p-4 bg-brand/5 border border-brand/20 rounded-lg">
+                             <div className="text-[9px] font-bold text-brand uppercase tracking-widest mb-1">VEHICLE MANUFACTURER NOTES</div>
+                             {Object.entries(selectedDTC.vehicle_specific_notes).map(([make, note]) => (
+                               <p key={make} className="text-[10px] text-text-secondary leading-tight"><span className="font-bold text-text-primary">{make}:</span> {note}</p>
+                             ))}
+                          </div>
+                        )}
+
+                        <div className={`p-4 border rounded-lg ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'bg-red-500/5 border-red-500/20' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-brand/5 border-brand/20'}`}>
+                           <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-400' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-400' : 'text-brand'}`}>STRICT SAFETY PROTOCOL</div>
+                           <p className={`text-[10px] opacity-80 uppercase leading-tight ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-300' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-300' : 'text-white'}`}>THREAT LEVEL: {selectedDTC.dangerLevel || selectedDTC.severity || 'HIGH'}. {String(selectedDTC.severity).toLowerCase() === 'critical' ? 'IMMEDIATE ACTION REQUIRED. DO NOT OPERATE SYSTEM.' : 'PROCEED WITH CAUTION OR ENGAGE PROFESSIONAL SUPPORT.'}</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="pt-4 flex gap-3">
-                      <button className="btn-primary flex-1 py-4 text-[10px] font-bold tracking-widest">COMMAND CENTER PRINT</button>
-                      <button className="btn-secondary w-14 h-14 flex items-center justify-center p-0 rounded-lg"><Share2 size={18} /></button>
-                    </div>
+                    {activeTab === 'causes' && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14} className="text-yellow-400" /> PROBABLE ROOT CAUSES (RANKED)</h4>
+                        <div className="space-y-2">
+                          {(() => {
+                            const rawCauses = selectedDTC?.causes;
+                            let processedCauses: { item: string; probability: number }[] = [];
+                            
+                            if (typeof rawCauses === 'string') {
+                              processedCauses = rawCauses.split(',').map(c => ({ item: c.trim(), probability: 0 }));
+                            } else if (Array.isArray(rawCauses)) {
+                              processedCauses = (rawCauses as any[]).map(c => {
+                                if (typeof c === 'string') return { item: c, probability: 0 };
+                                return c;
+                              });
+                            }
+                            
+                            // Sort by probability if it exists
+                            processedCauses.sort((a, b) => (b.probability || 0) - (a.probability || 0));
 
-                    <div className={`p-4 border rounded-lg ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'bg-red-500/5 border-red-500/20' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-brand/5 border-brand/20'}`}>
-                       <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-400' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-400' : 'text-brand'}`}>STRICT SAFETY PROTOCOL</div>
-                       <p className={`text-[10px] opacity-80 uppercase leading-tight ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-300' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-300' : 'text-white'}`}>THREAT LEVEL: {selectedDTC.dangerLevel || selectedDTC.severity || 'HIGH'}. {String(selectedDTC.severity).toLowerCase() === 'critical' ? 'IMMEDIATE ACTION REQUIRED. DO NOT OPERATE SYSTEM.' : 'PROCEED WITH CAUTION OR ENGAGE PROFESSIONAL SUPPORT.'}</p>
-                    </div>
+                            return processedCauses.length > 0 ? processedCauses.map((c: any, i: number) => (
+                              <div key={i} className="flex flex-col gap-1 p-3 bg-black/20 border border-white/5 rounded-lg group hover:border-brand/30 transition-all">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-text-primary capitalize font-medium">{c.item}</span>
+                                    {c.probability > 0 && <span className="text-[10px] text-brand font-bold bg-brand/10 px-2 py-0.5 rounded border border-brand/20">{(c.probability * 100).toFixed(0)}% MATCH</span>}
+                                </div>
+                                {c.probability > 0 && (
+                                  <ProgressBar progress={c.probability * 100} className="h-0.5 opacity-50 mt-1" />
+                                )}
+                              </div>
+                            )) : (
+                              <span className="text-[10px] text-text-secondary italic">Information synchronization in progress...</span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'repair' && (
+                      <div className="space-y-6">
+                        {/* Add Diagnostic Steps */}
+                        {selectedDTC.diagnostic_steps && (
+                          <div>
+                            <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><ToolIcon size={14} className="text-blue-400" /> DIAGNOSTIC PROCEDURES</h4>
+                            <ul className="space-y-2">
+                              {selectedDTC.diagnostic_steps.map((s, i) => (
+                                <li key={i} className="text-xs text-text-secondary flex gap-2">
+                                  <span className="text-blue-400 select-none">•</span> {s}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14} className="text-red-400" /> ALERT SYMPTOMS</h4>
+                          <ul className="space-y-2">
+                            {(() => {
+                              const symps = Array.isArray(selectedDTC?.symptoms) ? selectedDTC.symptoms : [];
+                              return symps.length > 0 ? symps.map((s: string, i: number) => (
+                                <li key={i} className="text-xs text-text-secondary flex gap-2">
+                                  <span className="text-brand select-none">•</span> {s}
+                                </li>
+                              )) : (
+                                <li className="text-[10px] text-text-secondary italic">Standard performance irregularities or warning indicator active.</li>
+                              );
+                            })()}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 size={14} className="text-green-400" /> REPAIR PROTOCOL</h4>
+                          <div className="space-y-3">
+                            {(() => {
+                              const steps = Array.isArray(selectedDTC?.remediation) ? selectedDTC.remediation : 
+                                            Array.isArray(selectedDTC?.solutions) ? selectedDTC.solutions : 
+                                            typeof selectedDTC?.solutions === 'string' ? [selectedDTC.solutions] : [];
+                              
+                              return steps.length > 0 ? (
+                                <>
+                                  {(showFullProtocol ? steps : steps.slice(0, 3)).map((step: string, i: number) => (
+                                    <div key={i} className="p-3 bg-black/30 border-l-2 border-brand rounded-r text-[11px] leading-relaxed text-text-primary italic hover:bg-white/5 transition-colors">
+                                      <div className="flex gap-3 items-start">
+                                        <span className="text-brand font-mono font-bold mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                                        <span>{step}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {steps.length > 3 && !showFullProtocol && (
+                                    <button 
+                                      onClick={() => setShowFullProtocol(true)}
+                                      className="text-[9px] font-bold text-brand uppercase tracking-widest hover:underline py-2 w-full text-center bg-brand/5 border border-brand/20 rounded-lg hover:bg-brand/10 transition-colors"
+                                    >
+                                      View Full {steps.length}-Step Protocol
+                                    </button>
+                                  )}
+                                  {showFullProtocol && (
+                                    <button 
+                                      onClick={() => setShowFullProtocol(false)}
+                                      className="text-[9px] font-bold text-text-secondary uppercase tracking-widest hover:underline py-2 w-full text-center bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+                                    >
+                                      Hide Extended Details
+                                    </button>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="p-3 bg-black/30 border-l-2 border-gray-600 rounded-r text-[11px] leading-relaxed text-text-secondary italic">
+                                  Comprehensive repair guide pending cloud synchronization. Inspect associated wiring and sensors.
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ) : (
