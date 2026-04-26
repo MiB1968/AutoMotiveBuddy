@@ -1,28 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Exo+2:wght@300;400;600&family=Orbitron:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&family=Orbitron:wght@400;600;700;800;900&display=swap');
 @import "./styles/design-system.css";
 @import "tailwindcss";
 
 @theme {
-  --color-bg-base-start: #0a0e1a;
-  --color-bg-base-end: #080c14;
+  --color-bg-base-start: #040814;
+  --color-bg-base-end: #02040a;
   --color-bg-card: rgba(17, 24, 39, 0.75);
   --color-bg-card-hover: rgba(22, 31, 50, 0.85);
-  --color-glass-border: rgba(249, 115, 22, 0.15);
-  --color-orange: #f97316;
-  --color-orange-glow: rgba(249, 115, 22, 0.35);
-  --color-orange-dark: #ea580c;
+  --color-glass-border: rgba(0, 212, 255, 0.15);
+  --color-orange: #00D4FF;
+  --color-orange-glow: rgba(0, 212, 255, 0.35);
+  --color-orange-dark: #2563EB;
+  --color-purple: #7C3AED;
   --color-red: #ef4444;
   --color-green: #22c55e;
   --color-blue: #3b82f6;
   --color-yellow: #eab308;
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #475569;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A1A1AA;
+  --color-text-muted: #71717a;
   --color-border: rgba(255, 255, 255, 0.07);
-  --color-sidebar-bg: #04070d;
+  --color-sidebar-bg: #030612;
 
   --font-sans: "Exo 2", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Rajdhani", sans-serif;
+  --font-display: "Orbitron", sans-serif;
   --font-accent: "Orbitron", sans-serif;
 
   --animate-pulse-glow: pulse-glow 3s infinite;
@@ -34,7 +35,7 @@
 @layer base {
   body {
     @apply text-text-primary min-h-screen font-sans selection:bg-orange/30 selection:text-white;
-    background: linear-gradient(-45deg, #0a0e1a, #111827, #080c14, #0f172a);
+    background: linear-gradient(-45deg, #040814, #08122a, #02040a, #0b1c40);
     background-size: 400% 400%;
     animation: gradientBG 15s ease infinite;
     background-attachment: fixed;

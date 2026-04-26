@@ -202,6 +202,14 @@ function AIMaintenanceTab({ user, store }: any) {
     if (typeof e !== 'string') {
       e.preventDefault();
     }
+    
+    // Unlock speech synthesis immediately on user interaction
+    if ('speechSynthesis' in window) {
+      const unlock = new SpeechSynthesisUtterance('');
+      unlock.volume = 0;
+      window.speechSynthesis.speak(unlock);
+    }
+    
     const searchQuery = typeof e === 'string' ? e : query;
     if (!searchQuery.trim()) return;
     
@@ -461,24 +469,126 @@ function UserAvatar({ user, size = "md", className = "", onUpdate }: { user: any
   );
 }
 
-const Logo = ({ className = "", size = "normal" }: { className?: string, size?: "small" | "normal" | "large" }) => (
-  <div className={`flex items-center gap-3 ${className}`}>
-    <div className={`
-      ${size === 'small' ? 'w-8 h-8' : size === 'large' ? 'w-16 h-16' : 'w-10 h-10'}
-      bg-gradient-to-br from-orange to-orange-dark rounded-xl flex items-center justify-center 
-      shadow-[0_0_20px_var(--color-orange-glow)] relative overflow-hidden group
-    `}>
-      <Wrench className={`${size === 'small' ? 'w-4 h-4' : size === 'large' ? 'w-8 h-8' : 'w-5 h-5'} text-white z-10`} />
-      <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-    </div>
-    <div className="flex flex-col leading-none">
-      <span className={`font-display font-bold ${size === 'large' ? 'text-3xl' : size === 'small' ? 'text-lg' : 'text-xl'} tracking-wider text-text-primary`}>
-        AUTO<span className="text-orange">MOTIVE</span>
-      </span>
-      {size !== 'small' && <span className="text-[9px] font-accent text-orange/80 tracking-[0.3em] uppercase">Buddy</span>}
-    </div>
-  </div>
+const LogoHex = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 120 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Hexagon Shield */}
+    <path d="M60 10 L105 35 L105 80 L60 105 L15 80 L15 35 Z" stroke="url(#hexGrad)" strokeWidth="6" strokeLinejoin="round"/>
+    
+    {/* Circuit Lines Left */}
+    <circle cx="8" cy="45" r="3" fill="#00D4FF"/>
+    <path d="M8 45 L15 45 L20 40 L30 40" stroke="#00D4FF" strokeWidth="2"/>
+    <circle cx="12" cy="70" r="3" fill="#00D4FF"/>
+    <path d="M12 70 L20 70 L25 65 L35 65" stroke="#00D4FF" strokeWidth="2"/>
+    
+    {/* Circuit Lines Right */}
+    <circle cx="112" cy="45" r="3" fill="#7C3AED"/>
+    <path d="M112 45 L105 45 L100 50 L90 50" stroke="#7C3AED" strokeWidth="2"/>
+    <circle cx="108" cy="70" r="3" fill="#7C3AED"/>
+    <path d="M108 70 L100 70 L95 65 L85 65" stroke="#7C3AED" strokeWidth="2"/>
+
+    {/* Car Silhouette */}
+    <path d="M35 65 C40 45 45 40 50 38 L70 38 C75 40 80 45 85 65 L90 85 C90 88 88 90 85 90 L80 90 L75 80 L45 80 L40 90 L35 90 C32 90 30 88 30 85 Z" fill="rgba(255,255,255,0.02)" stroke="#FFFFFF" strokeWidth="2" strokeLinejoin="round"/>
+    
+    {/* Windshield */}
+    <path d="M40 60 C45 48 50 45 60 45 C70 45 75 48 80 60 Z" fill="rgba(255,255,255,0.05)" stroke="#A1A1AA" strokeWidth="1.5"/>
+    
+    {/* Headlights (Cyan/Purple glow) */}
+    <path d="M33 70 L43 66 L48 66" stroke="#00D4FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter="drop-shadow(0 0 4px #00D4FF)"/>
+    <path d="M87 70 L77 66 L72 66" stroke="#00D4FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter="drop-shadow(0 0 4px #00D4FF)"/>
+    
+    {/* Grille */}
+    <path d="M45 75 L75 75 M46 80 L74 80 M48 85 L72 85" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round"/>
+
+    {/* ECG Pulse breaking the shield */}
+    <path d="M45 105 L50 105 L55 90 L65 120 L75 105 L80 105" stroke="url(#hexGrad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+
+    <defs>
+      <linearGradient id="hexGrad" x1="0" y1="0" x2="120" y2="120">
+        <stop offset="0%" stopColor="#00D4FF" />
+        <stop offset="50%" stopColor="#2563EB" />
+        <stop offset="100%" stopColor="#7C3AED" />
+      </linearGradient>
+    </defs>
+  </svg>
 );
+
+const Logo = ({ className = "", size = "normal" }: { className?: string, size?: "small" | "normal" | "large" }) => {
+  const [imgError, setImgError] = useState(false);
+
+  if (size === 'small') {
+    return (
+      <div className={`flex items-center gap-3 ${className}`}>
+        {imgError ? (
+          <LogoHex className="w-10 h-10" />
+        ) : (
+          <img 
+            src="/logo-icon.png" 
+            alt="AutoMotive Buddy" 
+            className="w-10 h-10 object-contain" 
+            onError={() => setImgError(true)} 
+          />
+        )}
+        <div className="flex flex-col leading-none justify-center">
+          <span className="font-display font-medium text-lg tracking-[0.1em] text-text-primary">
+            AUTOMOTIVE
+          </span>
+          <div className="flex items-center gap-1 w-full justify-between mt-0.5">
+            <div className="h-px w-3 bg-gradient-to-r from-transparent to-[#00D4FF]" />
+            <span className="font-display font-bold text-xs tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-[#2563EB] to-[#7C3AED]">
+              BUDDY
+            </span>
+            <div className="h-px w-3 bg-gradient-to-l from-transparent to-[#7C3AED]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Large/normal size
+  return (
+    <div className={`flex flex-col items-center justify-center ${className}`}>
+      {imgError ? (
+        <div className="flex flex-col items-center gap-3">
+          <LogoHex className={size === 'large' ? 'w-24 h-24' : 'w-16 h-16'} />
+          <div className="flex flex-col items-center leading-tight">
+            <span className={`font-display font-medium ${size === 'large' ? 'text-3xl' : 'text-xl'} tracking-[0.15em] text-text-primary`}>
+              AUTOMOTIVE
+            </span>
+            <div className="flex items-center gap-2 w-full justify-center mt-1">
+              <div className="h-px w-6 bg-gradient-to-r from-transparent to-[#00D4FF]" />
+              <span className={`font-display font-bold ${size === 'large' ? 'text-2xl' : 'text-lg'} tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-[#2563EB] to-[#7C3AED]`}>
+                BUDDY
+              </span>
+              <div className="h-px w-6 bg-gradient-to-l from-transparent to-[#7C3AED]" />
+            </div>
+            {size === 'large' && (
+              <div className="flex flex-col items-center mt-3 w-full">
+                <span className="text-[9px] font-sans text-text-secondary tracking-[0.3em] uppercase opacity-80 font-medium text-center">
+                  Intelligent Diagnostic Platform
+                </span>
+                <div className="flex flex-col items-center mt-6 pt-4 border-t border-white/10 w-full relative">
+                  <span className="text-[8px] font-sans text-[#00D4FF] tracking-[0.4em] uppercase mb-1">
+                    Engineered By
+                  </span>
+                  <span className="text-sm font-display font-medium text-white tracking-[0.25em]">
+                    RUBEN LLEGO
+                  </span>
+                </div>
+              </div>
+            )}
+           </div>
+        </div>
+      ) : (
+        <img 
+          src={size === 'large' ? "/logo-vertical.png" : "/logo-horizontal.png"} 
+          alt="AutoMotive Buddy" 
+          className={size === 'large' ? 'h-48 object-contain' : 'h-16 object-contain'}
+          onError={() => setImgError(true)} 
+        />
+      )}
+    </div>
+  );
+};
 
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error' | 'warning' | 'info', onClose: () => void }) => {
   useEffect(() => {
@@ -1137,6 +1247,38 @@ function PricingCard({ title, price, duration, icon: Icon, benefits, featured, a
 function AuthPage({ mode, onBack, toast }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Email and Password are required');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const { loginWithEmail, registerWithEmail } = await import('./lib/firebase');
+      if (mode === 'login') {
+        await loginWithEmail(email, password);
+      } else {
+        await registerWithEmail(email, password);
+      }
+    } catch (e: any) {
+      let errMsg = e.message;
+      if (e.code === 'auth/invalid-credential') {
+         errMsg = 'Invalid credentials or Email/Password provider not enabled in Firebase Console.';
+      } else if (e.code === 'auth/operation-not-allowed') {
+         errMsg = 'Email/Password auth is not enabled in Firebase setup. Please enable it in the Firebase Console -> Authentication -> Sign-in method.';
+      }
+      setError(`Auth Failed: ${errMsg}`);
+      toast('Access Denied', 'error');
+    }
+    setLoading(false);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
@@ -1181,8 +1323,44 @@ function AuthPage({ mode, onBack, toast }: any) {
           <header className={`mb-10 ${mode === 'login' ? 'text-center' : ''}`}>
             {mode === 'login' && <Logo className="justify-center mb-8" size="normal" />}
             <h2 className="text-2xl font-display font-bold tracking-widest uppercase">{mode === 'login' ? 'System Authorization' : 'Member Registration'}</h2>
-            <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">Select provider to establish link</p>
+            <p className="text-text-secondary text-[10px] uppercase tracking-[0.3em] font-medium mt-2">Enter credentials or select provider</p>
           </header>
+
+          <form onSubmit={handleEmailAuth} className="flex flex-col gap-4 mb-6">
+            <div>
+              <input 
+                type="email" 
+                placeholder="EMAIL ADDRESS" 
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                className="input-field w-full text-center tracking-widest uppercase bg-black/40 border-white/10" 
+              />
+            </div>
+            <div>
+              <input 
+                type="password" 
+                placeholder="PASSWORD" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoComplete={mode === 'login' ? "current-password" : "new-password"}
+                className="input-field w-full text-center tracking-widest uppercase bg-black/40 border-white/10" 
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full py-5 text-sm flex items-center justify-center gap-3 mt-2"
+            >
+              {loading ? 'AUTHORIZING...' : (mode === 'login' ? 'INITIALIZE LOGIN' : 'CREATE NEURAL LINK')}
+            </button>
+          </form>
+
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-[10px] text-text-muted uppercase tracking-[0.3em]">OR</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
           <div className="flex flex-col gap-6">
             <button
@@ -1201,13 +1379,13 @@ function AuthPage({ mode, onBack, toast }: any) {
                 setLoading(false);
               }}
               disabled={loading}
-              className="btn-secondary w-full py-5 text-sm flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-orange/50 hover:bg-orange/10"
+              className="btn-secondary w-full py-4 text-xs flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-orange/50 hover:bg-orange/10"
             >
-              <Globe className="text-orange" size={20} />
-              <span>{loading ? 'AUTHORIZING...' : 'CONTINUE WITH GOOGLE'}</span>
+              <Globe className="text-orange" size={16} />
+              <span>CONTINUE WITH GOOGLE</span>
             </button>
             {error && (
-              <div className="text-red-500 text-xs font-accent tracking-widest text-center mt-2 px-4 py-2 bg-red-500/10 rounded-md border border-red-500/20 shadow-inner">
+              <div className="text-red-500 text-xs font-accent tracking-widest text-center mt-2 px-4 py-2 bg-red-500/10 rounded-md border border-red-500/20 shadow-inner leading-relaxed">
                 {error}
               </div>
             )}
