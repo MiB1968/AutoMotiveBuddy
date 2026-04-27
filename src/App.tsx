@@ -671,17 +671,27 @@ export default function App() {
           let uData: UserType;
           if (userDoc.exists()) {
             uData = userDoc.data() as UserType;
+            if (uData.role === 'trial' && uData.trialExpiration) {
+               if (new Date(uData.trialExpiration).getTime() < Date.now()) {
+                  // Trial expired
+                  uData.status = 'rejected'; // essentially suspending them 
+                  addToast('Trial expired', 'error');
+               }
+            }
             setCurrentUser(uData);
           } else {
-            // New user via Google login
+            // New user via Google login or Anonymous
+            const isAnon = fbUser.isAnonymous;
+            const expirationTime = isAnon ? new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() : undefined;
             const newUser: UserType = {
               id: fbUser.uid,
-              username: fbUser.email?.split('@')[0] || 'user',
-              fullName: fbUser.displayName || 'Guest User',
+              username: fbUser.email?.split('@')[0] || (isAnon ? `anon_${fbUser.uid.slice(0,6)}` : 'user'),
+              fullName: fbUser.displayName || (isAnon ? 'Trial User' : 'Guest User'),
               email: fbUser.email || '',
-              role: fbUser.email === 'rubenlleg12@gmail.com' ? 'admin' : 'member',
-              status: fbUser.email === 'rubenlleg12@gmail.com' ? 'approved' : 'pending',
+              role: fbUser.email === 'rubenlleg12@gmail.com' ? 'admin' : (isAnon ? 'trial' : 'member'),
+              status: fbUser.email === 'rubenlleg12@gmail.com' || isAnon ? 'approved' : 'pending',
               createdAt: new Date().toISOString(),
+              trialExpiration: expirationTime,
               avatarUrl: fbUser.photoURL || '',
             };
             await setDoc(doc(db, 'users', fbUser.uid), newUser).catch(e => {
@@ -864,7 +874,29 @@ export default function App() {
       return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
     }
 
-    return <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
+    if (currentUser.status === 'suspended' || currentUser.status === 'rejected') {
+       return (
+         <div className="h-screen w-full flex flex-col items-center justify-center p-6 text-center space-y-6">
+           <Wrench size={64} className="text-red-500 opacity-80" />
+           <h2 className="text-2xl font-bold font-display uppercase text-red-400 tracking-widest">Access Denied</h2>
+           <p className="text-sm text-text-secondary max-w-md mx-auto">Your account {currentUser.role === 'trial' ? 'trial has expired' : 'has been suspended'}. Please contact your administrator to restore access.</p>
+           <button onClick={logout} className="btn-secondary py-3 px-8 text-xs">LOGOUT</button>
+         </div>
+       );
+    }
+
+    return (
+       <>
+          {currentUser.role === 'trial' && currentUser.status === 'approved' && (
+             <div className="fixed top-0 left-0 right-0 z-[100] p-1.5 text-center text-[10px] sm:text-xs font-bold tracking-widest uppercase bg-blue-500/10 text-blue-400 backdrop-blur-md border-b border-blue-500/20">
+               TRIAL ACCOUNT ACTIVE — EXPIRES EN 3 HOURS
+             </div>
+          )}
+          <div className={currentUser.role === 'trial' ? 'pt-6' : ''}>
+             <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />
+          </div>
+       </>
+    );
   };
 
   return (
@@ -1403,6 +1435,26 @@ function AuthPage({ mode, onBack, toast }: any) {
               <Globe className="text-brand" size={16} />
               <span>CONTINUE WITH GOOGLE</span>
             </button>
+            <button
+               type="button"
+               onClick={async () => {
+                 setLoading(true);
+                 setError('');
+                 try {
+                   const { startTrialAccount } = await import('./lib/firebase');
+                   await startTrialAccount();
+                 } catch (e: any) {
+                   setError(`Trial Activation Failed. Please enable Anonymous Auth in Firebase. ${e.message}`);
+                   toast('Access Denied', 'error');
+                 }
+                 setLoading(false);
+               }}
+               disabled={loading}
+               className="btn-secondary w-full py-4 text-xs flex items-center justify-center gap-3 relative overflow-hidden group border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10"
+             >
+               <Clock className="text-blue-400" size={16} />
+               <span>START 3-HOUR FREE TRIAL</span>
+             </button>
             {error && (
               <div className="text-red-500 text-xs font-accent tracking-widest text-center mt-2 px-4 py-2 bg-red-500/10 rounded-md border border-red-500/20 shadow-inner leading-relaxed">
                 {error}

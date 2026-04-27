@@ -80,13 +80,14 @@ export interface User {
   fullName: string;
   email?: string;
   password?: string;
-  role: 'admin' | 'member';
+  role: 'admin' | 'member' | 'trial';
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   subscription?: {
     plan: string;
     expiryDate: string;
   };
+  trialExpiration?: string;
   avatarUrl?: string;
 }
 
