@@ -16,19 +16,64 @@
       },
       "required": ["id", "username", "role", "createdAt"]
     },
-    "Log": {
-      "title": "Log",
-      "description": "Activity logs for the system",
+    "Wiring": {
+      "title": "Wiring",
+      "description": "Wiring information",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "username": { "type": "string" },
-        "action": { "type": "string" },
-        "details": { "type": "string" },
-        "timestamp": { "type": "string" }
+        "vehicle_id": { "type": "string" },
+        "system": { "type": "string" },
+        "component": { "type": "string" },
+        "wire_color": { "type": "string" },
+        "voltage": { "type": "string" },
+        "source": { "type": "string" },
+        "destination": { "type": "string" },
+        "location": { "type": "string" },
+        "confidence": { "type": "number" }
       },
-      "required": ["id", "userId", "action", "timestamp"]
+      "required": ["id", "vehicle_id", "component"]
+    },
+    "Fuse": {
+      "title": "Fuse",
+      "description": "Fuse information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vehicle_id": { "type": "string" },
+        "fuse_number": { "type": "string" },
+        "rating_amp": { "type": "number" },
+        "component": { "type": "string" },
+        "location": { "type": "string" },
+        "confidence": { "type": "number" }
+      },
+      "required": ["id", "vehicle_id", "fuse_number"]
+    },
+    "Relay": {
+      "title": "Relay",
+      "description": "Relay information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vehicle_id": { "type": "string" },
+        "name": { "type": "string" },
+        "input": { "type": "string" },
+        "output": { "type": "string" },
+        "location": { "type": "string" },
+        "confidence": { "type": "number" }
+      },
+      "required": ["id", "vehicle_id", "name"]
+    },
+    "Cache": {
+      "title": "Cache",
+      "description": "System cache",
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "results": { "type": "object" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["query", "timestamp"]
     }
   },
   "firestore": {
@@ -39,6 +84,22 @@
     "/logs/{logId}": {
       "schema": { "$ref": "#/entities/Log" },
       "description": "System activity logs"
+    },
+    "/wiring/{wiringId}": {
+      "schema": { "$ref": "#/entities/Wiring" },
+      "description": "Wiring info"
+    },
+    "/fuses/{fuseId}": {
+      "schema": { "$ref": "#/entities/Fuse" },
+      "description": "Fuse info"
+    },
+    "/relays/{relayId}": {
+      "schema": { "$ref": "#/entities/Relay" },
+      "description": "Relay info"
+    },
+    "/cache/{query}": {
+      "schema": { "$ref": "#/entities/Cache" },
+      "description": "System cache"
     }
   }
 }

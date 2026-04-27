@@ -34,7 +34,8 @@ import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
 import { Card, Badge, ProgressBar, Button } from './components/ui';
 import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
-import { syncData } from './sync/syncEngine';
+import { syncFromFirebase } from './services/syncService';
+import { startAutoSync } from './services/networkSync';
 import { auth, db, signInWithGoogle, logOut } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -706,6 +707,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!authLoading && currentUser) {                
+        syncFromFirebase(); // initial load
+        startAutoSync();    // background sync
+    }
+
     // Register Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
