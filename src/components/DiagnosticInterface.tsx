@@ -20,7 +20,9 @@ import {
   AlertTriangle,
   ArrowLeft,
   Wrench,
-  WifiOff
+  WifiOff,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { diagnoseDTC } from '../services/api';
 import { performDeepDTCSearch } from '../services/ai';
@@ -458,12 +460,44 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                             </div>
                             <div className="text-xs font-bold">{results.time_est || '30 - 60 Min'}</div>
                           </div>
-                          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-                            <div className="flex items-center gap-1.5 mb-1">
-                               <ShieldAlert size={12} className="text-zinc-500" />
-                               <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Conf. Score</span>
+                          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl flex flex-col justify-between">
+                            <div>
+                               <div className="flex items-center gap-1.5 mb-1">
+                                  <ShieldAlert size={12} className="text-zinc-500" />
+                                  <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Conf. Score</span>
+                               </div>
+                               <div className="text-xs font-bold">{results.confidence ? `${(results.confidence * 100).toFixed(0)}%` : '92%'}</div>
                             </div>
-                            <div className="text-xs font-bold">{results.confidence ? `${(results.confidence * 100).toFixed(0)}%` : '92%'}</div>
+                            <div className="flex items-center gap-2 mt-2">
+                               <button 
+                                  onClick={async() => {
+                                      const vStr = `${year || ''} ${brand || ''} ${model || ''}`.trim() || 'Generic Vehicle';
+                                      const key = `ai_dtc_${vStr}_${results.code || ''}`;
+                                      try {
+                                          const { updateCacheConfidence } = await import('../services/db');
+                                          const ok = await updateCacheConfidence(key, true);
+                                          if (ok) {
+                                             if (toast) toast('Feedback recorded. Neural matrix updated!', 'success');
+                                             setResults((p:any) => ({...p, confidence: Math.min(1.0, (p.confidence || 0.92) + 0.05)}));
+                                          }
+                                      } catch(e){}
+                                  }}
+                                  className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-green-500 transition-colors" title="Accurate"><ThumbsUp size={12}/></button>
+                               <button 
+                                  onClick={async() => {
+                                      const vStr = `${year || ''} ${brand || ''} ${model || ''}`.trim() || 'Generic Vehicle';
+                                      const key = `ai_dtc_${vStr}_${results.code || ''}`;
+                                      try {
+                                          const { updateCacheConfidence } = await import('../services/db');
+                                          const ok = await updateCacheConfidence(key, false);
+                                          if (ok) {
+                                             if (toast) toast('Feedback recorded. Confidence lowered.', 'success');
+                                             setResults((p:any) => ({...p, confidence: Math.max(0.1, (p.confidence || 0.92) - 0.20)}));
+                                          }
+                                      } catch(e){}
+                                  }}
+                                  className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-500 transition-colors" title="Inaccurate"><ThumbsDown size={12}/></button>
+                            </div>
                           </div>
                         </div>
                       </div>

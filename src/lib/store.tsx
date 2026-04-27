@@ -80,14 +80,13 @@ export interface User {
   fullName: string;
   email?: string;
   password?: string;
-  role: 'admin' | 'member' | 'trial';
-  status: 'pending' | 'approved' | 'rejected';
+  role: 'user' | 'admin' | 'super_admin';
+  status: 'pending' | 'active' | 'blocked';
   createdAt: string;
-  subscription?: {
-    plan: string;
-    expiryDate: string;
-  };
-  trialExpiration?: string;
+  trial_start_date: string;
+  trial_end_date: string;
+  account_start_date?: string;
+  account_end_date?: string;
   avatarUrl?: string;
 }
 
@@ -144,9 +143,11 @@ const INITIAL_ADMIN: User = {
   username: 'rubenllego',
   fullName: 'Ruben Llego O.',
   password: 'admin123',
-  role: 'admin',
-  status: 'approved',
+  role: 'super_admin',
+  status: 'active',
   createdAt: new Date().toISOString(),
+  trial_start_date: new Date().toISOString(),
+  trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
   avatarUrl: getSafeAvatar(),
 };
 

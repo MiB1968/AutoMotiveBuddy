@@ -17,7 +17,7 @@ import {
   Calendar, FileText, ChevronDown, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer, Cable,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
-  Mic, MicOff, Camera, Loader2, Brain
+  Mic, MicOff, Camera, Loader2, Brain, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
@@ -602,46 +602,99 @@ export default function App() {
           });
           
           let uData: UserType;
+          let updateNeeded = false;
+          let allowLogin = false;
+          let denyReason = '';
+
+          const now = Date.now();
+
           if (userDoc.exists()) {
             uData = userDoc.data() as UserType;
-            if (uData.role === 'trial' && uData.trialExpiration) {
-               if (new Date(uData.trialExpiration).getTime() < Date.now()) {
-                  // Trial expired
-                  uData.status = 'rejected'; // essentially suspending them 
-                  addToast('Trial expired', 'error');
+            
+            // Step 1: Check user status
+            if (uData.status === 'pending') {
+               denyReason = "Your account is pending admin approval.";
+            } else if (uData.status === 'blocked') {
+               denyReason = "Your account is blocked. Contact admin.";
+            } else {
+               // Step 2 & 3: Check trial and account duration
+               if (!uData.account_end_date) {
+                  const trialEnd = new Date(uData.trial_end_date).getTime();
+                  if (now > trialEnd) {
+                     uData.status = 'blocked';
+                     updateNeeded = true;
+                     denyReason = "Your 3-hour trial has expired.";
+                  } else {
+                     allowLogin = true;
+                  }
+               } else {
+                  const accountEnd = new Date(uData.account_end_date).getTime();
+                  if (now > accountEnd) {
+                     uData.status = 'pending';
+                     delete uData.account_start_date;
+                     delete uData.account_end_date;
+                     updateNeeded = true;
+                     denyReason = "Your subscription has expired. Await admin renewal.";
+                  } else {
+                     allowLogin = true;
+                  }
                }
             }
-            setCurrentUser(uData);
+
+            if (updateNeeded) {
+               await setDoc(doc(db, 'users', fbUser.uid), uData).catch(e => {
+                  handleFirestoreError(e, OperationType.UPDATE, `users/${fbUser.uid}`);
+                  throw e;
+               });
+            }
           } else {
-            // New user via Google login or Anonymous
-            const isAnon = fbUser.isAnonymous;
-            const expirationTime = isAnon ? new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() : undefined;
-            const newUser: UserType = {
-              id: fbUser.uid,
-              username: fbUser.email?.split('@')[0] || (isAnon ? `anon_${fbUser.uid.slice(0,6)}` : 'user'),
-              fullName: fbUser.displayName || (isAnon ? 'Trial User' : 'Guest User'),
-              email: fbUser.email || '',
-              role: fbUser.email === 'rubenlleg12@gmail.com' ? 'admin' : (isAnon ? 'trial' : 'member'),
-              status: fbUser.email === 'rubenlleg12@gmail.com' || isAnon ? 'approved' : 'pending',
-              createdAt: new Date().toISOString(),
-              avatarUrl: fbUser.photoURL || '',
-              ...(expirationTime ? { trialExpiration: expirationTime } : {})
-            };
-            await setDoc(doc(db, 'users', fbUser.uid), newUser).catch(e => {
-               handleFirestoreError(e, OperationType.CREATE, `users/${fbUser.uid}`);
-               throw e;
-            });
-            uData = newUser;
-            setCurrentUser(uData);
+             // New user registration
+             const isAnon = fbUser.isAnonymous;
+             const trialStart = new Date();
+             const trialEnd = new Date(trialStart.getTime() + 3 * 3600000); // 3 hours
+
+             uData = {
+               id: fbUser.uid,
+               username: fbUser.email?.split('@')[0] || (isAnon ? `anon_${fbUser.uid.slice(0,6)}` : 'user'),
+               fullName: fbUser.displayName || (isAnon ? 'Trial User' : 'Guest User'),
+               email: fbUser.email || '',
+               role: fbUser.email === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
+               status: fbUser.email === 'rubenlleg12@gmail.com' ? 'active' : 'pending',
+               createdAt: trialStart.toISOString(),
+               trial_start_date: trialStart.toISOString(),
+               trial_end_date: trialEnd.toISOString(),
+               avatarUrl: fbUser.photoURL || '',
+             };
+
+             await setDoc(doc(db, 'users', fbUser.uid), uData).catch(e => {
+                handleFirestoreError(e, OperationType.CREATE, `users/${fbUser.uid}`);
+                throw e;
+             });
+             
+             if (uData.status === 'pending') {
+                denyReason = "Your account is pending admin approval.";
+             } else {
+                allowLogin = true;
+             }
           }
           
-          // Redirect if currently on login/register view
-          if (window.location.hash === '#login' || window.location.hash === '#register') {
-            window.location.hash = uData.role === 'admin' ? '#admin-overview' : '#dashboard';
-            addToast(`Greetings, ${uData.fullName?.split(' ')[0] || 'User'}. Neural link established.`, 'success');
+          if (!allowLogin) {
+             addToast(denyReason, 'error');
+             setCurrentUser(null);
+             const { logOut } = await import('./lib/firebase');
+             await logOut();
+             window.location.hash = '#login';
+          } else {
+             setCurrentUser(uData);
+             if (window.location.hash === '#login' || window.location.hash === '#register') {
+               window.location.hash = (uData.role === 'admin' || uData.role === 'super_admin') ? '#admin-overview' : '#dashboard';
+               addToast(`Greetings, ${uData.fullName?.split(' ')[0] || 'User'}. Neural link established.`, 'success');
+             }
           }
         } catch (error) {
           console.error("Firestore getDoc error intercepted:", error);
+          const { logOut } = await import('./lib/firebase');
+          await logOut();
           addToast('Database connection error during login. Try again.', 'error');
         }
       } else {
@@ -803,16 +856,27 @@ export default function App() {
       return null;
     }
 
-    if (currentUser.role === 'admin') {
+    if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
       return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
     }
 
-    if (currentUser.status === 'rejected') {
+    if (currentUser.status === 'blocked') {
        return (
          <div className="h-screen w-full flex flex-col items-center justify-center p-6 text-center space-y-6">
            <Wrench size={64} className="text-red-500 opacity-80" />
            <h2 className="text-2xl font-bold font-display uppercase text-red-400 tracking-widest">Access Denied</h2>
-           <p className="text-sm text-text-secondary max-w-md mx-auto">Your account {currentUser.role === 'trial' ? 'trial has expired' : 'has been suspended'}. Please contact your administrator to restore access.</p>
+           <p className="text-sm text-text-secondary max-w-md mx-auto">Your account has been blocked or expired. Please contact your administrator to restore access.</p>
+           <button onClick={logout} className="btn-secondary py-3 px-8 text-xs">LOGOUT</button>
+         </div>
+       );
+    }
+    
+    if (currentUser.status === 'pending') {
+       return (
+         <div className="h-screen w-full flex flex-col items-center justify-center p-6 text-center space-y-6">
+           <Clock size={64} className="text-yellow-500 opacity-80 animate-pulse" />
+           <h2 className="text-2xl font-bold font-display uppercase text-yellow-400 tracking-widest">Pending Approval</h2>
+           <p className="text-sm text-text-secondary max-w-md mx-auto">Your account is pending system administration approval.</p>
            <button onClick={logout} className="btn-secondary py-3 px-8 text-xs">LOGOUT</button>
          </div>
        );
@@ -820,12 +884,12 @@ export default function App() {
 
     return (
        <>
-          {currentUser.role === 'trial' && currentUser.status === 'approved' && (
+          {currentUser.status === 'active' && !currentUser.account_end_date && (
              <div className="fixed top-0 left-0 right-0 z-[100] p-1.5 text-center text-[10px] sm:text-xs font-bold tracking-widest uppercase bg-blue-500/10 text-blue-400 backdrop-blur-md border-b border-blue-500/20">
-               TRIAL ACCOUNT ACTIVE — EXPIRES EN 3 HOURS
+               TRIAL ACCOUNT ACTIVE — VALID FOR 3 HOURS
              </div>
           )}
-          <div className={currentUser.role === 'trial' ? 'pt-6' : ''}>
+          <div className={currentUser.status === 'active' && !currentUser.account_end_date ? 'pt-6' : ''}>
              <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />
           </div>
        </>
@@ -2348,40 +2412,69 @@ function WiringColorTab({ store, user, toast }: any) {
   const [engine, setEngine] = useState(globalVehicle.engine);
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
 
   const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
   const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
+
+  const handleFeedback = async (isAccurate: boolean) => {
+     if (!currentCacheKey) return;
+     try {
+        const { updateCacheConfidence } = await import('./services/db');
+        const updated = await updateCacheConfidence(currentCacheKey, isAccurate);
+        if (updated) {
+           toast(`Feedback recorded. Neural matrix updated!`, 'success');
+           setResult((prev: any) => ({ ...prev, confidence: isAccurate ? Math.min(1.0, prev.confidence + 0.05) : Math.max(0.1, prev.confidence - 0.20) }));
+        }
+     } catch (e) { }
+  };
 
   const handleSearch = async () => {
     setIsLoading(true);
     setResult(null);
     try {
-      const prompt = `Provide standardized wiring color codes for ${make} ${model} ${year} ${engine}. Focus on common circuits (e.g., Ground, Ignition, Constant Power, CAN Bus). Format as JSON: { "circuits": [{"intent": "e.g. Ground", "color": "e.g. Black", "note": "Commonly connects to chassis"} ] }`;
-      const data = await generateDynamicVehicleData('wiring', make, model, year, engine, prompt);
+      const { smartCacheSearch } = await import('./services/db');
+      const queryStr = `${year} ${make} ${model} ${engine} wiring`;
+      
+      // Layer 2: Cached Smart Search
+      let dataStr: string | null = null;
+      let usedCache = false;
+      let usedCacheKey = null;
+
+      const cachedMatches = await smartCacheSearch<string>(queryStr, 'ai_data_wiring_');
+      if (cachedMatches.length > 0 && cachedMatches[0].score > 0.6) {
+         dataStr = cachedMatches[0].value;
+         usedCacheKey = cachedMatches[0].key;
+         usedCache = true;
+         // Store log
+         store.addLog(user.id, user.username, `Wiring Data Retreival`, `Retrieved cached blueprint (score: ${(cachedMatches[0].score * 100).toFixed(0)}%) for ${year} ${make} ${model}.`);
+      } else {
+         // Layer 3: Live AI Generation
+         const prompt = `Provide standardized wiring color codes for ${make} ${model} ${year} ${engine}. Focus on common circuits (e.g., Ground, Ignition, Constant Power, CAN Bus). Format as JSON: { "circuits": [{"intent": "e.g. Ground", "color": "e.g. Black", "note": "Commonly connects to chassis"} ] }`;
+         dataStr = await generateDynamicVehicleData('wiring', make, model, year, engine, prompt);
+         usedCacheKey = `ai_data_wiring_${make}_${model}_${year}_${engine}_${prompt}`;
+         store.addLog(user.id, user.username, `Wiring Data Generation`, `Live decoded wiring schema for ${year} ${make} ${model}.`);
+      }
+      
+      setCurrentCacheKey(usedCacheKey);
       
       let parsedData;
       try {
-          if (typeof data === 'string' && data.includes("### DATA TEMPORARILY UNAVAILABLE")) {
-             throw new Error(data);
+          if (typeof dataStr === 'string' && dataStr.includes("### DATA TEMPORARILY UNAVAILABLE")) {
+             throw new Error(dataStr);
           }
-          let cleanedData = data;
-          if (typeof data === 'string') {
-            const match = data.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match && match[1]) {
-              cleanedData = match[1];
-            } else {
-              const start = data.indexOf('{');
-              const end = data.lastIndexOf('}');
-              if (start !== -1 && end !== -1 && end > start) {
-                cleanedData = data.substring(start, end + 1);
-              }
-            }
-          }
-          parsedData = typeof cleanedData === 'string' ? JSON.parse(cleanedData) : cleanedData;
+          parsedData = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+          if (!parsedData.confidence) parsedData.confidence = usedCache ? 0.98 : 0.95;
       } catch (parseErr) {
-          console.error("Failed to parse AI JSON or received error message:", parseErr, data);
-          throw new Error(data && typeof data === 'string' && data.includes("###") ? data : "Received malformed data from AI.");
+          console.error("Failed to parse AI JSON or received error message:", parseErr, dataStr);
+          throw new Error(dataStr && typeof dataStr === 'string' && dataStr.includes("###") ? dataStr : "CRITICAL: Neural uplink corrupted data format. AI hallucinated wiring schema.");
       }
+      
+      // Strict validation layer
+      if (!parsedData.circuits || !Array.isArray(parsedData.circuits) || parsedData.circuits.length === 0) {
+         throw new Error("Strict Validation Failed: Incomplete circuits payload returned by neural matrix.");
+      }
+
       setResult(parsedData);
     } catch(err: any) {
       if (toast) toast(err.message || 'Failed to retrieve wiring data', 'error');
@@ -2476,8 +2569,21 @@ function WiringColorTab({ store, user, toast }: any) {
                 <motion.div 
                    initial={{ opacity: 0, y: 20 }}
                    animate={{ opacity: 1, y: 0 }}
-                   className="space-y-3"
+                   className="space-y-4"
                 >
+                    <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 p-3 rounded-xl mb-4">
+                       <div className="flex items-center gap-3">
+                          <Brain size={16} className={result.confidence >= 0.9 ? "text-green-500" : "text-yellow-500"} />
+                          <div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Confidence Score</div>
+                            <div className={`text-sm font-bold ${result.confidence >= 0.9 ? "text-green-500" : "text-yellow-500"}`}>{(result.confidence * 100).toFixed(0)}% Match</div>
+                          </div>
+                       </div>
+                       <div className="flex items-center gap-2">
+                          <button onClick={() => handleFeedback(true)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-green-500 transition-colors" title="Accurate"><ThumbsUp size={14}/></button>
+                          <button onClick={() => handleFeedback(false)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-500 transition-colors" title="Inaccurate"><ThumbsDown size={14}/></button>
+                       </div>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {result.circuits?.map((c: any, i: number) => (
                           <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-brand/30 transition-colors">
@@ -2528,46 +2634,69 @@ function FuseRelayTab({ store, user, toast }: any) {
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('');
+  const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
 
   const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
   const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
 
   const categories = ['Engine Bay', 'Interior Cabin', 'Lighting', 'Power Distribution', 'Ignition/Starting'];
 
+  const handleFeedback = async (isAccurate: boolean) => {
+     if (!currentCacheKey) return;
+     try {
+        const { updateCacheConfidence } = await import('./services/db');
+        const updated = await updateCacheConfidence(currentCacheKey, isAccurate);
+        if (updated) {
+           toast(`Feedback recorded. Neural matrix updated!`, 'success');
+           setResult((prev: any) => ({ ...prev, confidence: isAccurate ? Math.min(1.0, prev.confidence + 0.05) : Math.max(0.1, prev.confidence - 0.20) }));
+        }
+     } catch (e) { }
+  };
+
   const handleSearch = async (category: string) => {
     setIsLoading(true);
     setResult(null);
     setActiveCategory(category);
     try {
-      const prompt = `Provide fuses and relays information for ${make} ${model} ${year} ${engine}. 
-      Focus on category: ${category}. 
-      Format as JSON: { "fuses": [{"id": "Fuse #", "amperage": "A", "color": "Color", "circuit": "Circuit"}], "relays": [{"id": "Relay #", "function": "Function"}] }`;
+      const { smartCacheSearch } = await import('./services/db');
+      const queryStr = `${year} ${make} ${model} ${engine} fuses ${category}`;
       
-      const data = await generateDynamicVehicleData('fuses', make, model, year, engine, prompt);
+      const cachedMatches = await smartCacheSearch<string>(queryStr, 'ai_data_fuses_');
+      let dataStr: string | null = null;
+      let usedCache = false;
+      let usedCacheKey = null;
+
+      if (cachedMatches.length > 0 && cachedMatches[0].score > 0.6) {
+         dataStr = cachedMatches[0].value;
+         usedCacheKey = cachedMatches[0].key;
+         usedCache = true;
+         store.addLog(user.id, user.username, `Fuses Data Retrieval`, `Retrieved cached blueprint for ${category} (score: ${(cachedMatches[0].score * 100).toFixed(0)}%).`);
+      } else {
+         const prompt = category; // We just pass the category, systemPrompt handles the JSON schema now.
+         dataStr = await generateDynamicVehicleData('fuses', make, model, year, engine, prompt);
+         usedCacheKey = `ai_data_fuses_${make}_${model}_${year}_${engine}_${prompt}`;
+         store.addLog(user.id, user.username, `Fuses Data Generation`, `Live generated fuse box schema for ${year} ${make} ${model} [${category}].`);
+      }
+      
+      setCurrentCacheKey(usedCacheKey);
       
       let parsedData;
       try {
-          if (typeof data === 'string' && data.includes("### DATA TEMPORARILY UNAVAILABLE")) {
-             throw new Error(data);
+          if (typeof dataStr === 'string' && dataStr.includes("### DATA TEMPORARILY UNAVAILABLE")) {
+             throw new Error(dataStr);
           }
-          let cleanedData = data;
-          if (typeof data === 'string') {
-            const match = data.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match && match[1]) {
-              cleanedData = match[1];
-            } else {
-              const start = data.indexOf('{');
-              const end = data.lastIndexOf('}');
-              if (start !== -1 && end !== -1 && end > start) {
-                cleanedData = data.substring(start, end + 1);
-              }
-            }
-          }
-          parsedData = typeof cleanedData === 'string' ? JSON.parse(cleanedData) : cleanedData;
+          parsedData = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+          if (!parsedData.confidence) parsedData.confidence = usedCache ? 0.98 : 0.95;
       } catch (parseErr) {
-          console.error("Failed to parse AI JSON or received error message:", parseErr, data);
-          throw new Error(data && typeof data === 'string' && data.includes("###") ? data : "Received malformed data from AI.");
+          console.error("Failed to parse AI JSON or received error message:", parseErr, dataStr);
+          throw new Error(dataStr && typeof dataStr === 'string' && dataStr.includes("###") ? dataStr : "CRITICAL: Neural uplink corrupted data format. AI hallucinated fuse schema.");
       }
+      
+      // Strict validation layer
+      if (!parsedData.fuses && !parsedData.relays) {
+         throw new Error("Strict Validation Failed: Incomplete fuses/relays payload returned.");
+      }
+
       setResult(parsedData);
     } catch(err: any) {
       if (toast) toast(err.message || 'Failed to retrieve fuse/relay data', 'error');
@@ -2672,6 +2801,19 @@ function FuseRelayTab({ store, user, toast }: any) {
                  exit={{ opacity: 0, y: -20 }}
                  className="space-y-6"
               >
+                  <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 p-3 rounded-xl mb-4">
+                     <div className="flex items-center gap-3">
+                        <Brain size={16} className={result.confidence >= 0.9 ? "text-green-500" : "text-yellow-500"} />
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Confidence Score</div>
+                          <div className={`text-sm font-bold ${result.confidence >= 0.9 ? "text-green-500" : "text-yellow-500"}`}>{(result.confidence * 100).toFixed(0)}% Match</div>
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <button onClick={() => handleFeedback(true)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-green-500 transition-colors" title="Accurate"><ThumbsUp size={14}/></button>
+                        <button onClick={() => handleFeedback(false)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-500 transition-colors" title="Inaccurate"><ThumbsDown size={14}/></button>
+                     </div>
+                  </div>
                   {result.fuses && result.fuses.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
@@ -3346,6 +3488,10 @@ function MembersTab({ user, store, toast, ...props }: any) {
   const [newUserPass, setNewUserPass] = useState('');
   const [newUserName, setNewUserName] = useState('');
 
+  const [approveModalUser, setApproveModalUser] = useState<UserType | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<string>('none');
+  const [isApproving, setIsApproving] = useState(false);
+
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -3362,28 +3508,26 @@ function MembersTab({ user, store, toast, ...props }: any) {
     setIsCreatingUser(true);
     try {
        const { createAdminUser } = await import('./lib/firebase');
-       const { serverTimestamp, setDoc, doc } = await import('firebase/firestore');
+       const { setDoc, doc } = await import('firebase/firestore');
        
-       const newUser = await createAdminUser(newUserEmail, newUserPass);
-       const d = new Date();
-       d.setDate(d.getDate() + 30);
+       const newFbUser = await createAdminUser(newUserEmail, newUserPass);
+       const trialStart = new Date();
+       const trialEnd = new Date(trialStart.getTime() + 3 * 3600000);
        
-       await setDoc(doc(db, 'users', newUser.uid), {
-           id: newUser.uid,
-           email: newUser.email,
+       await setDoc(doc(db, 'users', newFbUser.uid), {
+           id: newFbUser.uid,
+           email: newUserEmail,
            fullName: newUserName,
            username: newUserName.split(' ').join('').toLowerCase() + Math.random().toString(36).substring(2,5),
-           role: 'technician',
-           status: 'approved',
-           subscription: { plan: 'pro', expiryDate: d.toISOString() },
-           createdAt: serverTimestamp(),
-           updatedAt: serverTimestamp(),
+           role: 'user',
+           status: 'pending',
+           trial_start_date: trialStart.toISOString(),
+           trial_end_date: trialEnd.toISOString(),
+           createdAt: trialStart.toISOString(),
            avatarUrl: '',
-           xp: 0,
-           level: 1
        });
        
-       toast('User account created and registered successfully.', 'success');
+       toast('User account created and pending approval.', 'success');
        setIsModalOpen(false);
        setNewUserEmail('');
        setNewUserPass('');
@@ -3392,6 +3536,53 @@ function MembersTab({ user, store, toast, ...props }: any) {
        toast(`Error creating user: ${error.message}`, 'error');
     }
     setIsCreatingUser(false);
+  };
+
+  const handleApproveSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!approveModalUser) return;
+     setIsApproving(true);
+     try {
+        const { setDoc, doc } = await import('firebase/firestore');
+        let updateData: any = { status: 'active' };
+        
+        if (user.role === 'super_admin' && selectedDuration !== 'none') {
+           const now = new Date();
+           const endDate = new Date(now);
+           if (selectedDuration === '1_month') endDate.setMonth(now.getMonth() + 1);
+           if (selectedDuration === '3_months') endDate.setMonth(now.getMonth() + 3);
+           if (selectedDuration === '6_months') endDate.setMonth(now.getMonth() + 6);
+           if (selectedDuration === '1_year') endDate.setFullYear(now.getFullYear() + 1);
+           
+           updateData.account_start_date = now.toISOString();
+           updateData.account_end_date = endDate.toISOString();
+        }
+
+        await setDoc(doc(db, 'users', approveModalUser.id), updateData, { merge: true });
+        toast(`Member ${approveModalUser.username} has been approved.`, 'success');
+        
+        await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
+           id: Math.random().toString(36).substr(2, 9),
+           userId: user.id, username: user.username,
+           action: 'Approval', details: `Approved user ${approveModalUser.fullName} (Duration: ${selectedDuration})`,
+           timestamp: new Date().toISOString()
+        });
+
+        setApproveModalUser(null);
+     } catch (error: any) {
+        toast(`Error approving user: ${error.message}`, 'error');
+     }
+     setIsApproving(false);
+  };
+
+  const handleReject = async (targetUser: UserType) => {
+     try {
+        const { setDoc, doc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'users', targetUser.id), { status: 'blocked' }, { merge: true });
+        toast(`Member ${targetUser.username} blocked.`, 'success');
+     } catch(e) {
+        toast(`Error blocking user`, 'error');
+     }
   };
 
   return (
@@ -3433,37 +3624,42 @@ function MembersTab({ user, store, toast, ...props }: any) {
                   </div>
                 </td>
                 <td className="p-6">
-                  <span className={`badge ${u.status === 'approved' ? 'badge-green' : 'animate-pulse'}`}>{u.status}</span>
+                  <span className={`badge ${u.status === 'active' ? 'badge-green' : (u.status === 'blocked' ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'animate-pulse bg-yellow-500/20 text-yellow-500 border border-yellow-500/30')}`}>{u.status}</span>
                 </td>
                 <td className="p-6">
-                  {u.subscription && <div className="text-[10px]"><span className="text-brand font-bold uppercase">{u.subscription.plan}</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.subscription.expiryDate).toLocaleDateString()}</div></div>}
+                  {u.account_end_date ? (
+                     <div className="text-[10px]"><span className="text-brand font-bold uppercase">Subscribed</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.account_end_date).toLocaleDateString()}</div></div>
+                  ) : (
+                     <div className="text-[10px]"><span className="text-blue-400 font-bold uppercase">Trial</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.trial_end_date).toLocaleDateString()} {new Date(u.trial_end_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div></div>
+                  )}
                 </td>
-                <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{typeof u.createdAt === 'string' ? new Date(u.createdAt).toLocaleDateString() : ((u.createdAt as any)?.toDate?.()?.toLocaleDateString() || 'N/A')}</td>
+                <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{typeof u.createdAt === 'string' ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
                 <td className="p-6">
                   <div className="flex gap-2">
                     {u.status === 'pending' && (
-                      <button 
-                        onClick={async () => {
-                          try {
-                             await setDoc(doc(db, 'users', u.id), { status: 'approved' }, { merge: true });
-                             toast(`Member ${u.username} has been approved. Access granted.`, 'success');
-                             await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
-                               id: Math.random().toString(36).substr(2, 9),
-                               userId: user.id, username: user.username,
-                               action: 'Approval', details: `Approved user ${u.fullName} (@${u.username})`,
-                               timestamp: new Date().toISOString()
-                             });
-                          } catch (error) {
-                             handleFirestoreError(error, OperationType.UPDATE, `users/${u.id}`);
-                          }
-                        }} 
-                        className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"
-                        title="Approve Member"
-                      >
-                        <ShieldCheck size={14} />
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => {
+                             setApproveModalUser(u);
+                             setSelectedDuration('none');
+                          }} 
+                          className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"
+                          title="Approve Member"
+                        >
+                          <ShieldCheck size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleReject(u)}
+                          className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer"
+                          title="Reject/Block Member"
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
                     )}
-                    <button className="p-2 bg-blue-500/20 text-blue-400 rounded hover:scale-110 transition-all cursor-pointer" title="Edit Access"><Edit size={14} /></button>
+                    {u.status === 'active' && (
+                       <button onClick={() => handleReject(u)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer" title="Block Access"><X size={14} /></button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -3538,7 +3734,67 @@ function MembersTab({ user, store, toast, ...props }: any) {
                          disabled={isCreatingUser}
                          className="btn-primary w-full py-3"
                        >
-                         {isCreatingUser ? "INITIALIZING NODE..." : "GRANT ACCESS"}
+                         {isCreatingUser ? "INITIALIZING NODE..." : "CREATE PENDING ACCOUNT"}
+                       </button>
+                    </div>
+                 </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        
+        {approveModalUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-[#050A15] border border-border-glass rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative"
+            >
+              <div className="p-6 border-b border-border-glass/30 flex justify-between items-center bg-black/20">
+                <h3 className="font-display uppercase tracking-widest text-brand font-bold text-lg">Approve Access</h3>
+                <button 
+                  onClick={() => setApproveModalUser(null)}
+                  className="text-text-secondary hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6">
+                 <p className="text-xs text-text-muted mb-6">Review access approval for <strong>{approveModalUser.fullName}</strong> (@{approveModalUser.username}).</p>
+                 <form onSubmit={handleApproveSubmit} className="space-y-4">
+                    {user.role === 'super_admin' ? (
+                       <div>
+                         <label className="text-[10px] text-text-secondary font-accent uppercase tracking-widest block mb-2">Assign Account Duration</label>
+                         <select 
+                           value={selectedDuration}
+                           onChange={(e) => setSelectedDuration(e.target.value)}
+                           className="form-input w-full bg-[#050A15]"
+                         >
+                           <option value="none" className="bg-[#050A15]">No Duration (Trial Logic Only)</option>
+                           <option value="1_month" className="bg-[#050A15]">1 Month Subscription</option>
+                           <option value="3_months" className="bg-[#050A15]">3 Months Subscription</option>
+                           <option value="6_months" className="bg-[#050A15]">6 Months Subscription</option>
+                           <option value="1_year" className="bg-[#050A15]">1 Year Subscription</option>
+                         </select>
+                       </div>
+                    ) : (
+                       <p className="text-xs text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 p-3 rounded">
+                         Only Super Admins can assign duration. Approval grants Trial access.
+                       </p>
+                    )}
+                    <div className="pt-2">
+                       <button
+                         type="submit"
+                         disabled={isApproving}
+                         className="btn-primary w-full py-3"
+                       >
+                         {isApproving ? "APPROVING..." : "CONFIRM APPROVAL"}
                        </button>
                     </div>
                  </form>

@@ -27,44 +27,56 @@ export async function generateDynamicVehicleData(type: 'fuses' | 'components' | 
     let systemPrompt = "";
 
     if (type === 'fuses') {
-      systemPrompt = customPrompt || `You are a top-tier automotive electrician and technical writer. Provide a highly detailed, comprehensive guide to the fuse boxes and relays for the ${year} ${manufacturer} ${modelStr} (${engine}), matching the detail level found in professional databases like StartMyCar or OEM service manuals.
-
-Your response MUST include:
-1. Exact locations of EVERY fuse box (Engine Compartment, Passenger Compartment, Trunk, etc.) with detailed instructions on how to access them.
-2. Complete tables for EACH fuse box containing:
-   - Fuse/Relay Number
-   - Amperage Rating (e.g., 10A, 20A)
-   - Color code if applicable
-   - A complete, detailed list of every circuit/component protected by that fuse. 
-3. Comprehensive relay mapping including what each relay controls.
-4. Any special warnings or "hidden" fuses.
-
-Format entirely in clean, readable Markdown using tables, bolding for emphasis, and clear headings. Do NOT skip any fuses; provide as exhaustive a list as possible.`;
+      systemPrompt = customPrompt || `You are a top-tier automotive electrician. Provide highly detailed standard JSON for fuses and relays for the ${year} ${manufacturer} ${modelStr} (${engine}). 
+Focus on category: ${customPrompt || 'General'}.
+MUST RETURN ONLY JSON using this exact schema:
+{
+  "vehicle": "${year} ${manufacturer} ${modelStr}",
+  "system": "fuses",
+  "confidence": 0.95,
+  "fuses": [{"id": "F1", "amperage": "15A", "color": "Blue", "circuit": "Fuel Pump"}],
+  "relays": [{"id": "R1", "function": "Starter Relay"}]
+}`;
     } else if (type === 'wiring') {
-      systemPrompt = customPrompt || `You are an expert automotive master technician specialized in electrical diagnostics. Provide a detailed guide for wiring color codes and circuit identification for the ${year} ${manufacturer} ${modelStr} (${engine}). 
-Focus on:
-1. Common wiring color standards for this specific manufacturer.
-2. Connector pinouts for major modules (ECU, Body Control Module) if available.
-3. Wire colors for critical circuits: Ground, Constant 12V+, Switched/Ignition 12V, CAN-High, CAN-Low, Fuel Pump, and Starter Trigger.
-4. Professional tips for tracing electrical gremlins in this model.
-Format in clean Markdown with tables where appropriate.`;
+      systemPrompt = customPrompt || `You are an expert automotive master technician specialized in electrical diagnostics. Provide wiring color codes for ${year} ${manufacturer} ${modelStr} (${engine}). 
+Focus on common circuits.
+MUST RETURN ONLY JSON using this exact schema:
+{
+  "vehicle": "${year} ${manufacturer} ${modelStr}",
+  "system": "wiring",
+  "confidence": 0.95,
+  "circuits": [{"intent": "Ground", "color": "Black", "note": "Connects to chassis"}]
+}`;
     } else if (type === 'components') {
-      systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${manufacturer} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, main engine computer (ECU/PCM), starter motor, alternator, oxygen sensors, mass airflow sensor, and oil/air/cabin filters. Format your response in clean Markdown.` + (customPrompt ? ` ${customPrompt}` : '');
+      systemPrompt = `You are a master mechanic. Provide component locations for ${year} ${manufacturer} ${modelStr} (${engine}). Format as clean Markdown.`;
     } else if (type === 'warning_lights') {
-      systemPrompt = `You are an expert automotive diagnostician. Provide a detailed guide on the dashboard warning lights for the ${year} ${manufacturer} ${modelStr}. Categorize them by severity (Red = Stop ASAP, Yellow = Check soon, Green/Blue = Informational). Describe what each light looks like, what it means, and recommended actions. Format your response in clean Markdown.` + (customPrompt ? ` ${customPrompt}` : '');
+      systemPrompt = `You are an expert diagnostician. Provide warning lights guide for ${year} ${manufacturer} ${modelStr}. Format as clean Markdown.`;
     }
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `I need the ${type} data for a ${year} ${manufacturer} ${modelStr} with engine ${engine}.`,
+      contents: `I need the EXACT ${type} data for a ${year} ${manufacturer} ${modelStr} with engine ${engine}. Use the strict format requested.`,
       config: {
         systemInstruction: systemPrompt,
-        temperature: 0.2
+        temperature: 0.2,
       }
     });
 
-    const text = response.text;
+    let text = response.text;
     if (text) {
+      // If asking for json, try to extract it from markdown blocks
+      if (type === 'fuses' || type === 'wiring') {
+         const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+         if (jsonMatch && jsonMatch[1]) {
+           text = jsonMatch[1];
+         } else {
+           const start = text.indexOf('{');
+           const end = text.lastIndexOf('}');
+           if (start !== -1 && end !== -1 && end > start) {
+             text = text.substring(start, end + 1);
+           }
+         }
+      }
       try {
         await setCache(cacheKey, text, null); // null means never expires
       } catch (e) {

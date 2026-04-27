@@ -1,5 +1,6 @@
 import api from "../services/api";
 import { getDB } from "../offline/db";
+import { getWeakCacheEntries, deleteCache } from "../services/db";
 
 export async function syncData() {
   try {
@@ -32,6 +33,20 @@ export async function syncData() {
         await tx.store.put(item);
       }
       await tx.done;
+    }
+
+    // 5. Background Sync: Refresh weak confidence neural data matrix
+    try {
+      const weakEntries = await getWeakCacheEntries();
+      for (const entry of weakEntries) {
+         // To completely refresh, we delete from cache so the next retrieve fetches fresh live AI data.
+         await deleteCache(entry.key);
+      }
+      if (weakEntries.length > 0) {
+         console.log(`[Neural Matrix] Scheduled ${weakEntries.length} weak entries for AI regeneration.`);
+      }
+    } catch(err) {
+      console.warn("Neural sync error:", err);
     }
 
     return true;

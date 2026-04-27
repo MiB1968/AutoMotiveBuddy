@@ -243,6 +243,46 @@ export async function setCache<T>(
   }, false);
 }
 
+export async function smartCacheSearch<T>(query: string, typePrefix?: string): Promise<{score: number, key: string, value: T}[]> {
+  return withDB(async (db) => {
+    // Normalize query
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    const qNorm = normalize(query);
+    if (!qNorm) return [];
+    
+    // Split into tokens
+    const qTokens = qNorm.split(' ');
+    
+    const results: {score: number, key: string, value: T}[] = [];
+    const tx = db.transaction("cache", "readonly");
+    let cursor = await tx.store.openCursor();
+    
+    while(cursor) {
+       const key = cursor.key.toString();
+       if (!typePrefix || key.startsWith(typePrefix)) {
+          const kNorm = normalize(key);
+          // Calculate a simple match score
+          let matches = 0;
+          for (const token of qTokens) {
+            if (kNorm.includes(token)) matches++;
+          }
+          
+          if (matches > 0) {
+             results.push({
+               score: matches / qTokens.length, // simple ratio
+               key: key,
+               value: cursor.value.value as T
+             });
+          }
+       }
+       cursor = await cursor.continue();
+    }
+    
+    // Sort by score descending
+    return results.sort((a, b) => b.score - a.score);
+  }, []);
+}
+
 export async function getCache<T>(key: string): Promise<T | null> {
   return withDB(async (db) => {
     const entry = (await db.get("cache", key)) as CacheEntry<T> | undefined;
@@ -255,11 +295,50 @@ export async function getCache<T>(key: string): Promise<T | null> {
   }, null);
 }
 
+export async function updateCacheConfidence(key: string, isAccurate: boolean): Promise<boolean> {
+   return withDB(async (db) => {
+      const entry = await db.get("cache", key);
+      if (!entry) return false;
+      const val: any = entry.value;
+      if (val && typeof val === 'object') {
+         if (val.confidence === undefined) val.confidence = 0.95;
+         
+         if (isAccurate) {
+            val.confidence = Math.min(1.0, val.confidence + 0.05);
+            val.source = 'user_confirmed';
+         } else {
+            val.confidence = Math.max(0.1, val.confidence - 0.20);
+         }
+         
+         entry.value = val;
+         await db.put("cache", entry, key);
+         return true;
+      }
+      return false;
+   }, false);
+}
+
 export async function deleteCache(key: string): Promise<boolean> {
   return withDB(async (db) => {
     await db.delete("cache", key);
     return true;
   }, false);
+}
+
+export async function getWeakCacheEntries(): Promise<{key: string, value: any}[]> {
+   return withDB(async (db) => {
+      const results: {key: string, value: any}[] = [];
+      const tx = db.transaction("cache", "readonly");
+      let cursor = await tx.store.openCursor();
+      while(cursor) {
+         const val: any = cursor.value.value;
+         if (val && typeof val === 'object' && val.confidence !== undefined && val.confidence < 0.6) {
+            results.push({ key: cursor.key.toString(), value: val });
+         }
+         cursor = await cursor.continue();
+      }
+      return results;
+   }, []);
 }
 
 export async function clearExpiredCache(): Promise<number> {
