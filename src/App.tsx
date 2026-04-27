@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useVehicleStore } from './store/vehicleStore';
 import { 
-  Wrench, Cpu, Map, History, Star, Shield, 
+  Wrench, Cpu, Map, History, Star, Shield, UserPlus,
   ChevronRight, LogOut, LayoutDashboard, Database, 
   MessageSquare, User, Users, Bell, Settings, 
   Plus, Trash2, Edit, CheckCircle2, AlertTriangle, 
@@ -608,55 +608,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
-  const welcomePlayedRef = useRef(false);
-
-  useEffect(() => {
-    if (currentUser && !welcomePlayedRef.current) {
-      welcomePlayedRef.current = true;
-      const text = `Welcome to AutoMotive Buddy — your intelligent automotive diagnostic companion. Designed to simplify vehicle troubleshooting, AutoMotive Buddy uses advanced AI to analyze diagnostic trouble codes, identify issues, and guide you toward the right solution — faster and smarter. Whether you're a professional mechanic or a car owner, our system empowers you with real-time insights, accurate diagnostics, and a seamless user experience. AutoMotive Buddy is proudly developed and led by Ruben Llego, owner and lead web developer, with a vision to revolutionize automotive diagnostics through intelligent technology. Get ready to experience the future of vehicle diagnostics. AutoMotive Buddy — Diagnose smarter. Drive better.`;
-      
-      let voicePlayed = false;
-
-      const playWelcome = () => {
-        if (voicePlayed) return;
-        
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.9;
-        utterance.pitch = 0.9;
-        
-        const voices = window.speechSynthesis.getVoices();
-        const techVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Microsoft')));
-        if (techVoice) {
-          utterance.voice = techVoice;
-        }
-
-        utterance.onstart = () => {
-          voicePlayed = true;
-          // Remove listeners once it successfully starts
-          document.removeEventListener('click', playWelcome);
-          document.removeEventListener('keydown', playWelcome);
-          document.removeEventListener('touchstart', playWelcome);
-        };
-
-        window.speechSynthesis.speak(utterance);
-      };
-
-      // Try speaking immediately. If blocked, the event listeners will catch a subsequent interaction.
-      setTimeout(playWelcome, 500);
-
-      document.addEventListener('click', playWelcome);
-      document.addEventListener('keydown', playWelcome);
-      document.addEventListener('touchstart', playWelcome);
-      
-      return () => {
-        window.speechSynthesis.cancel();
-        document.removeEventListener('click', playWelcome);
-        document.removeEventListener('keydown', playWelcome);
-        document.removeEventListener('touchstart', playWelcome);
-      };
-    }
-  }, [currentUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -1537,10 +1488,29 @@ function ChatBot({ currentUser, store, toast }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(true); // enabled by default for welcome msg since user wants voice activated
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasWelcomedRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && !hasWelcomedRef.current) {
+      hasWelcomedRef.current = true;
+      const welcomeText = `Welcome to AutoMotive Buddy — your intelligent automotive diagnostic companion. Designed to simplify vehicle troubleshooting, AutoMotive Buddy uses advanced AI to analyze diagnostic trouble codes, identify issues, and guide you toward the right solution — faster and smarter. Whether you're a professional mechanic or a car owner, our system empowers you with real-time insights, accurate diagnostics, and a seamless user experience. AutoMotive Buddy is proudly developed and led by Ruben Llego, owner and lead web developer, with a vision to revolutionize automotive diagnostics through intelligent technology. Get ready to experience the future of vehicle diagnostics. AutoMotive Buddy — Diagnose smarter. Drive better.`;
+      
+      const userId = currentUser?.id || 'guest';
+      const hasPreviousMessages = store.chatLogs.some((m: any) => m.userId === userId);
+      
+      if (!hasPreviousMessages) {
+         store.addChatMessage(userId, 'ai', welcomeText);
+      }
+      
+      if (autoSpeak) {
+         speakText(welcomeText, true);
+      }
+    }
+  }, [isOpen, currentUser, store, autoSpeak]);
 
   const toggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -3220,6 +3190,11 @@ import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestor
 
 function MembersTab({ user, store, toast, ...props }: any) {
   const [users, setUsers] = useState<UserType[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPass, setNewUserPass] = useState('');
+  const [newUserName, setNewUserName] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
@@ -3231,65 +3206,197 @@ function MembersTab({ user, store, toast, ...props }: any) {
     return () => unsubscribe();
   }, []);
 
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserEmail || !newUserPass || !newUserName) return;
+    setIsCreatingUser(true);
+    try {
+       const { createAdminUser } = await import('./lib/firebase');
+       const { serverTimestamp, setDoc, doc } = await import('firebase/firestore');
+       
+       const newUser = await createAdminUser(newUserEmail, newUserPass);
+       const d = new Date();
+       d.setDate(d.getDate() + 30);
+       
+       await setDoc(doc(db, 'users', newUser.uid), {
+           id: newUser.uid,
+           email: newUser.email,
+           fullName: newUserName,
+           username: newUserName.split(' ').join('').toLowerCase() + Math.random().toString(36).substring(2,5),
+           role: 'technician',
+           status: 'approved',
+           subscription: { plan: 'pro', expiryDate: d.toISOString() },
+           createdAt: serverTimestamp(),
+           updatedAt: serverTimestamp(),
+           avatarUrl: '',
+           xp: 0,
+           level: 1
+       });
+       
+       toast('User account created and registered successfully.', 'success');
+       setIsModalOpen(false);
+       setNewUserEmail('');
+       setNewUserPass('');
+       setNewUserName('');
+    } catch (error: any) {
+       toast(`Error creating user: ${error.message}`, 'error');
+    }
+    setIsCreatingUser(false);
+  };
+
   return (
-    <div className="glass-panel overflow-hidden p-0">
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-white/5 text-[9px] uppercase font-accent tracking-widest text-text-secondary border-b border-border-glass">
-          <tr>
-            <th className="p-6">User / Member</th>
-            <th className="p-6">Access Status</th>
-            <th className="p-6">Subscription</th>
-            <th className="p-6">Registered</th>
-            <th className="p-6">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-glass">
-          {users.map((u: UserType) => (
-            <tr key={u.id} className="hover:bg-white/2 transition-colors">
-              <td className="p-6">
-                <div className="flex items-center gap-3">
-                  <UserAvatar user={u} size="sm" className="border-border-glass bg-[#0A1224]" />
-                  <div><div className="text-sm font-bold text-text-primary uppercase">{u.fullName}</div><div className="text-[9px] text-text-secondary uppercase">@{u.username}</div></div>
-                </div>
-              </td>
-              <td className="p-6">
-                <span className={`badge ${u.status === 'approved' ? 'badge-green' : 'animate-pulse'}`}>{u.status}</span>
-              </td>
-              <td className="p-6">
-                {u.subscription && <div className="text-[10px]"><span className="text-brand font-bold uppercase">{u.subscription.plan}</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.subscription.expiryDate).toLocaleDateString()}</div></div>}
-              </td>
-              <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{new Date(u.createdAt).toLocaleDateString()}</td>
-              <td className="p-6">
-                <div className="flex gap-2">
-                  {u.status === 'pending' && (
-                    <button 
-                      onClick={async () => {
-                        try {
-                           await setDoc(doc(db, 'users', u.id), { status: 'approved' }, { merge: true });
-                           toast(`Member ${u.username} has been approved. Access granted.`, 'success');
-                           await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
-                             id: Math.random().toString(36).substr(2, 9),
-                             userId: user.id, username: user.username,
-                             action: 'Approval', details: `Approved user ${u.fullName} (@${u.username})`,
-                             timestamp: new Date().toISOString()
-                           });
-                        } catch (error) {
-                           handleFirestoreError(error, OperationType.UPDATE, `users/${u.id}`);
-                        }
-                      }} 
-                      className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"
-                      title="Approve Member"
-                    >
-                      <ShieldCheck size={14} />
-                    </button>
-                  )}
-                  <button className="p-2 bg-blue-500/20 text-blue-400 rounded hover:scale-110 transition-all cursor-pointer"><Edit size={14} /></button>
-                </div>
-              </td>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-xl text-white font-display uppercase tracking-widest">Registry Roster</h2>
+          <p className="text-[10px] text-text-secondary font-accent uppercase tracking-widest">Active nodes in the system</p>
+        </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="btn-primary text-xs py-2 group overflow-hidden relative cursor-pointer"
+        >
+           <span className="relative z-10 flex items-center gap-2">
+             <UserPlus size={14} /> Add Account
+           </span>
+           <div className="absolute inset-0 bg-brand/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+        </button>
+      </div>
+
+      <div className="glass-panel overflow-hidden p-0">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-white/5 text-[9px] uppercase font-accent tracking-widest text-text-secondary border-b border-border-glass">
+            <tr>
+              <th className="p-6">User / Member</th>
+              <th className="p-6">Access Status</th>
+              <th className="p-6">Subscription</th>
+              <th className="p-6">Registered</th>
+              <th className="p-6">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border-glass">
+            {users.map((u: UserType) => (
+              <tr key={u.id} className="hover:bg-white/2 transition-colors">
+                <td className="p-6">
+                  <div className="flex items-center gap-3">
+                    <UserAvatar user={u} size="sm" className="border-border-glass bg-[#0A1224]" />
+                    <div><div className="text-sm font-bold text-text-primary uppercase">{u.fullName}</div><div className="text-[9px] text-text-secondary uppercase">@{u.username}</div></div>
+                  </div>
+                </td>
+                <td className="p-6">
+                  <span className={`badge ${u.status === 'approved' ? 'badge-green' : 'animate-pulse'}`}>{u.status}</span>
+                </td>
+                <td className="p-6">
+                  {u.subscription && <div className="text-[10px]"><span className="text-brand font-bold uppercase">{u.subscription.plan}</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.subscription.expiryDate).toLocaleDateString()}</div></div>}
+                </td>
+                <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{u.createdAt instanceof Date ? u.createdAt.toLocaleDateString() : (u.createdAt && typeof u.createdAt.toDate === 'function' ? u.createdAt.toDate().toLocaleDateString() : 'N/A')}</td>
+                <td className="p-6">
+                  <div className="flex gap-2">
+                    {u.status === 'pending' && (
+                      <button 
+                        onClick={async () => {
+                          try {
+                             await setDoc(doc(db, 'users', u.id), { status: 'approved' }, { merge: true });
+                             toast(`Member ${u.username} has been approved. Access granted.`, 'success');
+                             await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
+                               id: Math.random().toString(36).substr(2, 9),
+                               userId: user.id, username: user.username,
+                               action: 'Approval', details: `Approved user ${u.fullName} (@${u.username})`,
+                               timestamp: new Date().toISOString()
+                             });
+                          } catch (error) {
+                             handleFirestoreError(error, OperationType.UPDATE, `users/${u.id}`);
+                          }
+                        }} 
+                        className="p-2 bg-green-500/20 text-green-500 rounded hover:scale-110 transition-all cursor-pointer"
+                        title="Approve Member"
+                      >
+                        <ShieldCheck size={14} />
+                      </button>
+                    )}
+                    <button className="p-2 bg-blue-500/20 text-blue-400 rounded hover:scale-110 transition-all cursor-pointer" title="Edit Access"><Edit size={14} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-[#050A15] border border-border-glass rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative"
+            >
+              <div className="p-6 border-b border-border-glass/30 flex justify-between items-center bg-black/20">
+                <h3 className="font-display uppercase tracking-widest text-brand font-bold text-lg">Create System Access</h3>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-text-secondary hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6">
+                 <p className="text-xs text-text-muted mb-6">Manually register a new operative into the system. This avoids logging out of your current session.</p>
+                 <form onSubmit={handleCreateAccount} className="space-y-4">
+                    <div>
+                      <label className="text-[10px] text-text-secondary font-accent uppercase tracking-widest block mb-2">Operative Name</label>
+                      <input 
+                        type="text" 
+                        value={newUserName}
+                        onChange={(e) => setNewUserName(e.target.value)}
+                        className="form-input w-full"
+                        placeholder="e.g. John Matrix"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-text-secondary font-accent uppercase tracking-widest block mb-2">System Email</label>
+                      <input 
+                        type="email" 
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
+                        className="form-input w-full"
+                        placeholder="john.matrix@sector7.com"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-text-secondary font-accent uppercase tracking-widest block mb-2">Access Code (Password)</label>
+                      <input 
+                        type="password" 
+                        value={newUserPass}
+                        onChange={(e) => setNewUserPass(e.target.value)}
+                        className="form-input w-full"
+                        placeholder="Enter secure password"
+                        minLength={6}
+                        required
+                      />
+                    </div>
+                    <div className="pt-2">
+                       <button
+                         type="submit"
+                         disabled={isCreatingUser}
+                         className="btn-primary w-full py-3"
+                       >
+                         {isCreatingUser ? "INITIALIZING NODE..." : "GRANT ACCESS"}
+                       </button>
+                    </div>
+                 </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
