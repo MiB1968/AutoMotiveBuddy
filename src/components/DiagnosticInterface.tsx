@@ -205,6 +205,20 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
       </header>
 
       <main className="flex-1 px-6 py-2 overflow-y-auto custom-scrollbar">
+        {/* Global Datalists for Autocomplete */}
+        <datalist id="brand-suggestions">
+          {currentSuggestions.brands.map(b => <option key={b} value={b} />)}
+        </datalist>
+        <datalist id="model-suggestions">
+          {currentSuggestions.models.map(m => <option key={m} value={m} />)}
+        </datalist>
+        <datalist id="year-suggestions">
+          {years.map(y => <option key={y} value={y} />)}
+        </datalist>
+        <datalist id="dtc-suggestions">
+          {currentSuggestions.codes.map(c => <option key={c} value={c} />)}
+        </datalist>
+
         <AnimatePresence mode="wait">
           {activeTab === 'diagnose' && (
             <motion.div 
@@ -260,9 +274,6 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                           onChange={(e) => setBrand(e.target.value)}
                           className="diag-input"
                         />
-                        <datalist id="brand-suggestions">
-                          {currentSuggestions.brands.map(b => <option key={b} value={b} />)}
-                        </datalist>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
@@ -274,9 +285,6 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                           onChange={(e) => setModel(e.target.value)}
                           className="diag-input"
                         />
-                        <datalist id="model-suggestions">
-                          {currentSuggestions.models.map(m => <option key={m} value={m} />)}
-                        </datalist>
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -289,9 +297,6 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                         onChange={(e) => setYear(e.target.value)}
                         className="diag-input"
                       />
-                      <datalist id="year-suggestions">
-                        {years.map(y => <option key={y} value={y} />)}
-                      </datalist>
                     </div>
                   </div>
 
@@ -309,9 +314,6 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                         onChange={(e) => setCodes(e.target.value)}
                         className="diag-input pt-10 font-mono"
                       />
-                      <datalist id="dtc-suggestions">
-                        {currentSuggestions.codes.map(c => <option key={c} value={c} />)}
-                      </datalist>
                       <div className="absolute top-3 left-4 flex items-center gap-2 opacity-40">
                          <Brain size={14} className="text-amber-500" />
                          <span className="text-[10px] uppercase font-bold tracking-widest">Neural Link Active</span>
@@ -631,6 +633,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                   <div className="search-inputs-row">
                     <input 
                       type="text" 
+                      list="brand-suggestions"
                       placeholder="Make (e.g., Ford)" 
                       value={brand} 
                       onChange={(e) => setBrand(e.target.value)}
@@ -638,6 +641,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                     />
                     <input 
                       type="text" 
+                      list="model-suggestions"
                       placeholder="Model (e.g., F150)" 
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
@@ -647,6 +651,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                   <div className="search-inputs-row">
                     <input 
                       type="text" 
+                      list="year-suggestions"
                       placeholder="Year (e.g., 2023)" 
                       value={year}
                       onChange={(e) => setYear(e.target.value)}

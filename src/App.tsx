@@ -2303,14 +2303,25 @@ function WiringColorTab({ store, user, toast }: any) {
       
       let parsedData;
       try {
-          // If the AI service returned an error message, parse will fail, or we can detect it
           if (typeof data === 'string' && data.includes("### DATA TEMPORARILY UNAVAILABLE")) {
              throw new Error(data);
           }
-          const cleanedData = typeof data === 'string' ? data.replace(/```json\n?/, '').replace(/\n?```/, '') : data;
+          let cleanedData = data;
+          if (typeof data === 'string') {
+            const match = data.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (match && match[1]) {
+              cleanedData = match[1];
+            } else {
+              const start = data.indexOf('{');
+              const end = data.lastIndexOf('}');
+              if (start !== -1 && end !== -1 && end > start) {
+                cleanedData = data.substring(start, end + 1);
+              }
+            }
+          }
           parsedData = typeof cleanedData === 'string' ? JSON.parse(cleanedData) : cleanedData;
       } catch (parseErr) {
-          console.error("Failed to parse AI JSON or received error message:", data);
+          console.error("Failed to parse AI JSON or received error message:", parseErr, data);
           throw new Error(data && typeof data === 'string' && data.includes("###") ? data : "Received malformed data from AI.");
       }
       setResult(parsedData);
@@ -2394,14 +2405,25 @@ function FuseRelayTab({ store, user, toast }: any) {
       
       let parsedData;
       try {
-          // If the AI service returned an error message, parse will fail, or we can detect it
           if (typeof data === 'string' && data.includes("### DATA TEMPORARILY UNAVAILABLE")) {
              throw new Error(data);
           }
-          const cleanedData = typeof data === 'string' ? data.replace(/```json\n?/, '').replace(/\n?```/, '') : data;
+          let cleanedData = data;
+          if (typeof data === 'string') {
+            const match = data.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (match && match[1]) {
+              cleanedData = match[1];
+            } else {
+              const start = data.indexOf('{');
+              const end = data.lastIndexOf('}');
+              if (start !== -1 && end !== -1 && end > start) {
+                cleanedData = data.substring(start, end + 1);
+              }
+            }
+          }
           parsedData = typeof cleanedData === 'string' ? JSON.parse(cleanedData) : cleanedData;
       } catch (parseErr) {
-          console.error("Failed to parse AI JSON or received error message:", data);
+          console.error("Failed to parse AI JSON or received error message:", parseErr, data);
           throw new Error(data && typeof data === 'string' && data.includes("###") ? data : "Received malformed data from AI.");
       }
       setResult(parsedData);
