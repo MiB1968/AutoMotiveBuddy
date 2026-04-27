@@ -2292,7 +2292,7 @@ function GlobalVehicleSelector() {
              disabled={!model}
           />
           <datalist id="engines">
-            {selectedMod?.engines.map(eng => (
+            {(selectedMod?.engines || []).map(eng => (
               <option key={eng} value={eng} />
             ))}
           </datalist>
@@ -2348,6 +2348,9 @@ function WiringColorTab({ store, user, toast }: any) {
   const [engine, setEngine] = useState(globalVehicle.engine);
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
+  const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
 
   const handleSearch = async () => {
     setIsLoading(true);
@@ -2417,21 +2420,41 @@ function WiringColorTab({ store, user, toast }: any) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
-                        <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                        <input className="diag-input" list="wiring-makes" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                        <datalist id="wiring-makes">
+                          {vehicleDatabase.manufacturers.map(mfr => (
+                            <option key={mfr.id} value={mfr.name} />
+                          ))}
+                        </datalist>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
-                        <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                        <input className="diag-input" list="wiring-models" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                        <datalist id="wiring-models">
+                          {selectedMfr?.models.map(mdl => (
+                            <option key={mdl.id} value={mdl.name} />
+                          ))}
+                        </datalist>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
-                        <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                        <input className="diag-input" list="wiring-years" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                        <datalist id="wiring-years">
+                          {selectedMod?.years.map(yr => (
+                            <option key={yr} value={yr} />
+                          ))}
+                        </datalist>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
-                        <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                        <input className="diag-input" list="wiring-engines" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                        <datalist id="wiring-engines">
+                          {(selectedMod?.engines || []).map(eng => (
+                            <option key={eng} value={eng} />
+                          ))}
+                        </datalist>
                       </div>
                     </div>
 
@@ -2506,6 +2529,9 @@ function FuseRelayTab({ store, user, toast }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('');
 
+  const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
+  const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
+
   const categories = ['Engine Bay', 'Interior Cabin', 'Lighting', 'Power Distribution', 'Ignition/Starting'];
 
   const handleSearch = async (category: string) => {
@@ -2578,21 +2604,41 @@ function FuseRelayTab({ store, user, toast }: any) {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
-                    <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                    <input className="diag-input" list="fuses-makes" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                    <datalist id="fuses-makes">
+                      {vehicleDatabase.manufacturers.map(mfr => (
+                        <option key={mfr.id} value={mfr.name} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
-                    <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                    <input className="diag-input" list="fuses-models" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                    <datalist id="fuses-models">
+                      {selectedMfr?.models.map(mdl => (
+                        <option key={mdl.id} value={mdl.name} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
-                    <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                    <input className="diag-input" list="fuses-years" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                    <datalist id="fuses-years">
+                      {selectedMod?.years.map(yr => (
+                        <option key={yr} value={yr} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
-                    <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                    <input className="diag-input" list="fuses-engines" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                    <datalist id="fuses-engines">
+                      {(selectedMod?.engines || []).map(eng => (
+                        <option key={eng} value={eng} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
              </div>
