@@ -909,13 +909,12 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
           {/* Stats Bar */}
           <div className="w-full max-w-5xl mx-auto glass-card flex flex-wrap justify-center md:items-center gap-6 py-8 px-10 grid grid-cols-2 md:grid-cols-4 lg:flex lg:justify-between">
              {[
-               { label: 'DTC Codes', value: '35+' },
-               { label: 'Vehicle Brands', value: '50+' },
-               { label: 'Warning Lights', value: '100+' },
-               { label: 'Wiring Diagrams', value: 'SVG/Text' },
-               { label: 'Fuse Box Guides', value: 'Visual' },
-               { label: 'AI Chatbot', value: '24/7' },
-               { label: 'Maintenance Guides', value: 'DIY' }
+               { label: 'DTC Protocols', value: '500+' },
+               { label: 'Multi-System', value: 'Light/Heavy' },
+               { label: 'Diagnostics', value: 'Neural AI' },
+               { label: 'Wiring Intel', value: 'Color Coding' },
+               { label: 'Power Mapping', value: 'Fuses/Relays' },
+               { label: 'Network Sync', value: 'Offline/Online' },
              ].map((stat, i) => (
                <div key={i} className="flex flex-col items-center gap-1">
                  <span className="text-xl font-accent font-bold text-text-primary">{stat.value}</span>
@@ -943,15 +942,12 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
-              { icon: Database, title: 'OBD2 Fault Codes', desc: 'Full fault code database with symptoms, causes, step-by-step DIY fix guides and estimated repair costs.' },
-              { icon: Zap, title: 'Fuse & Relay Diagrams', desc: 'Complete fuse box layouts and relay locations with amp ratings for the engine bay, interior, and trunk.' },
-              { icon: Map, title: 'Component Locations', desc: 'Visual finders for OBD ports, specific sensors, filters, and fluid reservoirs across hundreds of vehicles.' },
-              { icon: Eye, title: 'Warning Lights Guide', desc: 'Comprehensive visual guide to dashboard warning lights, what they mean, and how to safely reset them.' },
-              { icon: Clock, title: 'Maintenance Schedules', desc: 'Factory-recommended service intervals, fluid capacities, and step-by-step guides for routine DIY maintenance.' },
-              { icon: Activity, title: 'Electrical Wiring', desc: 'Full electrical system diagrams by model. Visual layouts of starting, charging, and engine control circuits.' },
-              { icon: Truck, title: 'Multi-Vehicle Support', desc: 'Extensive coverage for Cars, Motorcycles, Heavy Construction Equipment, and Agricultural machines worldwide.' },
-              { icon: MessageSquare, title: 'Voice-Enabled AI Chatbot', desc: 'Advanced 24/7 intelligent automotive assistant to help with troubleshooting, manual lookups, and system navigation.' },
-              { icon: Globe, title: 'Community Insights', desc: 'Search real-world repair experiences, known common problems, and verified solutions contributed by our community of owners.' }
+              { icon: Database, title: '500+ DTC Protocols', desc: 'Full fault code database with symptoms, causes, step-by-step DIY fix guides and estimated repair costs, featuring Offline and Online sync.' },
+              { icon: Cpu, title: 'Neural AI Diagnostics', desc: 'Direct access to the Neural DB for advanced real-time fault analysis, live chat support, and predictive failure modeling.' },
+              { icon: Zap, title: 'Integrated Fuses & Relays', desc: 'Complete fuse box layouts and relay locations directly tied into the DTC database for seamless electrical fault tracing.' },
+              { icon: Cable, title: 'Circuit Intent Analysis', desc: 'Advanced wiring color coding reference tool to identify circuit intent and electrical paths.' },
+              { icon: Activity, title: 'Multi-System Support', desc: 'Diagnostic logic adapted specifically for standard light vehicles, heavy trucks, and complex heavy equipment.' },
+              { icon: MessageSquare, title: 'Voice-Enabled Assistant', desc: 'Advanced voice-activated AI assistant to help with rapid troubleshooting and fault identification.' }
             ].map((f, i) => (
               <FeatureCard key={i} {...f} delay={i * 0.1} />
             ))}
@@ -996,11 +992,11 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch">
              <PricingCard 
                title="Single Phase" price="500" duration="1 Month" icon={Shield} 
-               benefits={['Full OBD2 DTC Lookup', 'Fuse & Relay Layouts', 'Dashboard Warning Lights', 'AI Chatbot Support', 'Member Community Access']}
+               benefits={['500+ DTC Lookup', 'Fuse & Relay Mapping', 'Offline Mode Basics', 'Neural AI Chatbot Support', 'Member Community Access']}
              />
              <PricingCard 
                title="Quarterly Sync" price="1,000" duration="3 Months" icon={Zap}
-               benefits={['Everything in 1 Month', 'Priority Database Updates', 'Manual Archiving', 'Bulk Data Access', 'Standard Support']}
+               benefits={['Everything in 1 Month', 'Priority Database Updates', 'Wiring Color Coding', 'Multi-System Access', 'Standard Support']}
              />
              <PricingCard 
                title="Semi-Annual" price="1,500" duration="6 Months" icon={Star} active
@@ -2074,10 +2070,10 @@ function LandingScreen({ onEnter }: { onEnter: () => void }) {
         
         <div>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-white/80">
-             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">AI Diagnostics</span>
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Neural AI Diagnostics</span>
              <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">500+ DTC Support</span>
-             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Offline Mode</span>
-             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Voice Activated</span>
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Offline & Online Modes</span>
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Wiring & Relays</span>
           </div>
         </div>
 
@@ -2395,15 +2391,15 @@ function WiringColorTab({ store, user, toast }: any) {
     <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
       <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
         {/* Background Glows */}
-        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-blue-600/5 blur-[120px] rounded-full -z-10" />
-        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-blue-900/5 blur-[100px] rounded-full -z-10" />
+        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-brand/5 blur-[120px] rounded-full -z-10" />
+        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-brand-dark/5 blur-[100px] rounded-full -z-10" />
 
         {/* Header */}
         <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex-1 flex justify-center w-full">
             <h2 className="text-xl font-bold font-display tracking-widest text-center uppercase relative">
-              <span className="text-blue-500">Wiring</span> Color Coding
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-blue-500/50 rounded-full" />
+              <span className="text-brand">Wiring</span> Color Coding
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-brand/50 rounded-full" />
             </h2>
           </div>
         </header>
@@ -2412,7 +2408,7 @@ function WiringColorTab({ store, user, toast }: any) {
            <div className="diag-card group">
              {/* Accent Top Line */}
              <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
-               <div className="w-1/3 h-full bg-blue-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
+               <div className="w-1/3 h-full bg-brand animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
              </div>
              
              <div className="space-y-4">
@@ -2440,7 +2436,7 @@ function WiringColorTab({ store, user, toast }: any) {
                 <button 
                       onClick={handleSearch}
                       disabled={isLoading}
-                      className="diag-primary-btn group !bg-blue-600 hover:!bg-blue-500 mt-4"
+                      className="diag-primary-btn group mt-4 w-full"
                 >
                   {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Cable size={16} />}
                   {isLoading ? "RETRIEVING CODES..." : "ANALYZE CIRCUIT INTENT"}
@@ -2456,7 +2452,7 @@ function WiringColorTab({ store, user, toast }: any) {
                className="space-y-3"
             >
                 {result.circuits?.map((c: any, i: number) => (
-                    <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-blue-500/30 transition-colors">
+                    <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-brand/30 transition-colors">
                         <div className="w-12 h-12 rounded-lg flex items-center justify-center text-[10px] uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#222' : c.color?.toLowerCase() || 'gray'}}>
                             {c.color}
                         </div>

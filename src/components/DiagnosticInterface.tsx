@@ -374,6 +374,30 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                   </div>
                 </div>
               </div>
+
+              {/* Instructions Guide */}
+              <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-[20px] space-y-5 mt-8">
+                <div className="flex items-center gap-2">
+                  <Database size={16} className="text-zinc-500" />
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Database Network Modes</h4>
+                </div>
+                <div className="space-y-4 text-[10px] leading-relaxed">
+                  <div className="flex items-start gap-4">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0 animate-pulse" />
+                    <div>
+                      <strong className="text-white block mb-1 text-xs">Online Mode (Network Synced)</strong>
+                      <span className="text-zinc-500">Connects directly to the live Neural DB matrix. Fetches latest DTC solutions, falls back to real-time AI generation, and automatically caches results to your local device.</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500/80 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-zinc-300 block mb-1 text-xs">Offline Mode (Local Engine)</strong>
+                      <span className="text-zinc-500">Operates 100% locally from your device's cache. Requires zero internet connectivity—ideal for remote diagnostic sites and deep basement workshops.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
 
