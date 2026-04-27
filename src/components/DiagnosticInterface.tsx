@@ -322,35 +322,34 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                   </div>
 
                   {/* DTC Code Area */}
-                  <div className="space-y-4">
-                     <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1 flex items-center justify-between">
-                          DTC Codes
-                          <span className="text-zinc-700 italic lowercase">Comma separated</span>
-                        </label>
-                        <div className="relative">
-                          <input 
-                            list="dtc-suggestions"
-                            placeholder="Enter P0101, P0300..."
-                            value={codes}
-                            onChange={(e) => setCodes(e.target.value)}
-                            className="diag-input pb-3 pt-10 font-mono text-center text-lg text-amber-500 focus:border-amber-500/50"
-                          />
-                          <div className="absolute top-3 w-full flex items-center justify-center gap-2 opacity-40">
-                             <Brain size={14} className="text-amber-500" />
-                             <span className="text-[10px] uppercase font-bold tracking-widest text-amber-500">Neural Link Active</span>
-                          </div>
-                        </div>
-                     </div>
-                     <button 
-                       onClick={handleRun}
-                       className="diag-primary-btn group !bg-amber-600 hover:!bg-amber-500 w-full justify-center"
-                     >
-                       <Zap size={16} className="mr-2" />
-                       RUN DIAGNOSTICS
-                       <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform ml-2" />
-                     </button>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                      DTC Codes
+                      <span className="text-zinc-700 italic lowercase">Comma separated</span>
+                    </label>
+                    <div className="relative">
+                      <input 
+                        list="dtc-suggestions"
+                        placeholder="Enter P0101, P0300..."
+                        value={codes}
+                        onChange={(e) => setCodes(e.target.value)}
+                        className="diag-input pt-10 font-mono"
+                      />
+                      <div className="absolute top-3 left-4 flex items-center gap-2 opacity-40">
+                         <Brain size={14} className="text-amber-500" />
+                         <span className="text-[10px] uppercase font-bold tracking-widest">Neural Link Active</span>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Action Button */}
+                  <button 
+                    onClick={handleRun}
+                    className="diag-primary-btn group"
+                  >
+                    RUN DIAGNOSTICS
+                    <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
                 </div>
               </div>
 
@@ -631,8 +630,128 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                           ))}
                        </div>
                     </div>
-                  </div>
+                 </div>
                )}
+            </motion.div>
+          )}
+
+          {activeTab === 'fuses' && (
+            <motion.div 
+              key="fuses"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6 pb-20"
+            >
+              <div className="fuses-relays-section">
+                <h1 className="fuses-relays-title">
+                  <Zap size={22} className="text-amber-500" />
+                  Fuses & Relays
+                </h1>
+
+                {/* Search Inputs */}
+                <div className="space-y-3">
+                  <div className="search-inputs-row">
+                    <input 
+                      type="text" 
+                      list="brand-suggestions"
+                      placeholder="Make (e.g., Ford)" 
+                      value={brand} 
+                      onChange={(e) => setBrand(e.target.value)}
+                      className="fuses-input" 
+                    />
+                    <input 
+                      type="text" 
+                      list="model-suggestions"
+                      placeholder="Model (e.g., F150)" 
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      className="fuses-input" 
+                    />
+                  </div>
+                  <div className="search-inputs-row">
+                    <input 
+                      type="text" 
+                      list="year-suggestions"
+                      placeholder="Year (e.g., 2023)" 
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      className="fuses-input" 
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Engine (e.g., 3.5L)" 
+                      className="fuses-input" 
+                    />
+                  </div>
+                </div>
+
+                <div className="h-px bg-zinc-800/50 w-full my-6" />
+
+                {/* Circuit Buttons Grid */}
+                <div className="circuit-buttons-grid">
+                  {[
+                    { id: 'engine', label: 'Engine Bay', icon: <Settings size={18} /> },
+                    { id: 'interior', label: 'Interior Cabin', icon: <Car size={18} /> },
+                    { id: 'lighting', label: 'Lighting', icon: <Zap size={18} /> },
+                    { id: 'pd', label: 'Power Dist.', icon: <Activity size={18} /> },
+                    { id: 'ign', label: 'Ignition/Start', icon: <Brain size={18} /> },
+                    { id: 'other', label: 'Auxiliary', icon: <Database size={18} /> }
+                  ].map((circuit) => (
+                    <button 
+                      key={circuit.id}
+                      onClick={() => setSelectedCircuit(circuit.id)}
+                      className={`circuit-btn ${selectedCircuit === circuit.id ? 'active' : ''}`}
+                    >
+                      <div className="mb-2 opacity-60 group-hover:opacity-100">{circuit.icon}</div>
+                      {circuit.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Prompt Message */}
+                <AnimatePresence mode="wait">
+                  {selectedCircuit ? (
+                    <motion.div 
+                      key={selectedCircuit}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="diag-card p-6 border-amber-500/20 bg-amber-500/5"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                          <Zap size={16} className="text-amber-500" />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-widest">{selectedCircuit.replace('-', ' ')} DIAGRAM</h3>
+                          <p className="text-[10px] text-zinc-500">Live schematics for {brand || 'Vehicle'}</p>
+                        </div>
+                      </div>
+                      <div className="aspect-video bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-center overflow-hidden relative">
+                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
+                         <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-[0.2em] relative z-10">Schematic Loading...</p>
+                         <motion.div 
+                          animate={{ 
+                            opacity: [0.1, 0.3, 0.1],
+                            scale: [1, 1.05, 1]
+                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="absolute inset-0 bg-amber-500/5"
+                         />
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800 text-[9px] font-bold text-zinc-500 text-center">PIN-OUTS</div>
+                        <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800 text-[9px] font-bold text-zinc-500 text-center">LOAD RATINGS</div>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <div className="select-circuit-prompt">
+                      <p className="prompt-main">Select a Circuit Area</p>
+                      <p className="prompt-sub">Tap one of the buttons above to load fuse and relay diagrams for the selected vehicle system.</p>
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -640,7 +759,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
 
       {/* Navigation */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
-        <nav className="bg-[#0a0a0a]/95 backdrop-blur-3xl border-t border-zinc-800/50 px-2 py-4 grid grid-cols-3 relative shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <nav className="bg-[#0a0a0a]/95 backdrop-blur-3xl border-t border-zinc-800/50 px-2 py-4 grid grid-cols-4 relative shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
           <button 
             onClick={() => setActiveTab('diagnose')}
             className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'diagnose' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
@@ -676,6 +795,20 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             <Wrench size={20} strokeWidth={activeTab === 'repair' ? 2.5 : 1.5} />
             <span className={`text-[8px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'repair' ? 'opacity-100' : 'opacity-60'}`}>Repair</span>
             {activeTab === 'repair' && (
+              <motion.div 
+                layoutId="nav-glow" 
+                className="absolute -bottom-4 w-10 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
+              />
+            )}
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('fuses')}
+            className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'fuses' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
+          >
+            <Zap size={20} strokeWidth={activeTab === 'fuses' ? 2.5 : 1.5} />
+            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'fuses' ? 'opacity-100' : 'opacity-60'}`}>Fuses</span>
+            {activeTab === 'fuses' && (
               <motion.div 
                 layoutId="nav-glow" 
                 className="absolute -bottom-4 w-10 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
