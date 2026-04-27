@@ -8,13 +8,26 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 };
 
-export async function generateDynamicVehicleData(type: 'fuses' | 'components' | 'warning_lights' | 'wiring', manufacturer: string, modelStr: string, year: string, engine: string) {
+import { getCache, setCache } from './db';
+
+export async function generateDynamicVehicleData(type: 'fuses' | 'components' | 'warning_lights' | 'wiring', manufacturer: string, modelStr: string, year: string, engine: string, customPrompt?: string) {
+  const cacheKey = `ai_data_${type}_${manufacturer}_${modelStr}_${year}_${engine}_${customPrompt || ''}`;
+  
+  try {
+    const cachedData = await getCache<string>(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+  } catch (e) {
+    console.warn("Could not read from cache", e);
+  }
+
   try {
     const ai = getAI();
     let systemPrompt = "";
 
     if (type === 'fuses') {
-      systemPrompt = `You are a top-tier automotive electrician and technical writer. Provide a highly detailed, comprehensive guide to the fuse boxes and relays for the ${year} ${manufacturer} ${modelStr} (${engine}), matching the detail level found in professional databases like StartMyCar or OEM service manuals.
+      systemPrompt = customPrompt || `You are a top-tier automotive electrician and technical writer. Provide a highly detailed, comprehensive guide to the fuse boxes and relays for the ${year} ${manufacturer} ${modelStr} (${engine}), matching the detail level found in professional databases like StartMyCar or OEM service manuals.
 
 Your response MUST include:
 1. Exact locations of EVERY fuse box (Engine Compartment, Passenger Compartment, Trunk, etc.) with detailed instructions on how to access them.
@@ -28,7 +41,7 @@ Your response MUST include:
 
 Format entirely in clean, readable Markdown using tables, bolding for emphasis, and clear headings. Do NOT skip any fuses; provide as exhaustive a list as possible.`;
     } else if (type === 'wiring') {
-      systemPrompt = `You are an expert automotive master technician specialized in electrical diagnostics. Provide a detailed guide for wiring color codes and circuit identification for the ${year} ${manufacturer} ${modelStr} (${engine}). 
+      systemPrompt = customPrompt || `You are an expert automotive master technician specialized in electrical diagnostics. Provide a detailed guide for wiring color codes and circuit identification for the ${year} ${manufacturer} ${modelStr} (${engine}). 
 Focus on:
 1. Common wiring color standards for this specific manufacturer.
 2. Connector pinouts for major modules (ECU, Body Control Module) if available.
@@ -36,9 +49,9 @@ Focus on:
 4. Professional tips for tracing electrical gremlins in this model.
 Format in clean Markdown with tables where appropriate.`;
     } else if (type === 'components') {
-      systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${manufacturer} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, main engine computer (ECU/PCM), starter motor, alternator, oxygen sensors, mass airflow sensor, and oil/air/cabin filters. Format your response in clean Markdown.`;
+      systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${manufacturer} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, main engine computer (ECU/PCM), starter motor, alternator, oxygen sensors, mass airflow sensor, and oil/air/cabin filters. Format your response in clean Markdown.` + (customPrompt ? ` ${customPrompt}` : '');
     } else if (type === 'warning_lights') {
-      systemPrompt = `You are an expert automotive diagnostician. Provide a detailed guide on the dashboard warning lights for the ${year} ${manufacturer} ${modelStr}. Categorize them by severity (Red = Stop ASAP, Yellow = Check soon, Green/Blue = Informational). Describe what each light looks like, what it means, and recommended actions. Format your response in clean Markdown.`;
+      systemPrompt = `You are an expert automotive diagnostician. Provide a detailed guide on the dashboard warning lights for the ${year} ${manufacturer} ${modelStr}. Categorize them by severity (Red = Stop ASAP, Yellow = Check soon, Green/Blue = Informational). Describe what each light looks like, what it means, and recommended actions. Format your response in clean Markdown.` + (customPrompt ? ` ${customPrompt}` : '');
     }
 
     const response = await ai.models.generateContent({
@@ -46,13 +59,29 @@ Format in clean Markdown with tables where appropriate.`;
       contents: `I need the ${type} data for a ${year} ${manufacturer} ${modelStr} with engine ${engine}.`,
       config: {
         systemInstruction: systemPrompt,
-        temperature: 0.3
+        temperature: 0.2
       }
     });
 
-    return response.text || "Dataset currently inaccessible. High-altitude network interference detected.";
+    const text = response.text;
+    if (text) {
+      try {
+        await setCache(cacheKey, text, null); // null means never expires
+      } catch (e) {
+        console.warn("Could not write to cache", e);
+      }
+      return text;
+    }
+    return "Dataset currently inaccessible. High-altitude network interference detected.";
   } catch (error: any) {
     console.error("Failed to generate dynamic vehicle data:", error);
+    
+    try {
+      const cachedData = await getCache<string>(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+    } catch(e) {}
     
     // Check for rate limiting
     if (error.status === 429 || error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED")) {
@@ -64,9 +93,16 @@ Format in clean Markdown with tables where appropriate.`;
 }
 
 export async function searchMaintenanceGuides(query: string, vehicle: any) {
+  const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
+  const cacheKey = `ai_search_${vStr}_${query}`;
+
+  try {
+    const cachedData = await getCache<string>(cacheKey);
+    if (cachedData) return cachedData;
+  } catch(e) {}
+
   try {
     const ai = getAI();
-    const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
     
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -75,17 +111,33 @@ export async function searchMaintenanceGuides(query: string, vehicle: any) {
         systemInstruction: `You are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant and master mechanic. Your goal is to provide step-by-step maintenance guides. Be professional and prioritize safety. Start your response by introducing yourself and mentioning that your owner and lead developer is Ruben Llego.`,
       }
     });
-    
-    return response.text || "Direct uplink failed. Please re-state your query.";
+
+    const text = response.text;
+    if (text) {
+      try { await setCache(cacheKey, text, null); } catch(e) {}
+      return text;
+    }
+    return "Direct uplink failed. Please re-state your query.";
   } catch (error: any) {
     console.error("Maintenance Search Error:", error);
+    try {
+      const cachedData = await getCache<string>(cacheKey);
+      if (cachedData) return cachedData;
+    } catch(e) {}
     return `Maintenance guide search failed: ${error.message}`;
   }
 }
 export async function askAutomotiveAssistant(prompt: string, vehicle: any, history: any[] = []) {
+  const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
+  const cacheKey = `ai_ask_${vStr}_${prompt}`;
+
+  try {
+    const cachedData = await getCache<string>(cacheKey);
+    if (cachedData) return cachedData;
+  } catch(e) {}
+
   try {
     const ai = getAI();
-    const vStr = `${vehicle?.year || 'Any'} ${vehicle?.make || 'Unknown'} ${vehicle?.model || 'Vehicle'} (${vehicle?.engine || 'Any Engine'})`;
     
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -103,9 +155,18 @@ RULES:
       }
     });
     
-    return response.text || "Direct uplink failed. Please re-state your query.";
+    const text = response.text;
+    if (text) {
+      try { await setCache(cacheKey, text, null); } catch(e) {}
+      return text;
+    }
+    return "Direct uplink failed. Please re-state your query.";
   } catch (error: any) {
     console.error("AI Generation Error:", error);
+    try {
+      const cachedData = await getCache<string>(cacheKey);
+      if (cachedData) return cachedData;
+    } catch(e) {}
     const errDetail = error?.message || "Unknown error";
     if (errDetail.includes("404")) {
       return "Diagnostic Matrix Error (404): The requested neural model is currently being upgraded. Please try a standard maintenance query or wait 60 seconds for synchronization.";
@@ -115,13 +176,20 @@ RULES:
 }
 
 export async function performDeepDTCSearch(code: string, vehicleContext?: { make?: string, model?: string, year?: string }) {
+  const vStr = vehicleContext ? `${vehicleContext.year || ''} ${vehicleContext.make || ''} ${vehicleContext.model || ''}`.trim() : "Generic Vehicle";
+  const cacheKey = `ai_dtc_${vStr}_${code}`;
+
   try {
-    const vStr = vehicleContext ? `${vehicleContext.year || ''} ${vehicleContext.make || ''} ${vehicleContext.model || ''}`.trim() : "Generic Vehicle";
+    const cachedData = await getCache<any>(cacheKey);
+    if (cachedData) return cachedData;
+  } catch(e) {}
+
+  try {
     try {
       const backendResult = await diagnoseDTC(code);
       if (backendResult?.data) {
         const d = backendResult.data;
-        return {
+        const res = {
           code: d.code || code,
           description: d.description,
           system: "Diagnostic System",
@@ -131,6 +199,8 @@ export async function performDeepDTCSearch(code: string, vehicleContext?: { make
           solutions: d.fixes || [],
           remediation: d.fixes || []
         };
+        try { await setCache(cacheKey, res, null); } catch(e) {}
+        return res;
       }
     } catch (apiError) {
       console.warn("Backend API not reachable/DTC not found, falling back to GenAI", apiError);
@@ -154,7 +224,7 @@ export async function performDeepDTCSearch(code: string, vehicleContext?: { make
       
       try {
         const parsed = JSON.parse(cleanText);
-        return {
+        const res = {
           code: parsed.code || code,
           description: parsed.description || "Detailed technical description currently being synchronized. Please re-scan in 30 seconds.",
           system: parsed.system || "Diagnostic System",
@@ -164,6 +234,8 @@ export async function performDeepDTCSearch(code: string, vehicleContext?: { make
           solutions: Array.isArray(parsed.solutions) ? parsed.solutions : ["Inspect electrical connectors", "Perform system scan"],
           remediation: Array.isArray(parsed.solutions) ? parsed.solutions : ["Inspect electrical connectors", "Perform system scan"]
         };
+        try { await setCache(cacheKey, res, null); } catch(e) {}
+        return res;
       } catch (e) {
         console.warn("JSON Parsing failed, using regex extraction", e);
       }
@@ -171,6 +243,10 @@ export async function performDeepDTCSearch(code: string, vehicleContext?: { make
     throw new Error("Invalid AI response format");
     } catch (error) {
     console.error("Deep Search Error:", error);
+    try {
+      const cachedData = await getCache<any>(cacheKey);
+      if (cachedData) return cachedData;
+    } catch(e) {}
     
     // Hardcoded logic for common critical codes that might fail AI search
     if (code.toUpperCase() === 'P1000') {

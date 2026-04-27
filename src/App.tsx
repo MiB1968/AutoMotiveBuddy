@@ -2357,7 +2357,7 @@ function WiringColorTab({ store, user, toast }: any) {
     setResult(null);
     try {
       const prompt = `Provide standardized wiring color codes for ${make} ${model} ${year} ${engine}. Focus on common circuits (e.g., Ground, Ignition, Constant Power, CAN Bus). Format as JSON: { "circuits": [{"intent": "e.g. Ground", "color": "e.g. Black", "note": "Commonly connects to chassis"} ] }`;
-      const data = await generateDynamicVehicleData('wiring', make, model, year, prompt);
+      const data = await generateDynamicVehicleData('wiring', make, model, year, engine, prompt);
       
       let parsedData;
       try {
@@ -2543,7 +2543,7 @@ function FuseRelayTab({ store, user, toast }: any) {
       Focus on category: ${category}. 
       Format as JSON: { "fuses": [{"id": "Fuse #", "amperage": "A", "color": "Color", "circuit": "Circuit"}], "relays": [{"id": "Relay #", "function": "Function"}] }`;
       
-      const data = await generateDynamicVehicleData('fuses', make, model, year, prompt);
+      const data = await generateDynamicVehicleData('fuses', make, model, year, engine, prompt);
       
       let parsedData;
       try {
@@ -2744,7 +2744,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
     try {
       // Pass category as extra context
       const promptContext = typeCategory !== 'General' ? ` focus on ${typeCategory}` : '';
-      const data = await generateDynamicVehicleData(type, make, model, year, engine + promptContext);
+      const data = await generateDynamicVehicleData(type, make, model, year, engine, promptContext);
       setResult(data);
     } catch(err: any) {
       if (toast) toast(err.message || 'Failed to retrieve vehicle data module from cloud matrix.', 'error');
