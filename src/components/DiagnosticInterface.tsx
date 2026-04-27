@@ -171,20 +171,21 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
   };
 
   return (
-    <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
+    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
       {/* Background Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-amber-600/5 blur-[120px] rounded-full -z-10" />
       <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-amber-900/5 blur-[100px] rounded-full -z-10" />
 
       {/* Header */}
       <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="hidden md:flex w-10 h-10 border border-zinc-800 rounded-lg items-center justify-center text-zinc-600 bg-zinc-900/50">
+        <div className="hidden md:flex w-10 h-10 border border-zinc-800 rounded-lg items-center justify-center text-zinc-600 bg-zinc-900/50 shrink-0">
            <Database size={16} />
         </div>
 
         {/* Center Toggle Dropdown / Switch */}
         <div className="flex-1 flex justify-center w-full md:w-auto">
           <div className="flex items-center bg-[#0a0e1a] border border-zinc-700/50 rounded-2xl p-2 relative overflow-hidden shadow-2xl min-w-[300px] max-w-[400px] w-full">
+
              {/* Background Slider */}
              <div 
                 className="absolute top-2 bottom-2 w-[calc(50%-8px)] rounded-xl transition-all duration-300 ease-out z-0 shadow-lg"
@@ -247,153 +248,157 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
+              className="grid grid-cols-1 md:grid-cols-5 gap-6 items-start"
             >
-              {/* Main Card */}
-              <div className="diag-card group">
-                {/* Accent Top Line */}
-                <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
-                  <div className="w-1/3 h-full bg-amber-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-
-                <div className="space-y-6">
-                  {/* Vehicle Type Selector */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <button 
-                      onClick={() => setVehicleType('light')}
-                      className={vehicleType === 'light' ? 'diag-btn-active' : 'diag-btn-inactive'}
-                    >
-                      <Car size={24} />
-                      <span className="text-[9px] mt-2 font-bold uppercase tracking-widest">Light</span>
-                    </button>
-                    <button 
-                      onClick={() => setVehicleType('heavy_truck')}
-                      className={vehicleType === 'heavy_truck' ? 'diag-btn-active' : 'diag-btn-inactive'}
-                    >
-                      <Truck size={24} />
-                      <span className="text-[9px] mt-2 font-bold uppercase tracking-widest">Heavy</span>
-                    </button>
-                    <button 
-                      onClick={() => setVehicleType('heavy_equipment')}
-                      className={vehicleType === 'heavy_equipment' ? 'diag-btn-active' : 'diag-btn-inactive'}
-                    >
-                      <Tractor size={24} />
-                      <span className="text-[9px] mt-2 font-bold uppercase tracking-widest">Equip.</span>
-                    </button>
+              <div className="md:col-span-3 space-y-6">
+                {/* Main Card */}
+                <div className="diag-card group">
+                  {/* Accent Top Line */}
+                  <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
+                    <div className="w-1/3 h-full bg-amber-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
 
-                  {/* Brand / Model / Year Inputs */}
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand</label>
-                        <input 
-                          type="text" 
-                          list="brand-suggestions"
-                          placeholder="Toyota"
-                          value={brand}
-                          onChange={(e) => setBrand(e.target.value)}
-                          className="diag-input"
-                        />
+                  <div className="space-y-6">
+                    {/* Vehicle Type Selector */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <button 
+                        onClick={() => setVehicleType('light')}
+                        className={vehicleType === 'light' ? 'diag-btn-active' : 'diag-btn-inactive'}
+                      >
+                        <Car size={24} />
+                        <span className="text-[9px] mt-2 font-bold uppercase tracking-widest">Light</span>
+                      </button>
+                      <button 
+                        onClick={() => setVehicleType('heavy_truck')}
+                        className={vehicleType === 'heavy_truck' ? 'diag-btn-active' : 'diag-btn-inactive'}
+                      >
+                        <Truck size={24} />
+                        <span className="text-[9px] mt-2 font-bold uppercase tracking-widest">Heavy</span>
+                      </button>
+                      <button 
+                        onClick={() => setVehicleType('heavy_equipment')}
+                        className={vehicleType === 'heavy_equipment' ? 'diag-btn-active' : 'diag-btn-inactive'}
+                      >
+                        <Tractor size={24} />
+                        <span className="text-[9px] mt-2 font-bold uppercase tracking-widest">Equip.</span>
+                      </button>
+                    </div>
+
+                    {/* Brand / Model / Year Inputs */}
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand</label>
+                          <input 
+                            type="text" 
+                            list="brand-suggestions"
+                            placeholder="Toyota"
+                            value={brand}
+                            onChange={(e) => setBrand(e.target.value)}
+                            className="diag-input"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
+                          <input 
+                            type="text" 
+                            list="model-suggestions"
+                            placeholder={vehicleType === 'heavy_equipment' ? '320D' : 'Hilux'}
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            className="diag-input"
+                          />
+                        </div>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
+                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
                         <input 
                           type="text" 
-                          list="model-suggestions"
-                          placeholder={vehicleType === 'heavy_equipment' ? '320D' : 'Hilux'}
-                          value={model}
-                          onChange={(e) => setModel(e.target.value)}
+                          list="year-suggestions"
+                          placeholder="2024"
+                          value={year}
+                          onChange={(e) => setYear(e.target.value)}
                           className="diag-input"
                         />
                       </div>
                     </div>
+
+                    {/* DTC Code Area */}
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
-                      <input 
-                        type="text" 
-                        list="year-suggestions"
-                        placeholder="2024"
-                        value={year}
-                        onChange={(e) => setYear(e.target.value)}
-                        className="diag-input"
-                      />
-                    </div>
-                  </div>
-
-                  {/* DTC Code Area */}
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1 flex items-center justify-between">
-                      DTC Codes
-                      <span className="text-zinc-700 italic lowercase">Comma separated</span>
-                    </label>
-                    <div className="relative">
-                      <input 
-                        list="dtc-suggestions"
-                        placeholder="Enter P0101, P0300..."
-                        value={codes}
-                        onChange={(e) => setCodes(e.target.value)}
-                        className="diag-input pt-10 font-mono"
-                      />
-                      <div className="absolute top-3 left-4 flex items-center gap-2 opacity-40">
-                         <Brain size={14} className="text-amber-500" />
-                         <span className="text-[10px] uppercase font-bold tracking-widest">Neural Link Active</span>
+                      <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                        DTC Codes
+                        <span className="text-zinc-700 italic lowercase">Comma separated</span>
+                      </label>
+                      <div className="relative">
+                        <input 
+                          list="dtc-suggestions"
+                          placeholder="Enter P0101, P0300..."
+                          value={codes}
+                          onChange={(e) => setCodes(e.target.value)}
+                          className="diag-input pt-10 font-mono"
+                        />
+                        <div className="absolute top-3 left-4 flex items-center gap-2 opacity-40">
+                           <Brain size={14} className="text-amber-500" />
+                           <span className="text-[10px] uppercase font-bold tracking-widest">Neural Link Active</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Action Button */}
-                  <button 
-                    onClick={handleRun}
-                    className="diag-primary-btn group"
-                  >
-                    RUN DIAGNOSTICS
-                    <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Status Footer */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-[20px] flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <Database size={16} className="text-green-500" />
-                  </div>
-                  <div>
-                    <div className="text-[8px] uppercase text-zinc-500 font-bold tracking-widest">Database</div>
-                    <div className="text-[10px] font-bold">STABLE V.24</div>
-                  </div>
-                </div>
-                <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-[20px] flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
-                    <Activity size={16} className="text-amber-500" />
-                  </div>
-                  <div>
-                    <div className="text-[8px] uppercase text-zinc-500 font-bold tracking-widest">Network</div>
-                    <div className="text-[10px] font-bold">54ms LATENCY</div>
+                    {/* Action Button */}
+                    <button 
+                      onClick={handleRun}
+                      className="diag-primary-btn group"
+                    >
+                      RUN DIAGNOSTICS
+                      <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Instructions Guide */}
-              <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-[20px] space-y-5 mt-8">
-                <div className="flex items-center gap-2">
-                  <Database size={16} className="text-zinc-500" />
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Database Network Modes</h4>
-                </div>
-                <div className="space-y-4 text-[10px] leading-relaxed">
-                  <div className="flex items-start gap-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0 animate-pulse" />
+              <div className="md:col-span-2 space-y-6">
+                {/* Status Footer */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-[20px] flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                      <Database size={16} className="text-green-500" />
+                    </div>
                     <div>
-                      <strong className="text-white block mb-1 text-xs">Online Mode (Network Synced)</strong>
-                      <span className="text-zinc-500">Connects directly to the live Neural DB matrix. Fetches latest DTC solutions, falls back to real-time AI generation, and automatically caches results to your local device.</span>
+                      <div className="text-[8px] uppercase text-zinc-500 font-bold tracking-widest">Database</div>
+                      <div className="text-[10px] font-bold">STABLE V.24</div>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500/80 mt-1.5 shrink-0" />
+                  <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-[20px] flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                      <Activity size={16} className="text-amber-500" />
+                    </div>
                     <div>
-                      <strong className="text-zinc-300 block mb-1 text-xs">Offline Mode (Local Engine)</strong>
-                      <span className="text-zinc-500">Operates 100% locally from your device's cache. Requires zero internet connectivity—ideal for remote diagnostic sites and deep basement workshops.</span>
+                      <div className="text-[8px] uppercase text-zinc-500 font-bold tracking-widest">Network</div>
+                      <div className="text-[10px] font-bold">54ms LATENCY</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instructions Guide */}
+                <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-[20px] space-y-5">
+                  <div className="flex items-center gap-2">
+                    <Database size={16} className="text-zinc-500" />
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Database Network Modes</h4>
+                  </div>
+                  <div className="space-y-4 text-[10px] leading-relaxed">
+                    <div className="flex items-start gap-4">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0 animate-pulse" />
+                      <div>
+                        <strong className="text-white block mb-1 text-xs">Online Mode (Network Synced)</strong>
+                        <span className="text-zinc-500">Connects directly to the live Neural DB matrix. Fetches latest DTC solutions, falls back to real-time AI generation, and automatically caches results to your local device.</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500/80 mt-1.5 shrink-0" />
+                      <div>
+                        <strong className="text-zinc-300 block mb-1 text-xs">Offline Mode (Local Engine)</strong>
+                        <span className="text-zinc-500">Operates 100% locally from your device's cache. Requires zero internet connectivity—ideal for remote diagnostic sites and deep basement workshops.</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -422,84 +427,88 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                   <p className="text-[10px] uppercase font-bold tracking-[0.3em] text-amber-500 animate-pulse">Establishing Neural Link...</p>
                 </div>
               ) : results ? (
-                <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-start">
                   {/* Results Overview */}
-                  <div className="diag-card">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="space-y-1">
-                        <div className="text-3xl font-display font-bold text-amber-500">{results.code}</div>
-                        <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border ${getSeverityColor(results.severity)}`}>
-                          {results.severity || 'Medium'} Severity
+                  <div className="md:col-span-2 space-y-6">
+                    <div className="diag-card">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="space-y-1">
+                          <div className="text-3xl font-display font-bold text-amber-500">{results.code}</div>
+                          <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border ${getSeverityColor(results.severity)} inline-block`}>
+                            {results.severity || 'Medium'} Severity
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="p-2 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><Save size={16}/></button>
+                          <button className="p-2 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><Share2 size={16}/></button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button className="p-2 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><Save size={16}/></button>
-                        <button className="p-2 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><Share2 size={16}/></button>
-                      </div>
-                    </div>
 
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-[9px] uppercase font-bold text-zinc-500 tracking-widest mb-1.5">Primary Diagnostic</h4>
-                        <p className="text-sm font-medium leading-relaxed">{results.description}</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-2">
-                        <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-                          <div className="flex items-center gap-1.5 mb-1">
-                             <Clock size={12} className="text-zinc-500" />
-                             <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Time Est.</span>
-                          </div>
-                          <div className="text-xs font-bold">{results.time_est || '30 - 60 Min'}</div>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-[9px] uppercase font-bold text-zinc-500 tracking-widest mb-1.5">Primary Diagnostic</h4>
+                          <p className="text-sm font-medium leading-relaxed">{results.description}</p>
                         </div>
-                        <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-                          <div className="flex items-center gap-1.5 mb-1">
-                             <ShieldAlert size={12} className="text-zinc-500" />
-                             <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Conf. Score</span>
+
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+                            <div className="flex items-center gap-1.5 mb-1">
+                               <Clock size={12} className="text-zinc-500" />
+                               <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Time Est.</span>
+                            </div>
+                            <div className="text-xs font-bold">{results.time_est || '30 - 60 Min'}</div>
                           </div>
-                          <div className="text-xs font-bold">{results.confidence ? `${(results.confidence * 100).toFixed(0)}%` : '92%'}</div>
+                          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+                            <div className="flex items-center gap-1.5 mb-1">
+                               <ShieldAlert size={12} className="text-zinc-500" />
+                               <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Conf. Score</span>
+                            </div>
+                            <div className="text-xs font-bold">{results.confidence ? `${(results.confidence * 100).toFixed(0)}%` : '92%'}</div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Causes & Fixes */}
-                  {results.causes && results.causes.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Probable Causes</h3>
-                      <div className="space-y-3">
-                        {results.causes.map((cause: any, idx: number) => (
-                          <div key={idx} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4">
-                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                               <span className="text-amber-500 font-bold text-xs">{idx + 1}</span>
+                  <div className="md:col-span-3 space-y-6">
+                    {/* Causes & Fixes */}
+                    {results.causes && results.causes.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Probable Causes</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {results.causes.map((cause: any, idx: number) => (
+                            <div key={idx} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4">
+                              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                                 <span className="text-amber-500 font-bold text-xs">{idx + 1}</span>
+                              </div>
+                              <div className="space-y-1 flex-1">
+                                 <div className="text-xs font-bold">{typeof cause === 'string' ? cause : cause.item}</div>
+                                 {cause.probability && (
+                                    <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+                                       <div className="h-full bg-amber-500 rounded-full" style={{ width: `${cause.probability * 100}%` }} />
+                                    </div>
+                                 )}
+                              </div>
                             </div>
-                            <div className="space-y-1 flex-1">
-                               <div className="text-xs font-bold">{typeof cause === 'string' ? cause : cause.item}</div>
-                               {cause.probability && (
-                                  <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
-                                     <div className="h-full bg-amber-500 rounded-full" style={{ width: `${cause.probability * 100}%` }} />
-                                  </div>
-                               )}
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {results.fixes && results.fixes.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Recommended Fixes</h3>
-                      <div className="space-y-3">
-                        {results.fixes.map((fix: string, idx: number) => (
-                          <div key={idx} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 items-start">
-                            <CheckCircle2 className="text-green-500 w-5 h-5 shrink-0 mt-0.5" />
-                            <div className="text-xs leading-relaxed text-zinc-300">{fix}</div>
-                          </div>
-                        ))}
+                    {results.fixes && results.fixes.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Recommended Fixes</h3>
+                        <div className="space-y-3">
+                          {results.fixes.map((fix: string, idx: number) => (
+                            <div key={idx} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 items-start">
+                              <CheckCircle2 className="text-green-500 w-5 h-5 shrink-0 mt-0.5" />
+                              <div className="text-xs leading-relaxed text-zinc-300">{fix}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ) : error ? (
                 <div className="diag-card text-center py-16 space-y-6">

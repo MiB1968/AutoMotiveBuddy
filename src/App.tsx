@@ -2388,88 +2388,107 @@ function WiringColorTab({ store, user, toast }: any) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
-      <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
+    <div className="max-w-5xl mx-auto -mt-8 md:mt-0 pt-4">
+      <div className="w-full mx-auto min-h-[80vh] flex flex-col font-sans text-white pb-12 relative overflow-hidden">
         {/* Background Glows */}
         <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-brand/5 blur-[120px] rounded-full -z-10" />
         <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-brand-dark/5 blur-[100px] rounded-full -z-10" />
 
         {/* Header */}
-        <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+        <header className="px-6 pb-2 md:pb-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex-1 flex justify-center w-full">
-            <h2 className="text-xl font-bold font-display tracking-widest text-center uppercase relative">
+            <h2 className="text-xl md:text-2xl font-bold font-display tracking-widest text-center uppercase relative">
               <span className="text-brand">Wiring</span> Color Coding
               <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-brand/50 rounded-full" />
             </h2>
           </div>
         </header>
 
-        <main className="flex-1 px-6 py-4 overflow-y-auto custom-scrollbar space-y-6">
-           <div className="diag-card group">
-             {/* Accent Top Line */}
-             <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
-               <div className="w-1/3 h-full bg-brand animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
+        <main className="flex-1 px-6 py-4 overflow-y-auto custom-scrollbar">
+           <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
+             <div className="md:col-span-2">
+               <div className="diag-card group">
+                 {/* Accent Top Line */}
+                 <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
+                   <div className="w-1/3 h-full bg-brand animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
+                 </div>
+                 
+                 <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
+                        <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
+                        <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
+                        <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
+                        <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <button 
+                          onClick={handleSearch}
+                          disabled={isLoading}
+                          className="diag-primary-btn group mt-4 w-full"
+                    >
+                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Cable size={16} />}
+                      {isLoading ? "RETRIEVING CODES..." : "ANALYZE CIRCUIT INTENT"}
+                      {!isLoading && <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform ml-auto" />}
+                    </button>
+                 </div>
+               </div>
              </div>
              
-             <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
-                    <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
-                    <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
-                    <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
-                    <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
-                  </div>
-                </div>
-
-                <button 
-                      onClick={handleSearch}
-                      disabled={isLoading}
-                      className="diag-primary-btn group mt-4 w-full"
+             <div className="md:col-span-3">
+               {result ? (
+                <motion.div 
+                   initial={{ opacity: 0, y: 20 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   className="space-y-3"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Cable size={16} />}
-                  {isLoading ? "RETRIEVING CODES..." : "ANALYZE CIRCUIT INTENT"}
-                  {!isLoading && <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform ml-auto" />}
-                </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {result.circuits?.map((c: any, i: number) => (
+                          <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-brand/30 transition-colors">
+                              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-[10px] uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#222' : c.color?.toLowerCase() || 'gray'}}>
+                                  {c.color}
+                              </div>
+                              <div className="flex-1">
+                                  <div className="text-sm font-bold text-white">{c.intent}</div>
+                                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{c.note}</div>
+                              </div>
+                          </div>
+                      ))}
+                    </div>
+                </motion.div>
+               ) : (
+                <div className="diag-card h-full min-h-[250px] flex items-center justify-center text-center">
+                    <div className="flex flex-col items-center">
+                      {isLoading ? (
+                        <>
+                          <div className="w-10 h-10 border-4 border-brand/20 border-t-brand rounded-full animate-spin mb-4" />
+                          <h3 className="text-sm font-bold text-brand uppercase tracking-widest animate-pulse">Scanning Blueprint...</h3>
+                        </>
+                      ) : (
+                        <>
+                          <Cable size={32} className="text-zinc-600 mb-4" />
+                          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Wiring Data Ready</h3>
+                          <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
+                        </>
+                      )}
+                    </div>
+                </div>
+               )}
              </div>
            </div>
-           
-           {result ? (
-            <motion.div 
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               className="space-y-3"
-            >
-                {result.circuits?.map((c: any, i: number) => (
-                    <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-brand/30 transition-colors">
-                        <div className="w-12 h-12 rounded-lg flex items-center justify-center text-[10px] uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#222' : c.color?.toLowerCase() || 'gray'}}>
-                            {c.color}
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-sm font-bold text-white">{c.intent}</div>
-                            <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{c.note}</div>
-                        </div>
-                    </div>
-                ))}
-            </motion.div>
-           ) : !isLoading && (
-            <div className="diag-card py-16 text-center flex flex-col items-center">
-                <Cable size={32} className="text-zinc-600 mb-4" />
-                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Wiring Data Ready</h3>
-                <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
-            </div>
-           )}
         </main>
       </div>
     </div>
