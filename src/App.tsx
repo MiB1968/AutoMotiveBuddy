@@ -2401,15 +2401,15 @@ function WiringColorTab({ store, user, toast }: any) {
     <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
       <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
         {/* Background Glows */}
-        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-blue-600/5 blur-[120px] rounded-full -z-10" />
-        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-blue-900/5 blur-[100px] rounded-full -z-10" />
+        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-amber-600/5 blur-[120px] rounded-full -z-10" />
+        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-amber-900/5 blur-[100px] rounded-full -z-10" />
 
         {/* Header */}
         <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex-1 flex justify-center w-full">
             <h2 className="text-xl font-bold font-display tracking-widest text-center uppercase relative">
-              <span className="text-blue-500">Wiring</span> Color Coding
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-blue-500/50 rounded-full" />
+              <span className="text-amber-500">Wiring</span> Color Coding
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-amber-500/50 rounded-full" />
             </h2>
           </div>
         </header>
@@ -2418,7 +2418,7 @@ function WiringColorTab({ store, user, toast }: any) {
            <div className="diag-card group">
              {/* Accent Top Line */}
              <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
-               <div className="w-1/3 h-full bg-blue-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
+               <div className="w-1/3 h-full bg-amber-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
              </div>
              
              <div className="space-y-4">
@@ -2446,9 +2446,9 @@ function WiringColorTab({ store, user, toast }: any) {
                 <button 
                       onClick={handleSearch}
                       disabled={isLoading}
-                      className="diag-primary-btn group !bg-blue-600 hover:!bg-blue-500 mt-4"
+                      className="diag-primary-btn group !bg-amber-600 hover:!bg-amber-500 mt-4"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Cable size={16} />}
+                  {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
                   {isLoading ? "RETRIEVING CODES..." : "ANALYZE CIRCUIT INTENT"}
                   {!isLoading && <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform ml-auto" />}
                 </button>
@@ -2462,7 +2462,7 @@ function WiringColorTab({ store, user, toast }: any) {
                className="space-y-3"
             >
                 {result.circuits?.map((c: any, i: number) => (
-                    <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-blue-500/30 transition-colors">
+                    <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-amber-500/30 transition-colors">
                         <div className="w-12 h-12 rounded-lg flex items-center justify-center text-[10px] uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#222' : c.color?.toLowerCase() || 'gray'}}>
                             {c.color}
                         </div>
@@ -2475,7 +2475,7 @@ function WiringColorTab({ store, user, toast }: any) {
             </motion.div>
            ) : !isLoading && (
             <div className="diag-card py-16 text-center flex flex-col items-center">
-                <Cable size={32} className="text-zinc-600 mb-4" />
+                <Zap size={32} className="text-amber-500/50 mb-4" />
                 <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Wiring Data Ready</h3>
                 <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
             </div>
@@ -2497,7 +2497,7 @@ function FuseRelayTab({ store, user, toast }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('');
 
-  const categories = ['Engine Bay', 'Interior Cabin', 'Lighting', 'Power Distribution', 'Ignition/Starting'];
+  const categories = ['Engine Bay', 'Interior Cabin', 'Lighting', 'Power Dist.', 'Ignition/Start', 'Auxiliary'];
 
   const handleSearch = async (category: string) => {
     setIsLoading(true);
@@ -2535,137 +2535,82 @@ function FuseRelayTab({ store, user, toast }: any) {
       }
       setResult(parsedData);
     } catch(err: any) {
-      if (toast) toast(err.message || 'Failed to retrieve fuse/relay data', 'error');
+      if (toast) toast({ title: "Error", description: err.message || 'Failed to retrieve fuse/relay data', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
-      <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
-        {/* Background Glows */}
-        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-purple-600/5 blur-[120px] rounded-full -z-10" />
-        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-purple-900/5 blur-[100px] rounded-full -z-10" />
-
-        {/* Header */}
-        <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex-1 flex justify-center w-full">
-            <h2 className="text-xl font-bold font-display tracking-widest text-center uppercase relative">
-              <span className="text-purple-500">Fuses</span> & Relays
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-500/50 rounded-full" />
-            </h2>
+    <div className="space-y-6 pb-20">
+       <div className="glass-panel p-6 border-brand/20">
+          <h2 className="text-xl font-bold text-white mb-6 tracking-tight flex items-center gap-2">
+            <Zap className="text-[#FF9900]" />
+            <span className="text-white">FUSES & RELAYS</span>
+          </h2>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <input className="input-field bg-white/5 border-white/10 text-white placeholder-white/40" placeholder="Make (e.g., Ford)" value={make} onChange={(e) => setMake(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10 text-white placeholder-white/40" placeholder="Model (e.g., F150)" value={model} onChange={(e) => setModel(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10 text-white placeholder-white/40" placeholder="Year (e.g., 2023)" value={year} onChange={(e) => setYear(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10 text-white placeholder-white/40" placeholder="Engine (e.g., 3.5L)" value={engine} onChange={(e) => setEngine(e.target.value)} />
           </div>
-        </header>
-
-        <main className="flex-1 px-6 py-4 overflow-y-auto custom-scrollbar space-y-6">
-           <div className="diag-card group">
-             {/* Accent Top Line */}
-             <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
-               <div className="w-1/3 h-full bg-purple-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
-             </div>
-             
-             <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
-                    <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
-                    <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
-                  </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            {categories.map((cat, index) => {
+              const Icon = [Settings, Car, Zap, Activity, Cpu, Database][index] || Zap;
+              return (
+                <motion.button 
+                  key={cat}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSearch(cat)}
+                  disabled={isLoading}
+                  className={`px-3 py-6 rounded-xl font-medium text-[11px] uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-2 shadow-lg ${activeCategory === cat ? 'bg-white/10 border border-[#FF9900] text-white shadow-brand/20' : 'bg-white/5 border border-white/10 text-text-secondary hover:bg-white/10 hover:border-brand/50'}`}
+                >
+                  {isLoading && activeCategory === cat ? <Loader2 className="animate-spin text-white" size={24} /> : <Icon size={24} className={activeCategory === cat ? 'text-[#FF9900]' : 'text-text-secondary'} />}
+                  <span className={activeCategory === cat ? 'text-white' : ''}>{cat}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+       </div>
+       
+       {result ? (
+        <div className="grid md:grid-cols-2 gap-6">
+            <div className="glass-panel p-6">
+                <h3 className="text-sm font-bold text-brand uppercase mb-4 tracking-widest">Relevant Fuses</h3>
+                <div className="space-y-3">
+                    {result.fuses?.map((f: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 hover:border-brand/30 transition-colors">
+                            <div className="w-12 h-12 rounded-lg flex items-center justify-center text-sm font-bold shadow-inner" style={{backgroundColor: f.color?.toLowerCase() || 'gray'}}>
+                                {f.amperage}
+                            </div>
+                            <div>
+                                <div className="text-base font-bold text-white">{f.id}</div>
+                                <div className="text-xs text-text-muted mt-0.5">{f.circuit}</div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
-                    <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
-                    <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
-                  </div>
+            </div>
+            <div className="glass-panel p-6">
+                <h3 className="text-sm font-bold text-brand uppercase mb-4 tracking-widest">Relevant Relays</h3>
+                <div className="space-y-3">
+                    {result.relays?.map((r: any, i: number) => (
+                        <div key={i} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-brand/30 transition-colors">
+                           <div className="text-base font-bold text-white">{r.id}</div>
+                           <div className="text-xs text-text-muted mt-0.5">{r.function}</div>
+                        </div>
+                    ))}
                 </div>
-             </div>
-           </div>
-
-           <div className="space-y-2">
-             <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Systems</h3>
-             <div className="grid grid-cols-2 gap-2">
-               {categories.map((cat) => (
-                   <motion.button 
-                     key={cat}
-                     whileHover={{ scale: 1.02 }}
-                     whileTap={{ scale: 0.98 }}
-                     onClick={() => handleSearch(cat)}
-                     disabled={isLoading}
-                     className={`px-3 py-3 rounded-xl font-bold text-[9px] uppercase tracking-widest transition-all flex items-center justify-start gap-2 shadow-sm border ${activeCategory === cat ? 'bg-purple-600 border-purple-500 text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
-                   >
-                     {isLoading && activeCategory === cat ? <Loader2 className="animate-spin shrink-0 text-purple-300" size={14} /> : <Zap size={14} className={activeCategory === cat ? 'text-purple-300' : 'text-zinc-600'} />}
-                     <span className="truncate">{cat}</span>
-                   </motion.button>
-               ))}
-             </div>
-           </div>
-           
-           <AnimatePresence mode="wait">
-             {result ? (
-              <motion.div 
-                 key="results"
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -20 }}
-                 className="space-y-6"
-              >
-                  {result.fuses && result.fuses.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
-                        <Zap size={10} className="text-purple-500" />
-                        Relevant Fuses
-                      </h3>
-                      {result.fuses.map((f: any, i: number) => (
-                          <div key={i} className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-purple-500/30 transition-colors">
-                              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-xs uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{backgroundColor: f.color?.toLowerCase() || 'gray'}}>
-                                  {f.amperage}
-                              </div>
-                              <div className="flex-1">
-                                  <div className="text-sm font-bold text-white">{f.id}</div>
-                                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{f.circuit}</div>
-                              </div>
-                          </div>
-                      ))}
-                    </div>
-                  )}
-                  {result.relays && result.relays.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
-                        <Activity size={10} className="text-blue-500" />
-                        Relevant Relays
-                      </h3>
-                      {result.relays.map((r: any, i: number) => (
-                          <div key={i} className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-blue-500/30 transition-colors">
-                             <div className="text-sm font-bold text-white">{r.id}</div>
-                             <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{r.function}</div>
-                          </div>
-                      ))}
-                    </div>
-                  )}
-              </motion.div>
-             ) : !isLoading && (
-              <motion.div 
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="diag-card py-16 text-center flex flex-col items-center"
-              >
-                  <Zap size={32} className="text-zinc-600 mb-4" />
-                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Select System</h3>
-                  <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Select a category above to load fuse block and relay logic maps.</p>
-              </motion.div>
-             )}
-           </AnimatePresence>
-        </main>
-      </div>
+            </div>
+        </div>
+       ) : !isLoading && (
+        <div className="glass-panel p-12 text-center border-dashed border border-white/10 flex flex-col items-center relative overflow-hidden group">
+            <h3 className="text-sm font-bold text-white uppercase tracking-widest relative z-10">SELECT A CIRCUIT AREA</h3>
+            <p className="text-xs text-text-muted mt-2 max-w-xs relative z-10">Tap one of the buttons above to load fuse and relay diagrams for the selected vehicle system.</p>
+        </div>
+       )}
     </div>
   );
 }
