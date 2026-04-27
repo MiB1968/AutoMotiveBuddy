@@ -538,28 +538,10 @@ const LogoHex = ({ className = "" }: { className?: string }) => (
 );
 
 const Logo = ({ className = "", size = "normal" }: { className?: string, size?: "small" | "normal" | "large" }) => {
-  if (size === 'small') {
-    return (
-      <div className={`flex items-center gap-2 ${className}`}>
-        <Settings className="text-amber-500 w-5 h-5" />
-        <span className="font-display font-medium text-lg tracking-tight text-text-primary">
-          AutoMotive Buddy
-        </span>
-      </div>
-    );
-  }
-
+  const widthClass = size === 'small' ? 'w-32' : size === 'large' ? 'w-64' : 'w-48';
   return (
-    <div className={`flex flex-col items-center justify-center ${className}`}>
-      <div className="flex items-center gap-3 mb-1">
-        <Settings className={`text-amber-500 ${size === 'large' ? 'w-10 h-10' : 'w-7 h-7'}`} />
-        <h1 className={`${size === 'large' ? 'text-4xl' : 'text-2xl'} font-display font-medium tracking-tight text-white`}>
-          AutoMotive Buddy
-        </h1>
-      </div>
-      <p className={`${size === 'large' ? 'text-[11px]' : 'text-[9px]'} text-zinc-500 tracking-[0.3em] font-medium uppercase opacity-80`}>
-        AUTOMOTIVE DIAGNOSTIC AI
-      </p>
+    <div className={`flex items-center justify-center ${className}`}>
+      <img src="/horizontal-logo.png" alt="AutoMotive Buddy" className={`${widthClass} h-auto object-contain mix-blend-screen drop-shadow-[0_0_15px_rgba(0,212,255,0.2)]`} />
     </div>
   );
 };
@@ -642,8 +624,8 @@ export default function App() {
               role: fbUser.email === 'rubenlleg12@gmail.com' ? 'admin' : (isAnon ? 'trial' : 'member'),
               status: fbUser.email === 'rubenlleg12@gmail.com' || isAnon ? 'approved' : 'pending',
               createdAt: new Date().toISOString(),
-              trialExpiration: expirationTime,
               avatarUrl: fbUser.photoURL || '',
+              ...(expirationTime ? { trialExpiration: expirationTime } : {})
             };
             await setDoc(doc(db, 'users', fbUser.uid), newUser).catch(e => {
                handleFirestoreError(e, OperationType.CREATE, `users/${fbUser.uid}`);
@@ -825,7 +807,7 @@ export default function App() {
       return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
     }
 
-    if (currentUser.status === 'suspended' || currentUser.status === 'rejected') {
+    if (currentUser.status === 'rejected') {
        return (
          <div className="h-screen w-full flex flex-col items-center justify-center p-6 text-center space-y-6">
            <Wrench size={64} className="text-red-500 opacity-80" />
@@ -1787,14 +1769,14 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
 
   const SidebarContent = () => (
     <>
-      <div className="p-6 mb-8 flex items-center justify-between">
+      <div className="sidebar-header">
         {(!sidebarCollapsed || mobileMenuOpen) && <Logo />}
         <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : setSidebarCollapsed(!sidebarCollapsed)} className="text-text-muted hover:text-brand transition-colors cursor-pointer hidden lg:block">
           <Menu size={20} />
         </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+      <nav className="sidebar-nav overflow-y-auto space-y-2">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'overview'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('overview')} />
         <NavItem icon={Users} label="Member Core" active={activeTab === 'members'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('members')} />
         <NavItem icon={Database} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
@@ -1815,8 +1797,8 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
         </button>
       </div>
 
-      <div className="p-4 border-t border-border-glass space-y-4">
-        <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
+      <div className="sidebar-footer space-y-4">
+        <div className={`sidebar-user transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
           <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} key={`admin-v-${user.avatarUrl}`} />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
@@ -1846,7 +1828,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
       {/* Desktop Sidebar */}
       <motion.aside 
         animate={{ width: sidebarCollapsed ? 80 : 280 }} 
-        className="hidden lg:flex bg-[#0d1117] border-r border-border-glass flex-col z-20 shrink-0 relative overflow-hidden"
+        className="sidebar hidden lg:flex flex-col shrink-0 relative z-20"
       >
         <SidebarContent />
       </motion.aside>
@@ -1866,7 +1848,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
               initial={{ x: -280 }} 
               animate={{ x: 0 }} 
               exit={{ x: -280 }}
-              className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0d1117] border-r border-border-glass flex flex-col z-[101] lg:hidden relative overflow-hidden"
+              className="sidebar fixed left-0 top-0 bottom-0 w-[280px] z-[101] lg:hidden flex flex-col pt-4 overflow-hidden"
             >
               <SidebarContent />
             </motion.aside>
@@ -1876,7 +1858,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
 
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
         <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.08] mix-blend-screen">
-           <img src="/logo-horizontal.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
+           <img src="/horizontal-logo.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
         </div>
         <div className="relative z-10 w-full">
           <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
@@ -1930,14 +1912,14 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
   const SidebarContent = () => (
     <>
-      <div className="p-6 mb-8 flex items-center justify-between">
+      <div className="sidebar-header">
         {(!sidebarCollapsed || mobileMenuOpen) && <Logo />}
         <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : setSidebarCollapsed(!sidebarCollapsed)} className="text-text-muted hover:text-brand transition-colors cursor-pointer hidden lg:block">
           <Menu size={20} />
         </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1 md:space-y-2 overflow-y-auto">
+      <nav className="sidebar-nav overflow-y-auto space-y-1 md:space-y-2">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
         <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={MessageSquare} label="AI Diagnostics" active={activeTab === 'chat'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('chat')} />
@@ -1960,8 +1942,8 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
         </button>
       </div>
 
-      <div className="p-4 border-t border-border-glass space-y-4">
-        <div className={`flex items-center gap-3 transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
+      <div className="sidebar-footer space-y-4">
+        <div className={`sidebar-user transition-all ${(sidebarCollapsed && !mobileMenuOpen) ? 'justify-center' : ''}`}>
           <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} key={`member-v-${user.avatarUrl}`} />
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex-1 min-w-0">
@@ -1995,7 +1977,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
           {/* Desktop Sidebar */}
           <motion.aside 
             animate={{ width: sidebarCollapsed ? 80 : 280 }} 
-            className="hidden lg:flex bg-[#0d1117] border-r border-border-glass flex-col z-20 shrink-0"
+            className="sidebar hidden lg:flex flex-col shrink-0 z-20 relative"
           >
             <SidebarContent />
           </motion.aside>
@@ -2016,7 +1998,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
                   initial={{ x: -280 }} 
                   animate={{ x: 0 }} 
                   exit={{ x: -280 }}
-                  className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0d1117] border-r border-border-glass flex flex-col z-[101] lg:hidden"
+                  className="sidebar fixed left-0 top-0 bottom-0 w-[280px] z-[101] lg:hidden flex flex-col overflow-hidden"
                 >
                   <SidebarContent />
                 </motion.aside>
@@ -2026,7 +2008,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
           <main className="flex-1 overflow-y-auto relative p-4 md:p-8">
             <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.08] mix-blend-screen">
-              <img src="/logo-horizontal.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
+              <img src="/horizontal-logo.png" alt="background watermark" className="w-[180%] md:w-[100%] max-w-none opacity-50 drop-shadow-[0_0_30px_rgba(0,212,255,0.8)]" />
             </div>
             <div className="relative z-10 w-full">
             <InstallDrawer isOpen={installDrawerOpen} onClose={() => setInstallDrawerOpen(false)} onInstall={() => { onInstall(); setInstallDrawerOpen(false); }} hasPrompt={showInstall} />
@@ -2072,13 +2054,74 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 }
 
 function LandingScreen({ onEnter }: { onEnter: () => void }) {
+  const adminAvatar = localStorage.getItem('ab_admin_avatar') || 'https://ui-avatars.com/api/?name=Ruben+Llego&background=0a0e1a&color=00d4ff&size=256';
+
   return (
-    <div className="h-screen w-screen bg-[#0a0e1a] flex flex-col items-center justify-center p-8 text-center">
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-6">
-        <div className="text-brand w-24 h-24 mx-auto"><LogoHex /></div>
-        <h1 className="text-5xl font-display font-bold text-white uppercase tracking-tighter">AutoMotive Buddy</h1>
-        <p className="text-text-secondary text-lg font-accent uppercase tracking-widest">Intelligent Diagnostics. Automated Repair.</p>
-        <button onClick={onEnter} className="btn-primary py-4 px-12 text-lg shadow-[0_0_30px_rgba(0,212,255,0.3)]">Enter Diagnostic Matrix</button>
+    <div className="h-screen w-screen bg-[#0a0e1a] relative overflow-hidden flex flex-col items-center justify-center p-6 text-center">
+      <FloatingBackground />
+      
+      {/* Background Glows */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-brand/5 blur-[120px] rounded-full pointer-events-none" />
+
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="relative z-10 w-full max-w-2xl space-y-8 flex flex-col items-center"
+      >
+        <motion.div 
+           initial={{ scale: 0.8 }} 
+           animate={{ scale: 1 }} 
+           transition={{ duration: 0.8, type: "spring" }}
+           className="mx-auto w-[90%] max-w-[600px] drop-shadow-[0_0_20px_rgba(0,212,255,0.3)] mb-4"
+        >
+          <img src="/horizontal-logo.png" alt="AutoMotive Buddy" className="w-full h-auto object-contain mix-blend-screen" />
+        </motion.div>
+        
+        <div>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-white/80">
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">AI Diagnostics</span>
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">500+ DTC Support</span>
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Offline Mode</span>
+             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Voice Activated</span>
+          </div>
+        </div>
+
+        <motion.button 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onEnter} 
+          className="btn-primary py-4 px-10 text-sm sm:text-base tracking-[0.2em] font-bold shadow-[0_0_30px_rgba(0,212,255,0.4)] hover:shadow-[0_0_50px_rgba(0,212,255,0.6)] w-full sm:w-auto mt-4 transition-all duration-300"
+        >
+          ENTER DIAGNOSTIC MATRIX
+        </motion.button>
+
+        {/* Credentials / Creator Card */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
+          className="mt-12 pt-8 border-t border-white/10 flex flex-col items-center gap-4 w-full"
+        >
+           <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl relative overflow-hidden group hover:border-brand/30 transition-colors">
+              <div className="absolute inset-0 bg-gradient-to-r from-brand/0 via-brand/10 to-brand/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+              <div className="relative">
+                <div className="absolute inset-0 bg-brand blur-md opacity-40 rounded-full" />
+                <img src={adminAvatar} alt="Ruben Llego" className="w-14 h-14 rounded-full border-2 border-brand relative z-10 object-cover" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-0.5 group-hover:text-brand transition-colors">Ruben Llego O.</h3>
+                <p className="text-[10px] text-brand uppercase tracking-widest font-bold">Owner & Lead Web Developer</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Wrench size={10} className="text-text-muted" />
+                  <p className="text-[9px] text-text-muted uppercase tracking-widest font-medium">
+                     Certified AI Specialist
+                  </p>
+                </div>
+              </div>
+           </div>
+        </motion.div>
+
       </motion.div>
     </div>
   );
@@ -2087,7 +2130,7 @@ function LandingScreen({ onEnter }: { onEnter: () => void }) {
 const NavItem = ({ icon: Icon, label, active, collapsed, onClick }: any) => (
   <button 
     onClick={onClick} 
-    className={`nav-item-styled ${active ? 'active' : ''} ${collapsed ? 'justify-center px-4' : ''} group relative`}
+    className={`sidebar-nav-item ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''} group relative`}
     title={collapsed ? label : ''}
   >
     <Icon size={18} className={`shrink-0 ${active ? 'text-brand' : 'text-text-secondary group-hover:text-text-primary'}`} />
@@ -2355,48 +2398,90 @@ function WiringColorTab({ store, user, toast }: any) {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-       <div className="glass-panel p-6 border-brand/20">
-          <h2 className="text-xl font-bold text-white mb-6 tracking-tight">Wiring Color Coding</h2>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <input className="input-field bg-white/5 border-white/10" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
-            <input className="input-field bg-white/5 border-white/10" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
-            <input className="input-field bg-white/5 border-white/10" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
-            <input className="input-field bg-white/5 border-white/10" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+    <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
+      <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
+        {/* Background Glows */}
+        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-blue-600/5 blur-[120px] rounded-full -z-10" />
+        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-blue-900/5 blur-[100px] rounded-full -z-10" />
+
+        {/* Header */}
+        <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex-1 flex justify-center w-full">
+            <h2 className="text-xl font-bold font-display tracking-widest text-center uppercase relative">
+              <span className="text-blue-500">Wiring</span> Color Coding
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-blue-500/50 rounded-full" />
+            </h2>
           </div>
-          <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleSearch}
-                disabled={isLoading}
-                className="w-full bg-brand text-black py-4 rounded-xl font-bold text-sm hover:bg-brand/90 transition-colors shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
-          >
-            {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Cable size={20} />}
-            {isLoading ? "Retrieving Codes..." : "Analyze Circuit Intent"}
-          </motion.button>
-       </div>
-       
-       {result ? (
-        <div className="space-y-4">
-            {result.circuits?.map((c: any, i: number) => (
-                <div key={i} className="glass-panel p-4 rounded-xl border border-white/5 hover:border-brand/30 transition-colors flex items-center gap-4">
-                    <div className="w-16 h-12 rounded-lg flex items-center justify-center text-[10px] font-bold shadow-inner bg-white/10 border border-white/10 p-1 text-center break-words" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#555' : c.color?.toLowerCase() || 'gray'}}>
-                        {c.color}
-                    </div>
-                    <div className="flex-1">
-                        <div className="text-base font-bold text-white">{c.intent}</div>
-                        <div className="text-xs text-text-muted mt-0.5">{c.note}</div>
-                    </div>
+        </header>
+
+        <main className="flex-1 px-6 py-4 overflow-y-auto custom-scrollbar space-y-6">
+           <div className="diag-card group">
+             {/* Accent Top Line */}
+             <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
+               <div className="w-1/3 h-full bg-blue-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
+             </div>
+             
+             <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
+                    <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
+                    <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                  </div>
                 </div>
-            ))}
-        </div>
-       ) : !isLoading && (
-        <div className="glass-panel p-12 text-center border-dashed border border-white/10 flex flex-col items-center">
-            <Cable size={48} className="text-text-muted mb-4 opacity-50" />
-            <h3 className="text-lg font-bold text-white">Wiring Data Ready</h3>
-            <p className="text-sm text-text-muted max-w-xs mt-2">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
-        </div>
-       )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
+                    <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
+                    <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                  </div>
+                </div>
+
+                <button 
+                      onClick={handleSearch}
+                      disabled={isLoading}
+                      className="diag-primary-btn group !bg-blue-600 hover:!bg-blue-500 mt-4"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Cable size={16} />}
+                  {isLoading ? "RETRIEVING CODES..." : "ANALYZE CIRCUIT INTENT"}
+                  {!isLoading && <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform ml-auto" />}
+                </button>
+             </div>
+           </div>
+           
+           {result ? (
+            <motion.div 
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="space-y-3"
+            >
+                {result.circuits?.map((c: any, i: number) => (
+                    <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-blue-500/30 transition-colors">
+                        <div className="w-12 h-12 rounded-lg flex items-center justify-center text-[10px] uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#222' : c.color?.toLowerCase() || 'gray'}}>
+                            {c.color}
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-sm font-bold text-white">{c.intent}</div>
+                            <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{c.note}</div>
+                        </div>
+                    </div>
+                ))}
+            </motion.div>
+           ) : !isLoading && (
+            <div className="diag-card py-16 text-center flex flex-col items-center">
+                <Cable size={32} className="text-zinc-600 mb-4" />
+                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Wiring Data Ready</h3>
+                <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
+            </div>
+           )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -2457,70 +2542,130 @@ function FuseRelayTab({ store, user, toast }: any) {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-       <div className="glass-panel p-6 border-brand/20">
-          <h2 className="text-xl font-bold text-white mb-6 tracking-tight">Fuses & Relays</h2>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <input className="input-field bg-white/5 border-white/10" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
-            <input className="input-field bg-white/5 border-white/10" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
-            <input className="input-field bg-white/5 border-white/10" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
-            <input className="input-field bg-white/5 border-white/10" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+    <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
+      <div className="w-full max-w-md mx-auto min-h-screen flex flex-col font-sans text-white pb-24 relative overflow-hidden">
+        {/* Background Glows */}
+        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-purple-600/5 blur-[120px] rounded-full -z-10" />
+        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-purple-900/5 blur-[100px] rounded-full -z-10" />
+
+        {/* Header */}
+        <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex-1 flex justify-center w-full">
+            <h2 className="text-xl font-bold font-display tracking-widest text-center uppercase relative">
+              <span className="text-purple-500">Fuses</span> & Relays
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-500/50 rounded-full" />
+            </h2>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {categories.map((cat) => (
-                <motion.button 
-                  key={cat}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSearch(cat)}
-                  disabled={isLoading}
-                  className={`px-3 py-3 rounded-xl font-medium text-[11px] uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-2 shadow-lg ${activeCategory === cat ? 'bg-brand text-black shadow-brand/20' : 'bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-brand/50'}`}
-                >
-                  {isLoading && activeCategory === cat ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-                  <span>{cat}</span>
-                </motion.button>
-            ))}
-          </div>
-       </div>
-       
-       {result ? (
-        <div className="grid md:grid-cols-2 gap-6">
-            <div className="glass-panel p-6">
-                <h3 className="text-sm font-bold text-brand uppercase mb-4 tracking-widest">Relevant Fuses</h3>
-                <div className="space-y-3">
-                    {result.fuses?.map((f: any, i: number) => (
-                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 hover:border-brand/30 transition-colors">
-                            <div className="w-12 h-12 rounded-lg flex items-center justify-center text-sm font-bold shadow-inner" style={{backgroundColor: f.color?.toLowerCase() || 'gray'}}>
-                                {f.amperage}
-                            </div>
-                            <div>
-                                <div className="text-base font-bold text-white">{f.id}</div>
-                                <div className="text-xs text-text-muted mt-0.5">{f.circuit}</div>
-                            </div>
-                        </div>
-                    ))}
+        </header>
+
+        <main className="flex-1 px-6 py-4 overflow-y-auto custom-scrollbar space-y-6">
+           <div className="diag-card group">
+             {/* Accent Top Line */}
+             <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
+               <div className="w-1/3 h-full bg-purple-500 animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
+             </div>
+             
+             <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
+                    <input className="diag-input" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
+                    <input className="diag-input" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+                  </div>
                 </div>
-            </div>
-            <div className="glass-panel p-6">
-                <h3 className="text-sm font-bold text-brand uppercase mb-4 tracking-widest">Relevant Relays</h3>
-                <div className="space-y-3">
-                    {result.relays?.map((r: any, i: number) => (
-                        <div key={i} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-brand/30 transition-colors">
-                           <div className="text-base font-bold text-white">{r.id}</div>
-                           <div className="text-xs text-text-muted mt-0.5">{r.function}</div>
-                        </div>
-                    ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
+                    <input className="diag-input" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
+                    <input className="diag-input" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+                  </div>
                 </div>
-            </div>
-        </div>
-       ) : !isLoading && (
-        <div className="glass-panel p-12 text-center border-dashed border border-white/10 flex flex-col items-center">
-            <Zap size={48} className="text-text-muted mb-4 opacity-50" />
-            <h3 className="text-lg font-bold text-white">Select a Circuit Area</h3>
-            <p className="text-sm text-text-muted max-w-xs mt-2">Tap one of the buttons above to load fuse and relay diagrams for the selected vehicle system.</p>
-        </div>
-       )}
+             </div>
+           </div>
+
+           <div className="space-y-2">
+             <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Systems</h3>
+             <div className="grid grid-cols-2 gap-2">
+               {categories.map((cat) => (
+                   <motion.button 
+                     key={cat}
+                     whileHover={{ scale: 1.02 }}
+                     whileTap={{ scale: 0.98 }}
+                     onClick={() => handleSearch(cat)}
+                     disabled={isLoading}
+                     className={`px-3 py-3 rounded-xl font-bold text-[9px] uppercase tracking-widest transition-all flex items-center justify-start gap-2 shadow-sm border ${activeCategory === cat ? 'bg-purple-600 border-purple-500 text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                   >
+                     {isLoading && activeCategory === cat ? <Loader2 className="animate-spin shrink-0 text-purple-300" size={14} /> : <Zap size={14} className={activeCategory === cat ? 'text-purple-300' : 'text-zinc-600'} />}
+                     <span className="truncate">{cat}</span>
+                   </motion.button>
+               ))}
+             </div>
+           </div>
+           
+           <AnimatePresence mode="wait">
+             {result ? (
+              <motion.div 
+                 key="results"
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 exit={{ opacity: 0, y: -20 }}
+                 className="space-y-6"
+              >
+                  {result.fuses && result.fuses.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
+                        <Zap size={10} className="text-purple-500" />
+                        Relevant Fuses
+                      </h3>
+                      {result.fuses.map((f: any, i: number) => (
+                          <div key={i} className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-purple-500/30 transition-colors">
+                              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-xs uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{backgroundColor: f.color?.toLowerCase() || 'gray'}}>
+                                  {f.amperage}
+                              </div>
+                              <div className="flex-1">
+                                  <div className="text-sm font-bold text-white">{f.id}</div>
+                                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{f.circuit}</div>
+                              </div>
+                          </div>
+                      ))}
+                    </div>
+                  )}
+                  {result.relays && result.relays.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
+                        <Activity size={10} className="text-blue-500" />
+                        Relevant Relays
+                      </h3>
+                      {result.relays.map((r: any, i: number) => (
+                          <div key={i} className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-blue-500/30 transition-colors">
+                             <div className="text-sm font-bold text-white">{r.id}</div>
+                             <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{r.function}</div>
+                          </div>
+                      ))}
+                    </div>
+                  )}
+              </motion.div>
+             ) : !isLoading && (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="diag-card py-16 text-center flex flex-col items-center"
+              >
+                  <Zap size={32} className="text-zinc-600 mb-4" />
+                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Select System</h3>
+                  <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Select a category above to load fuse block and relay logic maps.</p>
+              </motion.div>
+             )}
+           </AnimatePresence>
+        </main>
+      </div>
     </div>
   );
 }
@@ -3288,7 +3433,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <td className="p-6">
                   {u.subscription && <div className="text-[10px]"><span className="text-brand font-bold uppercase">{u.subscription.plan}</span><div className="text-[9px] text-text-secondary mt-1 uppercase font-accent">Exp: {new Date(u.subscription.expiryDate).toLocaleDateString()}</div></div>}
                 </td>
-                <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{u.createdAt instanceof Date ? u.createdAt.toLocaleDateString() : (u.createdAt && typeof u.createdAt.toDate === 'function' ? u.createdAt.toDate().toLocaleDateString() : 'N/A')}</td>
+                <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{typeof u.createdAt === 'string' ? new Date(u.createdAt).toLocaleDateString() : ((u.createdAt as any)?.toDate?.()?.toLocaleDateString() || 'N/A')}</td>
                 <td className="p-6">
                   <div className="flex gap-2">
                     {u.status === 'pending' && (

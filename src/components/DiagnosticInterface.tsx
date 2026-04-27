@@ -96,57 +96,57 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
     try {
       addOfflineLog({ level: 'info', message: `Started diagnostic scan for ${firstCode}`, context: { brand, model, year } });
       
-      // Attempt 0: Check Offline DB first
-      const offlineCache = await getDTCOffline(firstCode);
-      if (offlineCache && offlineCache.description) {
-        // Map from DB schema back to UI expectation
-        setResults({
-          code: offlineCache.code,
-          description: offlineCache.description,
-          severity: offlineCache.severity || 'medium',
-          system: offlineCache.system || 'Vehicle System',
-          causes: offlineCache.possibleCauses?.map(c => ({ item: c, probability: null })) || [],
-          fixes: offlineCache.recommendedActions || [],
-          confidence: 0.95, // Assumed high for cached
-          time_est: 'Saved Locally'
-        });
-        if (toast) toast("Loaded from offline database", "success");
-        setIsScanning(false);
-        return;
-      }
-
-      // If offline, we can't do anything else unless we have it cached
-      if (isOffline) {
-        throw new Error("You are offline and this code is not in your local database.");
-      }
-
-      // Attempt 1: Fetch from specialized backend
       let data;
-      try {
-        data = await diagnoseDTC(firstCode);
-      } catch (err) {
-        console.warn("Backend fail, moving to AI matrix");
-      }
 
-      // Attempt 2: If data is generic or missing, perform deep AI search
-      if (!data || !data.fixes || data.fixes.length === 0) {
-        data = await performDeepDTCSearch(firstCode, { make: brand, model, year });
-      }
-      
-      setResults(data);
+      if (isOffline) {
+        // Offline Mode: Check local database ONLY
+        const offlineCache = await getDTCOffline(firstCode);
+        if (offlineCache && offlineCache.description) {
+          // Map from DB schema back to UI expectation
+          data = {
+            code: offlineCache.code,
+            description: offlineCache.description,
+            severity: offlineCache.severity || 'medium',
+            system: offlineCache.system || 'Vehicle System',
+            causes: offlineCache.possibleCauses?.map(c => ({ item: c, probability: null })) || [],
+            fixes: offlineCache.recommendedActions || [],
+            confidence: 0.95, // Assumed high for cached
+            time_est: 'Saved Locally'
+          };
+          setResults(data);
+          if (toast) toast("Loaded from offline database", "success");
+        } else {
+          throw new Error("Offline Mode Active: This code is not in your local database.");
+        }
+      } else {
+        // Online Mode: Fetch from API, then save to local database
+        try {
+          data = await diagnoseDTC(firstCode);
+        } catch (err) {
+          console.warn("Backend fail, moving to AI matrix");
+        }
 
-      // Save valid results for offline mode
-      if (data && data.description) {
-        await saveDTCOffline({
-          code: firstCode,
-          description: data.description,
-          severity: data.severity,
-          system: data.system || 'Powertrain',
-          manufacturer: brand,
-          possibleCauses: data.causes?.map((c: any) => typeof c === 'string' ? c : c.item) || [],
-          recommendedActions: data.fixes || []
-        });
-        addOfflineLog({ level: 'info', message: `Saved ${firstCode} diagnostic to offline DB.` });
+        // Deep AI search fallback
+        if (!data || !data.fixes || data.fixes.length === 0) {
+          data = await performDeepDTCSearch(firstCode, { make: brand, model, year });
+        }
+        
+        setResults(data);
+
+        // Save fresh results locally so they are available when offline
+        if (data && data.description) {
+          await saveDTCOffline({
+            code: firstCode,
+            description: data.description,
+            severity: data.severity,
+            system: data.system || 'Powertrain',
+            manufacturer: brand,
+            possibleCauses: data.causes?.map((c: any) => typeof c === 'string' ? c : c.item) || [],
+            recommendedActions: data.fixes || []
+          });
+          addOfflineLog({ level: 'info', message: `Saved ${firstCode} diagnostic to offline DB.` });
+          if (toast) toast("Search complete & saved for offline use.", "success");
+        }
       }
 
       if (onRunDiagnostics) {
@@ -177,28 +177,49 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
       <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-amber-900/5 blur-[100px] rounded-full -z-10" />
 
       {/* Header */}
-      <header className="p-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-600/10 border border-amber-600/20 rounded-xl flex items-center justify-center">
-            <Settings className="text-amber-500 w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="font-display font-medium text-xl tracking-tight leading-none mb-1">AutoMotive Buddy</h1>
-            <div className="flex items-center gap-2">
-              <div className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-red-500' : 'bg-amber-500 animate-pulse'}`} />
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                {isOffline ? 'Offline Mode Active' : 'AI Diagnostics Platform'}
-              </span>
-            </div>
+      <header className="p-6 pb-2 md:pb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="hidden md:flex w-10 h-10 border border-zinc-800 rounded-lg items-center justify-center text-zinc-600 bg-zinc-900/50">
+           <Database size={16} />
+        </div>
+
+        {/* Center Toggle Dropdown / Switch */}
+        <div className="flex-1 flex justify-center w-full md:w-auto">
+          <div className="flex items-center bg-[#0a0e1a] border border-zinc-700/50 rounded-2xl p-2 relative overflow-hidden shadow-2xl min-w-[300px] max-w-[400px] w-full">
+             {/* Background Slider */}
+             <div 
+                className="absolute top-2 bottom-2 w-[calc(50%-8px)] rounded-xl transition-all duration-300 ease-out z-0 shadow-lg"
+                style={{ 
+                  left: isOffline ? 'calc(50% + 4px)' : '4px',
+                  backgroundColor: isOffline ? '#ef4444' : '#10b981' // red-500 | emerald-500
+                }}
+             />
+             
+             {/* Online Button */}
+             <button 
+                onClick={() => setIsOffline(false)}
+                className={`flex-1 relative z-10 flex items-center justify-center gap-3 px-6 py-4 rounded-xl text-xs uppercase tracking-widest font-bold transition-colors ${!isOffline ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-300'}`}
+             >
+                <div className={`w-2 h-2 rounded-full ${!isOffline ? 'bg-zinc-900 animate-pulse' : 'bg-green-500 opacity-50'}`} />
+                ONLINE MODE
+             </button>
+
+             {/* Offline Button */}
+             <button 
+                onClick={() => setIsOffline(true)}
+                className={`flex-1 relative z-10 flex items-center justify-center gap-3 px-6 py-4 rounded-xl text-xs uppercase tracking-widest font-bold transition-colors ${isOffline ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+             >
+                <WifiOff size={16} className={isOffline ? 'text-white' : 'text-red-500/50'} />
+                OFFLINE MODE
+             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isOffline && <WifiOff size={16} className="text-red-500 mr-2" />}
+
+        <div className="hidden md:flex items-center justify-end w-10">
           {user?.avatarUrl ? (
-            <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-zinc-800" alt="Avatar" />
+            <img src={user.avatarUrl} className="w-10 h-10 rounded-full border-2 border-zinc-800" alt="Avatar" />
           ) : (
-            <div className="w-8 h-8 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center text-zinc-600">
-              <Brain size={16} />
+            <div className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center text-zinc-600">
+              <Brain size={18} />
             </div>
           )}
         </div>
