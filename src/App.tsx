@@ -15,7 +15,7 @@ import {
   Zap, Activity, Send, Menu, Filter, Save, Globe, 
   BookOpen, Truck, Tractor, Bike, Car, Download, CloudDownload,
   Calendar, FileText, ChevronDown, Search, ArrowRight,
-  Phone, Eye, EyeOff, Check, Heart, Clock, Printer,
+  Phone, Eye, EyeOff, Check, Heart, Clock, Printer, Cable,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
   Mic, MicOff, Camera, Loader2, Brain
 } from 'lucide-react';
@@ -28,6 +28,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch } from './services/ai';
 
+import DiagnosticInterface from './components/DiagnosticInterface';
 import api, { diagnoseDTC } from './services/api';
 import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
@@ -537,79 +538,28 @@ const LogoHex = ({ className = "" }: { className?: string }) => (
 );
 
 const Logo = ({ className = "", size = "normal" }: { className?: string, size?: "small" | "normal" | "large" }) => {
-  const [imgError, setImgError] = useState(false);
-
   if (size === 'small') {
     return (
-      <div className={`flex items-center gap-3 ${className}`}>
-        {imgError ? (
-          <LogoHex className="w-10 h-10" />
-        ) : (
-          <img 
-            src="/logo-icon.png" 
-            alt="AutoMotive Buddy" 
-            className="w-10 h-10 object-contain mix-blend-screen brightness-110 drop-shadow-[0_0_10px_rgba(0,212,255,0.2)]" 
-            onError={() => setImgError(true)} 
-          />
-        )}
-        <div className="flex flex-col leading-none justify-center">
-          <span className="font-display font-medium text-lg tracking-[0.1em] text-text-primary">
-            AUTOMOTIVE
-          </span>
-          <div className="flex items-center gap-1 w-full justify-between mt-0.5">
-            <div className="h-px w-3 bg-gradient-to-r from-transparent to-[#00D4FF]" />
-            <span className="font-display font-bold text-xs tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-[#2563EB] to-[#7C3AED]">
-              BUDDY
-            </span>
-            <div className="h-px w-3 bg-gradient-to-l from-transparent to-[#7C3AED]" />
-          </div>
-        </div>
+      <div className={`flex items-center gap-2 ${className}`}>
+        <Settings className="text-amber-500 w-5 h-5" />
+        <span className="font-display font-medium text-lg tracking-tight text-text-primary">
+          AutoMotive Buddy
+        </span>
       </div>
     );
   }
 
-  // Large/normal size
   return (
     <div className={`flex flex-col items-center justify-center ${className}`}>
-      {imgError ? (
-        <div className="flex flex-col items-center gap-3">
-          <LogoHex className={size === 'large' ? 'w-24 h-24' : 'w-16 h-16'} />
-          <div className="flex flex-col items-center leading-tight">
-            <span className={`font-display font-medium ${size === 'large' ? 'text-3xl' : 'text-xl'} tracking-[0.15em] text-text-primary`}>
-              AUTOMOTIVE
-            </span>
-            <div className="flex items-center gap-2 w-full justify-center mt-1">
-              <div className="h-px w-6 bg-gradient-to-r from-transparent to-[#00D4FF]" />
-              <span className={`font-display font-bold ${size === 'large' ? 'text-2xl' : 'text-lg'} tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-[#2563EB] to-[#7C3AED]`}>
-                BUDDY
-              </span>
-              <div className="h-px w-6 bg-gradient-to-l from-transparent to-[#7C3AED]" />
-            </div>
-            {size === 'large' && (
-              <div className="flex flex-col items-center mt-3 w-full">
-                <span className="text-[9px] font-sans text-text-secondary tracking-[0.3em] uppercase opacity-80 font-medium text-center">
-                  Intelligent Diagnostic Platform
-                </span>
-                <div className="flex flex-col items-center mt-6 pt-4 border-t border-white/10 w-full relative">
-                  <span className="text-[8px] font-sans text-[#00D4FF] tracking-[0.4em] uppercase mb-1">
-                    Engineered By
-                  </span>
-                  <span className="text-sm font-display font-medium text-white tracking-[0.25em]">
-                    RUBEN LLEGO
-                  </span>
-                </div>
-              </div>
-            )}
-           </div>
-        </div>
-      ) : (
-        <img 
-          src={size === 'large' ? "/logo-vertical.png" : "/logo-horizontal.png"} 
-          alt="AutoMotive Buddy" 
-          className={size === 'large' ? 'w-full max-w-[280px] object-contain px-4 mix-blend-screen drop-shadow-md' : 'w-full max-w-[200px] h-auto max-h-[60px] object-contain mix-blend-screen drop-shadow-md'}
-          onError={() => setImgError(true)} 
-        />
-      )}
+      <div className="flex items-center gap-3 mb-1">
+        <Settings className={`text-amber-500 ${size === 'large' ? 'w-10 h-10' : 'w-7 h-7'}`} />
+        <h1 className={`${size === 'large' ? 'text-4xl' : 'text-2xl'} font-display font-medium tracking-tight text-white`}>
+          AutoMotive Buddy
+        </h1>
+      </div>
+      <p className={`${size === 'large' ? 'text-[11px]' : 'text-[9px]'} text-zinc-500 tracking-[0.3em] font-medium uppercase opacity-80`}>
+        AUTOMOTIVE DIAGNOSTIC AI
+      </p>
     </div>
   );
 };
@@ -1614,10 +1564,10 @@ function ChatBot({ currentUser, store, toast }: any) {
     <>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-brand to-brand-dark text-white shadow-[0_0_30px_var(--color-brand-glow)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-transform group"
+        className="fixed bottom-24 right-6 w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-[0_0_30px_rgba(245,158,11,0.4)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-transform group"
       >
         <Wrench className="w-7 h-7 group-hover:rotate-45 transition-transform duration-500" />
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red rounded-full border-2 border-bg-base-end" />
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-zinc-900" />
       </button>
 
       <AnimatePresence>
@@ -1665,9 +1615,13 @@ function ChatBot({ currentUser, store, toast }: any) {
                 )}
                 {currentChats.map((m: any) => (
                   <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] p-3.5 rounded-2xl text-[12px] leading-relaxed ${m.role === 'user' ? 'bg-brand text-white rounded-tr-none' : 'glass-card bg-bg-card border-white/5 rounded-tl-none'} shadow-xl`}>
-                      {m.content}
-                      <div className={`text-[8px] mt-1.5 font-bold uppercase tracking-widest opacity-40 text-right`}>
+                    <div className={`max-w-[85%] p-4 rounded-2xl text-[12px] leading-relaxed break-words ${
+                      m.role === 'user' 
+                        ? 'bg-brand text-white rounded-tr-none text-right' 
+                        : 'glass-card bg-bg-card border-white/5 rounded-tl-none text-left font-mono'
+                    } shadow-xl`}>
+                      <div className="whitespace-pre-wrap">{m.content}</div>
+                      <div className={`text-[8px] mt-2 font-bold uppercase tracking-widest opacity-40 ${m.role === 'user' ? 'text-left' : 'text-right'}`}>
                         {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
@@ -1822,10 +1776,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'overview'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('overview')} />
         <NavItem icon={Users} label="Member Core" active={activeTab === 'members'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('members')} />
         <NavItem icon={Database} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
-        <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
-        <NavItem icon={Map} label="Component Locations" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
         <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
-        <NavItem icon={Bell} label="Transmissions" active={activeTab === 'announcements'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('announcements')} />
         <NavItem icon={Activity} label="Audit Registry" active={activeTab === 'logs'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('logs')} />
         <NavItem icon={User} label="Admin Profile" active={activeTab === 'profile'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('profile')} />
         <NavItem icon={Settings} label="Core Config" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
@@ -1928,9 +1879,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
             {activeTab === 'overview' && <OverviewTab key="adm-ov" user={user} store={store} />}
             {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} user={user} toast={toast} />}
             {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
-            {activeTab === 'warning_lights' && <DynamicResourceTab key="adm-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
-            {activeTab === 'components' && <DynamicResourceTab key="adm-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
-            {activeTab === 'fuses' && <DynamicResourceTab key="adm-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
+            {activeTab === 'fuses' && <FuseRelayTab key="adm-fuses" store={store} user={user} toast={toast} />}
             {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
             {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
             {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
@@ -1948,6 +1897,8 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [installDrawerOpen, setInstallDrawerOpen] = useState(false);
+  const [flowStep, setFlowStep] = useState<'landing' | 'app'>('landing'); // Moved here
+
   const activeTab = h.replace('#', '') || 'dashboard';
 
   const navigateTo = (tab: string) => {
@@ -1968,11 +1919,9 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
         <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={MessageSquare} label="AI Diagnostics" active={activeTab === 'chat'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('chat')} />
-        <NavItem icon={Eye} label="Warning Lights Guide" active={activeTab === 'warning_lights'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('warning_lights')} />
         <NavItem icon={Zap} label="Fuses & Relays" active={activeTab === 'fuses'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('fuses')} />
-        <NavItem icon={Map} label="Component Locator" active={activeTab === 'components'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('components')} />
+        <NavItem icon={Cable} label="Wiring Color Coding" active={activeTab === 'wiring'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('wiring')} />
         <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
-        <NavItem icon={BookOpen} label="Maintenance Guides" active={activeTab === 'admin'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('admin')} />
         <div className="border-t border-white/5 my-4 mx-4 pt-4" />
         <NavItem icon={User} label="Profile" active={activeTab === 'profile'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('profile')} />
         <NavItem icon={Settings} label="Settings" active={activeTab === 'settings'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('settings')} />
@@ -2085,11 +2034,9 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
               {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
               {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
               {activeTab === 'chat' && <AIChatTab key="mbr-chat" user={user} store={store} />}
-              {activeTab === 'warning_lights' && <DynamicResourceTab key="mbr-lights" type="warning_lights" title="Warning Lights Guide" icon={Eye} store={store} user={user} toast={toast} />}
-              {activeTab === 'fuses' && <DynamicResourceTab key="mbr-fuses" type="fuses" title="Fuses & Relays" icon={Zap} store={store} user={user} toast={toast} />}
-              {activeTab === 'components' && <DynamicResourceTab key="mbr-comps" type="components" title="Component Locations" icon={Map} store={store} user={user} toast={toast} />}
+              {activeTab === 'fuses' && <FuseRelayTab key="mbr-fuses" store={store} user={user} toast={toast} />}
+              {activeTab === 'wiring' && <WiringColorTab key="mbr-wiring" store={store} user={user} toast={toast} />}
               {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
-              {activeTab === 'admin' && <AIMaintenanceTab key="mbr-admin" user={user} store={store} />}
               {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
               {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
             </AnimatePresence>
@@ -2316,513 +2263,220 @@ function GlobalVehicleSelector() {
 
 // --- DTC Lookup Tool Component ---
 function DTCLookupTab({ store, toast, user, ...props }: any) {
-  const { make: selectedManufacturer, model: selectedModel, year: selectedYear, engine: selectedEngine } = useVehicleStore();
-  const [dtcInput, setDtcInput] = useState('');
-  const [searchResults, setSearchResults] = useState<DTC[]>([]);
-  const [selectedDTC, setSelectedDTC] = useState<DTC | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showFullProtocol, setShowFullProtocol] = useState(false);
-  const [activeTab, setActiveTab] = useState<'summary' | 'causes' | 'repair'>('summary'); 
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = dtcInput.toUpperCase().trim();
-    if (!query) return;
-
-    setIsLoading(true);
-    setSearchResults([]);
-    setSelectedDTC(null);
-    setShowFullProtocol(false);
-    setActiveTab('summary');
-
-    let dtcData;
-    let localMatches: any[] = [];
-    
-    try {
-      // 1. Try exact match from Render API
-      let dtcResult = await diagnoseDTC(query);
-
-      // 2. Try keyword search for broader results (disabled if unsupported by Render)
-      let broadResults: any[] = [];
-      try {
-        const searchRes = await api.get(`/api/dtc/search/${query}`); 
-        // Fallback for search route if we add it later
-        if (Array.isArray(searchRes.data)) {
-          broadResults = searchRes.data.map((d: any) => ({
-            ...d,
-            id: d.code,
-            title: d.code,
-            description: d.description
-          }));
-        }
-      } catch (sErr) {
-        // console.warn("Keyword search failed:", sErr);
-      }
-
-      // If the backend says search is required/pending AI, trigger frontend deep search
-      if (dtcResult.status === 'AI_PENDING' && query.match(/^[PBCO]\d{4}/i)) {
-        try {
-          const aiDeepData = await performDeepDTCSearch(query);
-          dtcResult = { 
-            ...aiDeepData, 
-            status: 'AI_SEARCH_GENERATED',
-            manufacturer: 'Verified Global Search'
-          };
-        } catch (aiErr) {
-          console.error("Deep search failed, sticking with placeholder", aiErr);
-        }
-      }
-
-      dtcData = {
-        ...dtcResult,
-        id: dtcResult.code || query,
-        title: dtcResult.title || dtcResult.description,
-      };
-      
-      // Temporary Heal: If API backend truncated the description, recover it from local db
-      if (!dtcData.title && !dtcData.description) {
-         const allLocalDTCs = [
-           ...(fordDTCDatabase as unknown as DTC[]), 
-           ...(otherMfrDTCs as unknown as DTC[]), 
-           ...(genericDTCs as unknown as DTC[]),
-           ...(komatsuDTCs as unknown as DTC[]),
-           ...(dtcMasterData as unknown as DTC[]),
-           ...store.dtcs
-         ];
-         const localMatch = allLocalDTCs.find(d => String(d?.code).toUpperCase() === query.toUpperCase());
-         if (localMatch) {
-            dtcData = { ...localMatch, ...dtcData, title: localMatch.title || localMatch.description || dtcData.title };
-         }
-      }
-      
-      // Save offline
-      try {
-        await saveDTCOffline(dtcResult);
-      } catch (dbErr) {
-        console.warn("IndexedDB save error:", dbErr);
-      }
-      
-      if (dtcData && dtcData.status !== 'AI_PENDING') {
-        localMatches.push(dtcData);
-      }
-
-      // Merge results
-      broadResults.forEach(br => {
-        if (!localMatches.find(lm => lm.code === br.code)) {
-          localMatches.push(br);
-        }
-      });
-      
-    } catch (err) {
-      console.warn("API query failed, falling back to local DB", err);
-      
-      let offlineData = null;
-      try {
-        offlineData = await getDTCOffline(query);
-      } catch (dbErr) {
-        console.warn("IndexedDB error:", dbErr);
-      }
-      
-      if (offlineData && (offlineData.description || offlineData.title)) {
-        dtcData = {
-           ...offlineData,
-           id: offlineData.code,
-           title: offlineData.title || offlineData.description,
-           status: 'OFFLINE_CACHE'
-        };
-        localMatches.push(dtcData);
-      } else {
-        // Ultimate Local Fallback (Static Data)
-        const allLocalDTCs = [
-          ...(fordDTCDatabase as unknown as DTC[]), 
-          ...(otherMfrDTCs as unknown as DTC[]), 
-          ...(genericDTCs as unknown as DTC[]),
-          ...(komatsuDTCs as unknown as DTC[]),
-          ...(dtcMasterData as unknown as DTC[]),
-          ...store.dtcs
-        ];
-        
-        const results = allLocalDTCs.filter(dtc => 
-          String(dtc?.code || '').toUpperCase().includes(query) || 
-          (dtc?.title && String(dtc.title).toUpperCase().includes(query)) ||
-          (dtc?.description && String(dtc.description).toUpperCase().includes(query))
-        );
-        
-        if (results.length > 0) {
-          // Deduplicate
-          const uniqueResults = results.reduce((acc: any[], current: any) => {
-            if (!acc.find(item => item?.code === current?.code)) return acc.concat([current]);
-            return acc;
-          }, []);
-          localMatches = uniqueResults.slice(0, 10);
-        } else {
-          // AI Extrapolated mock fallback for offline local mode
-          localMatches.push({
-            code: query,
-            id: query,
-            title: `AI Extrapolated Meaning for ${query} (Offline Local)`,
-            description: `AI Extrapolated Meaning for ${query}. System likely implies a specialized module fault.`,
-            system: "Unknown Module",
-            severity: "Requires Attention",
-            causes: "Manufacturer-specific fault or undocumented circuit anomaly.",
-            solutions: ["Check live telemetry", "Consult OEM repair manual", "Trace circuits to associated sensor"],
-            manufacturer: "AI_ESTIMATED",
-            status: "AI_ESTIMATED",
-            confidence: 0.75
-          });
-        }
-      }
-    }
-
-    if (localMatches.length > 0) {
-      setSearchResults(localMatches);
-      
-      store.addSearchHistory({
-        userId: user.id,
-        query: query,
-        type: 'dtc',
-        timestamp: new Date().toISOString()
-      });
-      store.addLog(user.id, user.username, `DTC Search`, `Searched for fault code ${query}`);
-      
-      // Store log for sync when offline
-      if (!navigator.onLine) {
-        try {
-          await addOfflineLog({
-            action: "DTC Search",
-            code: query,
+  return (
+    <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
+      <DiagnosticInterface 
+        user={user} 
+        toast={toast}
+        onRunDiagnostics={(data) => {
+          store.addSearchHistory({
+            userId: user.id,
+            query: data.codes,
+            type: 'dtc',
             timestamp: new Date().toISOString()
           });
-        } catch (dbErr) {
-           console.warn("Offline log error", dbErr);
-        }
+          store.addLog(user.id, user.username, `DTC Search`, `Searched for fault code ${data.codes}`);
+        }}
+      />
+    </div>
+  );
+}
+
+
+
+// --- Wiring Color Coding Tab Component ---
+function WiringColorTab({ store, user, toast }: any) {
+  const globalVehicle = useVehicleStore();
+  const [make, setMake] = useState(globalVehicle.make);
+  const [model, setModel] = useState(globalVehicle.model);
+  const [year, setYear] = useState(globalVehicle.year);
+  const [engine, setEngine] = useState(globalVehicle.engine);
+  const [result, setResult] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSearch = async () => {
+    setIsLoading(true);
+    setResult(null);
+    try {
+      const prompt = `Provide standardized wiring color codes for ${make} ${model} ${year} ${engine}. Focus on common circuits (e.g., Ground, Ignition, Constant Power, CAN Bus). Format as JSON: { "circuits": [{"intent": "e.g. Ground", "color": "e.g. Black", "note": "Commonly connects to chassis"} ] }`;
+      const data = await generateDynamicVehicleData('wiring', make, model, year, prompt);
+      
+      let parsedData;
+      try {
+          // If the AI service returned an error message, parse will fail, or we can detect it
+          if (typeof data === 'string' && data.includes("### DATA TEMPORARILY UNAVAILABLE")) {
+             throw new Error(data);
+          }
+          const cleanedData = typeof data === 'string' ? data.replace(/```json\n?/, '').replace(/\n?```/, '') : data;
+          parsedData = typeof cleanedData === 'string' ? JSON.parse(cleanedData) : cleanedData;
+      } catch (parseErr) {
+          console.error("Failed to parse AI JSON or received error message:", data);
+          throw new Error(data && typeof data === 'string' && data.includes("###") ? data : "Received malformed data from AI.");
       }
+      setResult(parsedData);
+    } catch(err: any) {
+      if (toast) toast(err.message || 'Failed to retrieve wiring data', 'error');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
-  };
-
-  const handleSave = (dtc: DTC) => {
-    store.addSavedItem({
-      userId: user.id,
-      type: 'DTC',
-      itemId: dtc.id || dtc.code,
-      title: `${dtc.code} - ${dtc.title || dtc.description}`
-    });
-    if (toast) toast('DTC Protocol successfully saved to your neural library', 'success');
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <GlobalVehicleSelector />
-
-      {/* DTC Search Section */}
-      <div className="glass-panel p-6 md:p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <Search size={24} className="text-brand" />
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">PHASE 2: NEURAL FAULT SCAN</h2>
-        </div>
-
-        <form onSubmit={handleSearch} className="flex gap-2 mb-8">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              list="dtc-suggestions"
-              placeholder="ENTER OBD-II FAULT CODE (E.G. P0101)..."
-              value={dtcInput}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDtcInput(val);
-                // Immediate search logic
-                if (val.length >= 2) {
-                  const query = val.toUpperCase().trim();
-                  const allLocalDTCs = [
-                    ...(fordDTCDatabase as unknown as DTC[]), 
-                    ...(otherMfrDTCs as unknown as DTC[]), 
-                    ...(genericDTCs as unknown as DTC[]),
-                    ...(komatsuDTCs as unknown as DTC[]),
-                    ...(dtcMasterData as unknown as DTC[]),
-                    ...store.dtcs
-                  ];
-                  const results = allLocalDTCs.filter(dtc => 
-                    String(dtc?.code || '').toUpperCase().includes(query) || 
-                    (dtc?.title && String(dtc.title).toUpperCase().includes(query)) ||
-                    (dtc?.description && String(dtc.description).toUpperCase().includes(query))
-                  );
-                  setSearchResults(results.slice(0, 10));
-                } else if (val.length === 0) {
-                  setSearchResults([]);
-                }
-              }}
-              className="input-field w-full h-[52px] font-accent uppercase tracking-widest pl-12"
-            />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
-            <datalist id="dtc-suggestions">
-               <option value="P0300" />
-               <option value="P0420" />
-               <option value="P1234" />
-               <option value="CA111" />
-               <option value="U0100" />
-            </datalist>
+    <div className="space-y-6 pb-20">
+       <div className="glass-panel p-6 border-brand/20">
+          <h2 className="text-xl font-bold text-white mb-6 tracking-tight">Wiring Color Coding</h2>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <input className="input-field bg-white/5 border-white/10" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
           </div>
-          <button 
-            type="submit"
-            className="btn-primary px-8 h-[52px] flex items-center justify-center min-w-[120px]"
+          <motion.button 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSearch}
+                disabled={isLoading}
+                className="w-full bg-brand text-black py-4 rounded-xl font-bold text-sm hover:bg-brand/90 transition-colors shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
           >
-            {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'SCAN'}
-          </button>
-        </form>
-
-        {/* Results Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">
-              {searchResults.length} SCAN RESULTS RETURNED
-            </h3>
-
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              {searchResults.map((dtc, idx) => (
-                <button 
-                  key={`${dtc.code}-${idx}`}
-                  className={`w-full text-left p-6 glass-panel border transition-all hover:-translate-y-1 ${selectedDTC?.code === dtc.code ? 'border-brand bg-brand/5 shadow-[0_0_20px_rgba(0,212,255,0.1)]' : 'border-border-glass hover:border-brand/50 hover:shadow-lg'}`}
-                  onClick={() => { setSelectedDTC(dtc); setShowFullProtocol(false); }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-accent text-xl text-brand font-bold">{dtc.code}</span>
-                        <span className={`badge ${String(dtc.severity || 'low').toLowerCase() === 'critical' ? 'badge-red' : String(dtc.severity || 'low').toLowerCase() === 'high' ? 'badge-brand' : 'badge-yellow'}`}>
-                          {String(dtc.severity || 'low').toUpperCase()}
-                        </span>
-                        <span className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[7px] text-text-secondary uppercase font-bold">
-                          {dtc.manufacturer || (dtc.code?.startsWith('P') ? 'Generic OBD' : 'Unknown')}
-                        </span>
-                      </div>
-                      <p className="text-sm text-text-primary font-display font-medium uppercase tracking-tight">
-                        {dtc.title || dtc.description || 'System Diagnostic Details Unavailable'}
-                      </p>
+            {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Cable size={20} />}
+            {isLoading ? "Retrieving Codes..." : "Analyze Circuit Intent"}
+          </motion.button>
+       </div>
+       
+       {result ? (
+        <div className="space-y-4">
+            {result.circuits?.map((c: any, i: number) => (
+                <div key={i} className="glass-panel p-4 rounded-xl border border-white/5 hover:border-brand/30 transition-colors flex items-center gap-4">
+                    <div className="w-16 h-12 rounded-lg flex items-center justify-center text-[10px] font-bold shadow-inner bg-white/10 border border-white/10 p-1 text-center break-words" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#555' : c.color?.toLowerCase() || 'gray'}}>
+                        {c.color}
                     </div>
-                    <ChevronRight size={20} className={`text-text-secondary mt-1 transition-transform ${selectedDTC?.code === dtc.code ? 'rotate-90 text-brand' : ''}`} />
-                  </div>
-                </button>
-              ))}
-
-              {searchResults.length === 0 && dtcInput && !isLoading && (
-                <div className="py-20 text-center glass-panel opacity-50 border-dashed">
-                  <AlertTriangle size={48} className="mx-auto mb-4 text-red-500" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-2">SCAN FAILURE: NO MATCHES</p>
-                  <p className="text-[9px] text-text-secondary uppercase">Check fault code syntax and retry uplink</p>
+                    <div className="flex-1">
+                        <div className="text-base font-bold text-white">{c.intent}</div>
+                        <div className="text-xs text-text-muted mt-0.5">{c.note}</div>
+                    </div>
                 </div>
-              )}
-
-              {searchResults.length === 0 && !dtcInput && (
-                <div className="py-20 text-center glass-panel opacity-30 border-dashed">
-                  <Database size={48} className="mx-auto mb-4" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest">Awaiting Scanner Input</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Details Panel */}
-          <div className="lg:sticky lg:top-8 h-fit">
-            <AnimatePresence mode="wait">
-              {selectedDTC ? (
-                <motion.div 
-                  key={`detail-${selectedDTC.code}`}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="glass-panel border-t-4 border-t-brand space-y-6"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="font-accent text-4xl text-brand font-bold tracking-tighter">{selectedDTC.code}</div>
-                    <button onClick={() => handleSave(selectedDTC)} className="w-10 h-10 rounded-full bg-white/5 border border-border-glass flex items-center justify-center text-text-secondary hover:text-brand transition-colors">
-                      <Star size={18} />
-                    </button>
-                  </div>
-
-                  <h2 className="text-xl font-display font-bold uppercase tracking-tight text-text-primary">
-                    {selectedDTC.title || selectedDTC.description}
-                  </h2>
-                  
-                  {/* Tabs */}
-                  <div className="flex border-b border-border-glass">
-                    {['summary', 'causes', 'repair'].map(tab => (
-                      <button 
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest border-b-2 transition-colors ${activeTab === tab ? 'border-brand text-brand' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="space-y-6 pt-2">
-                    {activeTab === 'summary' && (
-                      <div className="space-y-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          <div className="p-3 bg-white/5 border border-border-glass rounded-lg">
-                            <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock size={10} /> TIME BASE</div>
-                            <div className="text-xs font-bold text-text-primary">{selectedDTC.timeEstimate || '30-45 MIN'}</div>
-                          </div>
-                          <div className="p-3 border border-border-glass rounded-lg bg-gradient-to-r from-white/5 to-transparent">
-                            <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><Brain size={10} /> AI CONFIDENCE</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <div className="text-xs font-bold text-brand">{selectedDTC.confidence ? `${(selectedDTC.confidence * 100).toFixed(0)}%` : '85%'}</div>
-                              <ProgressBar progress={selectedDTC.confidence ? selectedDTC.confidence * 100 : 85} className="flex-1 h-1" />
-                            </div>
-                          </div>
-                          <div className="col-span-2 md:col-span-1 p-3 bg-white/5 border border-border-glass rounded-lg">
-                            <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1 flex items-center gap-1.5"><CreditCard size={10} /> UNIT COST (EST)</div>
-                            <div className="text-xs font-bold text-text-primary">{selectedDTC.estimatedCost || '₱1,500 - ₱4,000'}</div>
-                          </div>
-                        </div>
-                        
-                        {/* Vehicle Specific Notes */}
-                        {selectedDTC.vehicle_specific_notes && Object.keys(selectedDTC.vehicle_specific_notes).length > 0 && (
-                          <div className="p-4 bg-brand/5 border border-brand/20 rounded-lg">
-                             <div className="text-[9px] font-bold text-brand uppercase tracking-widest mb-1">VEHICLE MANUFACTURER NOTES</div>
-                             {Object.entries(selectedDTC.vehicle_specific_notes).map(([make, note]) => (
-                               <p key={make} className="text-[10px] text-text-secondary leading-tight"><span className="font-bold text-text-primary">{make}:</span> {note}</p>
-                             ))}
-                          </div>
-                        )}
-
-                        <div className={`p-4 border rounded-lg ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'bg-red-500/5 border-red-500/20' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-brand/5 border-brand/20'}`}>
-                           <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-400' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-400' : 'text-brand'}`}>STRICT SAFETY PROTOCOL</div>
-                           <p className={`text-[10px] opacity-80 uppercase leading-tight ${String(selectedDTC.severity).toLowerCase() === 'critical' ? 'text-red-300' : String(selectedDTC.severity).toLowerCase() === 'medium' ? 'text-yellow-300' : 'text-white'}`}>THREAT LEVEL: {selectedDTC.dangerLevel || selectedDTC.severity || 'HIGH'}. {String(selectedDTC.severity).toLowerCase() === 'critical' ? 'IMMEDIATE ACTION REQUIRED. DO NOT OPERATE SYSTEM.' : 'PROCEED WITH CAUTION OR ENGAGE PROFESSIONAL SUPPORT.'}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeTab === 'causes' && (
-                      <div>
-                        <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14} className="text-yellow-400" /> PROBABLE ROOT CAUSES (RANKED)</h4>
-                        <div className="space-y-2">
-                          {(() => {
-                            const rawCauses = selectedDTC?.causes;
-                            let processedCauses: { item: string; probability: number }[] = [];
-                            
-                            if (typeof rawCauses === 'string') {
-                              processedCauses = rawCauses.split(',').map(c => ({ item: c.trim(), probability: 0 }));
-                            } else if (Array.isArray(rawCauses)) {
-                              processedCauses = (rawCauses as any[]).map(c => {
-                                if (typeof c === 'string') return { item: c, probability: 0 };
-                                return c;
-                              });
-                            }
-                            
-                            // Sort by probability if it exists
-                            processedCauses.sort((a, b) => (b.probability || 0) - (a.probability || 0));
-
-                            return processedCauses.length > 0 ? processedCauses.map((c: any, i: number) => (
-                              <div key={i} className="flex flex-col gap-1 p-3 bg-black/20 border border-white/5 rounded-lg group hover:border-brand/30 transition-all">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-text-primary capitalize font-medium">{c.item}</span>
-                                    {c.probability > 0 && <span className="text-[10px] text-brand font-bold bg-brand/10 px-2 py-0.5 rounded border border-brand/20">{(c.probability * 100).toFixed(0)}% MATCH</span>}
-                                </div>
-                                {c.probability > 0 && (
-                                  <ProgressBar progress={c.probability * 100} className="h-0.5 opacity-50 mt-1" />
-                                )}
-                              </div>
-                            )) : (
-                              <span className="text-[10px] text-text-secondary italic">Information synchronization in progress...</span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    )}
-
-                    {activeTab === 'repair' && (
-                      <div className="space-y-6">
-                        {/* Add Diagnostic Steps */}
-                        {selectedDTC.diagnostic_steps && (
-                          <div>
-                            <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><ToolIcon size={14} className="text-blue-400" /> DIAGNOSTIC PROCEDURES</h4>
-                            <ul className="space-y-2">
-                              {selectedDTC.diagnostic_steps.map((s, i) => (
-                                <li key={i} className="text-xs text-text-secondary flex gap-2">
-                                  <span className="text-blue-400 select-none">•</span> {s}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        <div>
-                          <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14} className="text-red-400" /> ALERT SYMPTOMS</h4>
-                          <ul className="space-y-2">
-                            {(() => {
-                              const symps = Array.isArray(selectedDTC?.symptoms) ? selectedDTC.symptoms : [];
-                              return symps.length > 0 ? symps.map((s: string, i: number) => (
-                                <li key={i} className="text-xs text-text-secondary flex gap-2">
-                                  <span className="text-brand select-none">•</span> {s}
-                                </li>
-                              )) : (
-                                <li className="text-[10px] text-text-secondary italic">Standard performance irregularities or warning indicator active.</li>
-                              );
-                            })()}
-                          </ul>
-                        </div>
-
-                        <div>
-                          <h4 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 size={14} className="text-green-400" /> REPAIR PROTOCOL</h4>
-                          <div className="space-y-3">
-                            {(() => {
-                              const steps = Array.isArray(selectedDTC?.remediation) ? selectedDTC.remediation : 
-                                            Array.isArray(selectedDTC?.solutions) ? selectedDTC.solutions : 
-                                            typeof selectedDTC?.solutions === 'string' ? [selectedDTC.solutions] : [];
-                              
-                              return steps.length > 0 ? (
-                                <>
-                                  {(showFullProtocol ? steps : steps.slice(0, 3)).map((step: string, i: number) => (
-                                    <div key={i} className="p-3 bg-black/30 border-l-2 border-brand rounded-r text-[11px] leading-relaxed text-text-primary italic hover:bg-white/5 transition-colors">
-                                      <div className="flex gap-3 items-start">
-                                        <span className="text-brand font-mono font-bold mt-0.5">{String(i + 1).padStart(2, '0')}</span>
-                                        <span>{step}</span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {steps.length > 3 && !showFullProtocol && (
-                                    <button 
-                                      onClick={() => setShowFullProtocol(true)}
-                                      className="text-[9px] font-bold text-brand uppercase tracking-widest hover:underline py-2 w-full text-center bg-brand/5 border border-brand/20 rounded-lg hover:bg-brand/10 transition-colors"
-                                    >
-                                      View Full {steps.length}-Step Protocol
-                                    </button>
-                                  )}
-                                  {showFullProtocol && (
-                                    <button 
-                                      onClick={() => setShowFullProtocol(false)}
-                                      className="text-[9px] font-bold text-text-secondary uppercase tracking-widest hover:underline py-2 w-full text-center bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                                    >
-                                      Hide Extended Details
-                                    </button>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="p-3 bg-black/30 border-l-2 border-gray-600 rounded-r text-[11px] leading-relaxed text-text-secondary italic">
-                                  Comprehensive repair guide pending cloud synchronization. Inspect associated wiring and sensors.
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ) : (
-                <div className="h-[500px] glass-panel border-dashed border-2 flex flex-col items-center justify-center text-center opacity-30">
-                  <Cpu size={64} className="mb-6" />
-                  <p className="text-xs uppercase font-bold tracking-widest">Select an entry for<br />deep system analysis</p>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+            ))}
         </div>
-      </div>
+       ) : !isLoading && (
+        <div className="glass-panel p-12 text-center border-dashed border border-white/10 flex flex-col items-center">
+            <Cable size={48} className="text-text-muted mb-4 opacity-50" />
+            <h3 className="text-lg font-bold text-white">Wiring Data Ready</h3>
+            <p className="text-sm text-text-muted max-w-xs mt-2">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
+        </div>
+       )}
+    </div>
+  );
+}
+
+// --- Fuse & Relay Tab Component ---
+function FuseRelayTab({ store, user, toast }: any) {
+  const globalVehicle = useVehicleStore();
+  const [make, setMake] = useState(globalVehicle.make);
+  const [model, setModel] = useState(globalVehicle.model);
+  const [year, setYear] = useState(globalVehicle.year);
+  const [engine, setEngine] = useState(globalVehicle.engine);
+  const [result, setResult] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>('');
+
+  const categories = ['Engine Bay', 'Interior Cabin', 'Lighting', 'Power Distribution', 'Ignition/Starting'];
+
+  const handleSearch = async (category: string) => {
+    setIsLoading(true);
+    setResult(null);
+    setActiveCategory(category);
+    try {
+      const prompt = `Provide fuses and relays information for ${make} ${model} ${year} ${engine}. 
+      Focus on category: ${category}. 
+      Format as JSON: { "fuses": [{"id": "Fuse #", "amperage": "A", "color": "Color", "circuit": "Circuit"}], "relays": [{"id": "Relay #", "function": "Function"}] }`;
+      
+      const data = await generateDynamicVehicleData('fuses', make, model, year, prompt);
+      
+      let parsedData;
+      try {
+          // If the AI service returned an error message, parse will fail, or we can detect it
+          if (typeof data === 'string' && data.includes("### DATA TEMPORARILY UNAVAILABLE")) {
+             throw new Error(data);
+          }
+          const cleanedData = typeof data === 'string' ? data.replace(/```json\n?/, '').replace(/\n?```/, '') : data;
+          parsedData = typeof cleanedData === 'string' ? JSON.parse(cleanedData) : cleanedData;
+      } catch (parseErr) {
+          console.error("Failed to parse AI JSON or received error message:", data);
+          throw new Error(data && typeof data === 'string' && data.includes("###") ? data : "Received malformed data from AI.");
+      }
+      setResult(parsedData);
+    } catch(err: any) {
+      if (toast) toast(err.message || 'Failed to retrieve fuse/relay data', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-20">
+       <div className="glass-panel p-6 border-brand/20">
+          <h2 className="text-xl font-bold text-white mb-6 tracking-tight">Fuses & Relays</h2>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <input className="input-field bg-white/5 border-white/10" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
+            <input className="input-field bg-white/5 border-white/10" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {categories.map((cat) => (
+                <motion.button 
+                  key={cat}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSearch(cat)}
+                  disabled={isLoading}
+                  className={`px-3 py-3 rounded-xl font-medium text-[11px] uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-2 shadow-lg ${activeCategory === cat ? 'bg-brand text-black shadow-brand/20' : 'bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-brand/50'}`}
+                >
+                  {isLoading && activeCategory === cat ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+                  <span>{cat}</span>
+                </motion.button>
+            ))}
+          </div>
+       </div>
+       
+       {result ? (
+        <div className="grid md:grid-cols-2 gap-6">
+            <div className="glass-panel p-6">
+                <h3 className="text-sm font-bold text-brand uppercase mb-4 tracking-widest">Relevant Fuses</h3>
+                <div className="space-y-3">
+                    {result.fuses?.map((f: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 hover:border-brand/30 transition-colors">
+                            <div className="w-12 h-12 rounded-lg flex items-center justify-center text-sm font-bold shadow-inner" style={{backgroundColor: f.color?.toLowerCase() || 'gray'}}>
+                                {f.amperage}
+                            </div>
+                            <div>
+                                <div className="text-base font-bold text-white">{f.id}</div>
+                                <div className="text-xs text-text-muted mt-0.5">{f.circuit}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="glass-panel p-6">
+                <h3 className="text-sm font-bold text-brand uppercase mb-4 tracking-widest">Relevant Relays</h3>
+                <div className="space-y-3">
+                    {result.relays?.map((r: any, i: number) => (
+                        <div key={i} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-brand/30 transition-colors">
+                           <div className="text-base font-bold text-white">{r.id}</div>
+                           <div className="text-xs text-text-muted mt-0.5">{r.function}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+       ) : !isLoading && (
+        <div className="glass-panel p-12 text-center border-dashed border border-white/10 flex flex-col items-center">
+            <Zap size={48} className="text-text-muted mb-4 opacity-50" />
+            <h3 className="text-lg font-bold text-white">Select a Circuit Area</h3>
+            <p className="text-sm text-text-muted max-w-xs mt-2">Tap one of the buttons above to load fuse and relay diagrams for the selected vehicle system.</p>
+        </div>
+       )}
     </div>
   );
 }
@@ -2834,15 +2488,19 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [typeCategory, setTypeCategory] = useState<string>('General');
+  
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setResult(null);
 
-    store.addLog(user.id, user.username, `AI Data Generation`, `Generated ${type} for ${year} ${make} ${model}`);
+    store.addLog(user.id, user.username, `AI Data Generation`, `Generated ${type} for ${year} ${make} ${model} [Category: ${typeCategory}]`);
 
     try {
-      const data = await generateDynamicVehicleData(type, make, model, year, engine);
+      // Pass category as extra context
+      const promptContext = typeCategory !== 'General' ? ` focus on ${typeCategory}` : '';
+      const data = await generateDynamicVehicleData(type, make, model, year, engine + promptContext);
       setResult(data);
     } catch(err: any) {
       if (toast) toast(err.message || 'Failed to retrieve vehicle data module from cloud matrix.', 'error');
@@ -2861,14 +2519,25 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">VEHICLE SELECT: {title}</h2>
         </div>
 
-        <form onSubmit={handleSearch} className="flex gap-4 items-center">
+        <form onSubmit={handleSearch} className="flex flex-col gap-4">
+            <select 
+                className="input-field bg-white/5 border-white/10"
+                value={typeCategory}
+                onChange={(e) => setTypeCategory(e.target.value)}
+            >
+                <option value="General">General/Overview</option>
+                <option value="Engine Controls">Engine Controls (ECU)</option>
+                <option value="Lighting/Signal">Lighting/Signal</option>
+                <option value="Body Controller/Interior">Body Controller/Interior</option>
+                <option value="Power Distribution">Power Distribution</option>
+            </select>
             <button 
               type="submit"
               disabled={isLoading || !make || !model || !year || !engine} 
               className="btn-primary w-full max-w-sm h-[50px] gap-2"
             >
               <Search size={16} />
-              {isLoading ? "Querying..." : "Search"}
+              {isLoading ? "Querying..." : "Analyze Diagnostic Matrix"}
             </button>
         </form>
       </div>

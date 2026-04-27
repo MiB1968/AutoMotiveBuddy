@@ -8,7 +8,7 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 };
 
-export async function generateDynamicVehicleData(type: 'fuses' | 'components' | 'warning_lights', manufacturer: string, modelStr: string, year: string, engine: string) {
+export async function generateDynamicVehicleData(type: 'fuses' | 'components' | 'warning_lights' | 'wiring', manufacturer: string, modelStr: string, year: string, engine: string) {
   try {
     const ai = getAI();
     let systemPrompt = "";
@@ -27,6 +27,14 @@ Your response MUST include:
 4. Any special warnings or "hidden" fuses.
 
 Format entirely in clean, readable Markdown using tables, bolding for emphasis, and clear headings. Do NOT skip any fuses; provide as exhaustive a list as possible.`;
+    } else if (type === 'wiring') {
+      systemPrompt = `You are an expert automotive master technician specialized in electrical diagnostics. Provide a detailed guide for wiring color codes and circuit identification for the ${year} ${manufacturer} ${modelStr} (${engine}). 
+Focus on:
+1. Common wiring color standards for this specific manufacturer.
+2. Connector pinouts for major modules (ECU, Body Control Module) if available.
+3. Wire colors for critical circuits: Ground, Constant 12V+, Switched/Ignition 12V, CAN-High, CAN-Low, Fuel Pump, and Starter Trigger.
+4. Professional tips for tracing electrical gremlins in this model.
+Format in clean Markdown with tables where appropriate.`;
     } else if (type === 'components') {
       systemPrompt = `You are a master mechanic. Provide a detailed guide on component locations for the ${year} ${manufacturer} ${modelStr} (${engine}). Include exact locations for: OBD2 port, battery, main engine computer (ECU/PCM), starter motor, alternator, oxygen sensors, mass airflow sensor, and oil/air/cabin filters. Format your response in clean Markdown.`;
     } else if (type === 'warning_lights') {
@@ -45,6 +53,12 @@ Format entirely in clean, readable Markdown using tables, bolding for emphasis, 
     return response.text || "Dataset currently inaccessible. High-altitude network interference detected.";
   } catch (error: any) {
     console.error("Failed to generate dynamic vehicle data:", error);
+    
+    // Check for rate limiting
+    if (error.status === 429 || error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED")) {
+      return `### DATA TEMPORARILY UNAVAILABLE\n\n**Rate limit exceeded.** You have reached the usage quota for the AI assistant.\n\n**Advice:** Please wait a short while, and try your request again. The quota typically resets daily. You can monitor your usage in your Google AI Studio plan and billing details.`;
+    }
+
     return `### DATA TEMPORARILY UNAVAILABLE\n\nThe diagnostic uplink for this specific ${manufacturer} model is currently being recalibrated.\n\n**Error details:** ${error.message}\n\n**Common Advice:**\n- Verify battery voltage (12.6V engine off).\n- Inspect ground straps for corrosion.\n- Check for symptoms related to the specific fault code if applicable.`;
   }
 }
@@ -77,7 +91,15 @@ export async function askAutomotiveAssistant(prompt: string, vehicle: any, histo
       model: "gemini-2.5-flash",
       contents: `Vehicle Context: ${vStr}\n\nUser Query: ${prompt}`,
       config: {
-        systemInstruction: `You are "AutoMotive Buddy AI", a world-class automotive diagnostics assistant. Your goal is to help users identify engine codes (DTCs), explain symptoms, and suggest solutions. You now officially support both English and Tagalog (Filipino) languages. Respond in the language used by the user, or as specifically requested. Be professional, technical yet accessible, and always prioritize safety. Owner: Ruben Llego. Greeting: "Hello! I'm your AutoMotive Buddy. How can I help with your vehicle today?" (or its Tagalog equivalent if the user speaks Tagalog). Do not use markdown headers larger than h3.`,
+        systemInstruction: `You are "AutoMotive Buddy AI", a professional automotive diagnostic intelligence system. Your goal is to provide DIRECT, ACCURATE, and TECHNICIAN-LEVEL answers. 
+
+RULES: 
+1. NO CONVERSATIONAL FLUFF. Do not say "How can I help you today" or "Hello". 
+2. START DIRECTLY with the answer or diagnostic steps.
+3. If the user asks about a DTC, provide: Code Meaning, Top Causes, and Fixes. 
+4. Use Bullet points. 
+5. Language: Use the user's language (English or Tagalog). 
+6. Owner: Ruben Llego.`,
       }
     });
     
@@ -92,8 +114,9 @@ export async function askAutomotiveAssistant(prompt: string, vehicle: any, histo
   }
 }
 
-export async function performDeepDTCSearch(code: string) {
+export async function performDeepDTCSearch(code: string, vehicleContext?: { make?: string, model?: string, year?: string }) {
   try {
+    const vStr = vehicleContext ? `${vehicleContext.year || ''} ${vehicleContext.make || ''} ${vehicleContext.model || ''}`.trim() : "Generic Vehicle";
     try {
       const backendResult = await diagnoseDTC(code);
       if (backendResult?.data) {
@@ -116,7 +139,7 @@ export async function performDeepDTCSearch(code: string) {
     const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Perform a deep technical search for the OBD2 fault code: ${code}. Identify the specific part, system affected, common causes, symptoms, and repair protocol. Return ONLY a JSON object with: code, description, system, severity, causes (string array), symptoms (string array), solutions (string array).`,
+      contents: `Vehicle: ${vStr}\nOBD2 Fault Code: ${code}. Perform a deep technical analysis for this specific vehicle model if possible. Identify the specific part, system affected, common causes, symptoms, and repair protocol. Return ONLY a JSON object with: code, description, system, severity, causes (string array), symptoms (string array), solutions (string array).`,
       config: {
         responseMimeType: "application/json"
       }
