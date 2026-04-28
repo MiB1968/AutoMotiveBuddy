@@ -1,4 +1,4 @@
-const CACHE_NAME = 'automotive-buddy-v1';
+const CACHE_NAME = 'automotive-buddy-v2';
 const ASSETS = [
   '/',
   '/index.html',
