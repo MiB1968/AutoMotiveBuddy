@@ -25,7 +25,7 @@ export class KeyRouter {
           contents: prompt,
         });
         this.keyLimiter.record(apiKey);
-        return result.text();
+        return result.text;
       } catch (e: any) {
         if (e.status === 429) {
           await this.keyLimiter.triggerCooldown(apiKey);

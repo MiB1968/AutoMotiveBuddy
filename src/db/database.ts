@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 
-export const dbPromise = openDB('autoMotiveBuddyDB', 1, {
+export const dbPromise = openDB('autoMotiveBuddyDB', 2, {
   upgrade(db) {
     // VEHICLES
     if (!db.objectStoreNames.contains('vehicles')) {

@@ -596,120 +596,21 @@ export default function App() {
   const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setAuthLoading(true);
-      if (fbUser) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', fbUser.uid)).catch(e => {
-             handleFirestoreError(e, OperationType.GET, `users/${fbUser.uid}`);
-             throw e;
-          });
-          
-          let uData: UserType;
-          let updateNeeded = false;
-          let allowLogin = false;
-          let denyReason = '';
-
-          const now = Date.now();
-
-          if (userDoc.exists()) {
-            uData = userDoc.data() as UserType;
-            
-            // Step 1: Check user status
-            if (uData.status === 'pending') {
-               denyReason = "Your account is pending admin approval.";
-            } else if (uData.status === 'blocked') {
-               denyReason = "Your account is blocked. Contact admin.";
-            } else {
-               // Step 2 & 3: Check trial and account duration
-               if (!uData.account_end_date) {
-                  const trialEnd = new Date(uData.trial_end_date).getTime();
-                  if (now > trialEnd) {
-                     uData.status = 'pending';
-                     uData.trialExpired = true;
-                     updateNeeded = true;
-                     denyReason = "Your 3-hour trial has expired.";
-                     setShowTrialExpiredModal(true);
-                     speakText("The 3 hours free trial account has been consumed. Thank you for using Automotive Buddy. If you are satisfied with our service, directly message the developer or admin for the approval of your account.", true);
-                  } else {
-                     allowLogin = true;
-                  }
-               } else {
-                  const accountEnd = new Date(uData.account_end_date).getTime();
-                  if (now > accountEnd) {
-                     uData.status = 'pending';
-                     delete uData.account_start_date;
-                     delete uData.account_end_date;
-                     updateNeeded = true;
-                     denyReason = "Your subscription has expired. Await admin renewal.";
-                  } else {
-                     allowLogin = true;
-                  }
-               }
-            }
-
-            if (updateNeeded) {
-               await setDoc(doc(db, 'users', fbUser.uid), uData).catch(e => {
-                  handleFirestoreError(e, OperationType.UPDATE, `users/${fbUser.uid}`);
-                  throw e;
-               });
-            }
-          } else {
-             // New user registration
-             const isAnon = fbUser.isAnonymous;
-             const trialStart = new Date();
-             const trialEnd = new Date(trialStart.getTime() + 3 * 3600000); // 3 hours
-
-             uData = {
-               id: fbUser.uid,
-               username: fbUser.email?.split('@')[0] || (isAnon ? `anon_${fbUser.uid.slice(0,6)}` : 'user'),
-               fullName: fbUser.displayName || (isAnon ? 'Trial User' : 'Guest User'),
-               email: fbUser.email || '',
-               role: fbUser.email === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
-               status: fbUser.email === 'rubenlleg12@gmail.com' ? 'active' : 'trial',
-               createdAt: trialStart.toISOString(),
-               trial_start_date: trialStart.toISOString(),
-               trial_end_date: trialEnd.toISOString(),
-               avatarUrl: fbUser.photoURL || '',
-             };
-
-             await setDoc(doc(db, 'users', fbUser.uid), uData).catch(e => {
-                handleFirestoreError(e, OperationType.CREATE, `users/${fbUser.uid}`);
-                throw e;
-             });
-             
-             if (uData.status === 'pending') {
-                denyReason = "Your account is pending admin approval.";
-             } else {
-                allowLogin = true;
-             }
-          }
-          
-          if (!allowLogin) {
-             addToast(denyReason, 'error');
-             setCurrentUser(null);
-             const { logOut } = await import('./lib/firebase');
-             await logOut();
-             window.location.hash = '#login';
-          } else {
-             setCurrentUser(uData);
-             if (window.location.hash === '#login' || window.location.hash === '#register') {
-               window.location.hash = (uData.role === 'admin' || uData.role === 'super_admin') ? '#admin-overview' : '#dashboard';
-               addToast(`Greetings, ${uData.fullName?.split(' ')[0] || 'User'}. Neural link established.`, 'success');
-             }
-          }
-        } catch (error) {
-          console.error("Firestore getDoc error intercepted:", error);
-          const { logOut } = await import('./lib/firebase');
-          await logOut();
-          addToast('Database connection error during login. Try again.', 'error');
-        }
-      } else {
-        setCurrentUser(null);
-      }
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
+    // Disable Firebase Auth check and bypass login
+    const mockUser: UserType = {
+        id: 'guest_user_123',
+        username: 'guest',
+        fullName: 'Guest User',
+        email: 'guest@example.com',
+        role: 'user',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        trial_start_date: new Date().toISOString(),
+        trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
+        avatarUrl: '',
+    };
+    setCurrentUser(mockUser);
+    setAuthLoading(false);
   }, []);
 
   useEffect(() => {
@@ -3670,7 +3571,6 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{typeof u.createdAt === 'string' ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
                 <td className="p-6">
                   <div className="flex gap-2">
-                    {console.log("Rendering shield - User Role:", user?.role, "User Status:", u.status)}
                     {(u.status?.toLowerCase() !== 'active' || user?.role === 'super_admin') && (
                       <>
                         <button 
