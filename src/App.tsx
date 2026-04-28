@@ -40,6 +40,8 @@ import { auth, db, signInWithGoogle, logOut } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
+import RestrictedAccountModal from './components/RestrictedAccountModal';
+import { syncData } from './sync/syncEngine';
 
 // --- UI Helper Components ---
 
@@ -591,6 +593,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
+  const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -622,9 +625,12 @@ export default function App() {
                if (!uData.account_end_date) {
                   const trialEnd = new Date(uData.trial_end_date).getTime();
                   if (now > trialEnd) {
-                     uData.status = 'blocked';
+                     uData.status = 'pending';
+                     uData.trialExpired = true;
                      updateNeeded = true;
                      denyReason = "Your 3-hour trial has expired.";
+                     setShowTrialExpiredModal(true);
+                     speakText("The 3 hours free trial account has been consumed. Thank you for using Automotive Buddy. If you are satisfied with our service, directly message the developer or admin for the approval of your account.", true);
                   } else {
                      allowLogin = true;
                   }
@@ -660,7 +666,7 @@ export default function App() {
                fullName: fbUser.displayName || (isAnon ? 'Trial User' : 'Guest User'),
                email: fbUser.email || '',
                role: fbUser.email === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
-               status: fbUser.email === 'rubenlleg12@gmail.com' ? 'active' : 'pending',
+               status: fbUser.email === 'rubenlleg12@gmail.com' ? 'active' : 'trial',
                createdAt: trialStart.toISOString(),
                trial_start_date: trialStart.toISOString(),
                trial_end_date: trialEnd.toISOString(),
@@ -878,14 +884,7 @@ export default function App() {
     }
     
     if (currentUser.status === 'pending') {
-       return (
-         <div className="h-screen w-full flex flex-col items-center justify-center p-6 text-center space-y-6">
-           <Clock size={64} className="text-yellow-500 opacity-80 animate-pulse" />
-           <h2 className="text-2xl font-bold font-display uppercase text-yellow-400 tracking-widest">Pending Approval</h2>
-           <p className="text-sm text-text-secondary max-w-md mx-auto">Your account is pending system administration approval.</p>
-           <button onClick={logout} className="btn-secondary py-3 px-8 text-xs">LOGOUT</button>
-         </div>
-       );
+       return <RestrictedAccountModal reason={(currentUser as any).trialExpired ? 'trial' : 'pending'} onClose={() => {}} />;
     }
 
     return (
@@ -918,6 +917,34 @@ export default function App() {
         {toasts.map(t => (
           <Toast key={t.id} {...t} onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />
         ))}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showTrialExpiredModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card p-8 max-w-lg w-full text-center space-y-6"
+            >
+              <h2 className="text-xl font-display font-bold text-amber-500 uppercase tracking-widest">Trial Expired</h2>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                The 3 hours free trial account has been consumed. Thank you for using Automotive Buddy. If you are satisfied with our service, directly message the developer or admin for the approval of your account.
+              </p>
+              <div className="flex flex-col items-center gap-4">
+                 <img src="/qr-code.png" alt="Contact QR" className="w-48 h-48 border-2 border-brand p-2 bg-white" />
+                 <p className="text-[10px] text-text-muted uppercase tracking-widest">Scan to contact developer</p>
+              </div>
+              <button onClick={() => setShowTrialExpiredModal(false)} className="btn-primary w-full py-3">CLOSE</button>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <ChatBot currentUser={currentUser} store={store} toast={addToast} />
@@ -3487,6 +3514,7 @@ function AIChatTab({ user, store, ...props }: any) {
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 
 function MembersTab({ user, store, toast, ...props }: any) {
+  const currentUser = user;
   const [users, setUsers] = useState<UserType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
@@ -3593,14 +3621,14 @@ function MembersTab({ user, store, toast, ...props }: any) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
         <div>
           <h2 className="text-xl text-white font-display uppercase tracking-widest">Registry Roster</h2>
           <p className="text-[10px] text-text-secondary font-accent uppercase tracking-widest">Active nodes in the system</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="btn-primary text-xs py-2 group overflow-hidden relative cursor-pointer"
+          className="btn-primary text-xs py-2 px-4 group overflow-hidden relative cursor-pointer self-start sm:self-auto"
         >
            <span className="relative z-10 flex items-center gap-2">
              <UserPlus size={14} /> Add Account
@@ -3609,8 +3637,8 @@ function MembersTab({ user, store, toast, ...props }: any) {
         </button>
       </div>
 
-      <div className="glass-panel overflow-hidden p-0">
-        <table className="w-full text-left border-collapse">
+      <div className="glass-panel overflow-hidden p-0 overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[600px]">
           <thead className="bg-white/5 text-[9px] uppercase font-accent tracking-widest text-text-secondary border-b border-border-glass">
             <tr>
               <th className="p-6">User / Member</th>
@@ -3630,7 +3658,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                   </div>
                 </td>
                 <td className="p-6">
-                  <span className={`badge ${u.status === 'active' ? 'badge-green' : (u.status === 'blocked' ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'animate-pulse bg-yellow-500/20 text-yellow-500 border border-yellow-500/30')}`}>{u.status}</span>
+                  <span className={`badge ${u.status?.toLowerCase() === 'active' ? 'badge-green' : (u.status?.toLowerCase() === 'blocked' ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'animate-pulse bg-yellow-500/20 text-yellow-500 border border-yellow-500/30')}`}>{u.status?.toUpperCase()}</span>
                 </td>
                 <td className="p-6">
                   {u.account_end_date ? (
@@ -3642,7 +3670,8 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <td className="p-6 text-[10px] font-accent text-text-secondary uppercase">{typeof u.createdAt === 'string' ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
                 <td className="p-6">
                   <div className="flex gap-2">
-                    {u.status === 'pending' && (
+                    {console.log("Rendering shield - User Role:", user?.role, "User Status:", u.status)}
+                    {(u.status?.toLowerCase() !== 'active' || user?.role === 'super_admin') && (
                       <>
                         <button 
                           onClick={() => {
@@ -3663,7 +3692,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                         </button>
                       </>
                     )}
-                    {u.status === 'active' && (
+                    {u.status?.toLowerCase() === 'active' && (
                        <button onClick={() => handleReject(u)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer" title="Block Access"><X size={14} /></button>
                     )}
                   </div>
@@ -3777,17 +3806,12 @@ function MembersTab({ user, store, toast, ...props }: any) {
                     {user.role === 'super_admin' ? (
                        <div>
                          <label className="text-[10px] text-text-secondary font-accent uppercase tracking-widest block mb-2">Assign Account Duration</label>
-                         <select 
-                           value={selectedDuration}
-                           onChange={(e) => setSelectedDuration(e.target.value)}
-                           className="form-input w-full bg-[#050A15]"
-                         >
-                           <option value="none" className="bg-[#050A15]">No Duration (Trial Logic Only)</option>
-                           <option value="1_month" className="bg-[#050A15]">1 Month Subscription</option>
-                           <option value="3_months" className="bg-[#050A15]">3 Months Subscription</option>
-                           <option value="6_months" className="bg-[#050A15]">6 Months Subscription</option>
-                           <option value="1_year" className="bg-[#050A15]">1 Year Subscription</option>
-                         </select>
+                          <div className="grid grid-cols-2 gap-2">
+                             <button type="button" onClick={() => setSelectedDuration('1_month')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '1_month' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>1 Month</button>
+                             <button type="button" onClick={() => setSelectedDuration('3_months')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '3_months' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>3 Months</button>
+                             <button type="button" onClick={() => setSelectedDuration('6_months')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '6_months' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>6 Months</button>
+                             <button type="button" onClick={() => setSelectedDuration('1_year')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '1_year' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>1 Year</button>
+                           </div>
                        </div>
                     ) : (
                        <p className="text-xs text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 p-3 rounded">

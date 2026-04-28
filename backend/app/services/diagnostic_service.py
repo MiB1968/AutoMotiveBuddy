@@ -1,6 +1,8 @@
 import logging
+import asyncio
 from app.domain.dtc_engine import DTCEngine
 from app.models.schemas import DiagnosticRequest, DiagnosticResponse
+from app.services.ai_service import ask_ai
 
 logger = logging.getLogger("automotive-buddy-api")
 
@@ -20,7 +22,13 @@ class DiagnosticService:
                     break
         
         if not dtc_data:
-            return {"error": "DTC not found"}
+            logger.info(f"DTC not found, fallback to AI: {request.code}")
+            try:
+                ai_response = asyncio.run(ask_ai(f"Diagnose DTC code {request.code} with symptoms {request.symptoms}"))
+                return {"success": True, "ai_data": ai_response}
+            except Exception as e:
+                logger.error(f"AI fallback failed: {e}")
+                return {"error": "DTC not found and AI fallback failed"}
 
         return self.engine.rank_dtc(
             dtc_data,

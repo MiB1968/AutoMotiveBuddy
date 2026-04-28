@@ -1,0 +1,25 @@
+619:               denyReason = "Your account is pending admin approval.";
+621:               denyReason = "Your account is blocked. Contact admin.";
+632:                     speakText("The 3 hours free trial account has been consumed. Thank you for using Automotive Buddy. If you are satisfied with our service, directly message the developer or admin for the approval of your account.", true);
+643:                     denyReason = "Your subscription has expired. Await admin renewal.";
+667:               role: fbUser.email === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
+681:                denyReason = "Your account is pending admin approval.";
+696:               window.location.hash = (uData.role === 'admin' || uData.role === 'super_admin') ? '#admin-overview' : '#dashboard';
+793:    window.location.hash = user.role === 'admin' ? '#admin-overview' : '#dashboard';
+805:        if (updated.username === 'rubenllego' || updated.role === 'admin') {
+806:          localStorage.setItem('ab_admin_avatar', newUrl);
+870:    if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
+879:           <p className="text-sm text-text-secondary max-w-md mx-auto">Your account has been blocked or expired. Please contact your administrator to restore access.</p>
+937:                The 3 hours free trial account has been consumed. Thank you for using Automotive Buddy. If you are satisfied with our service, directly message the developer or admin for the approval of your account.
+1107:            All prices in Philippine Peso ₱. Access activated after admin payment verification. <br />
+1123:                      user={user?.role === 'admin' ? user : { fullName: "Ruben Llego O.", avatarUrl: localStorage.getItem('ab_admin_avatar') || "/ruben_avatar.jpg" }} 
+1125:                      onUpdate={user?.role === 'admin' ? onUpdateAvatar : undefined}
+1194:                    Personalized support and fleet bulk licensing available through direct admin consult.
+1855:  const activeTab = h.startsWith('#admin-') ? h.replace('#admin-', '') : (h === '#admin' ? 'overview' : (h.replace('#', '') || 'overview'));
+1858:    window.location.hash = `#admin-${tab}`;
+1893:          <UserAvatar user={user} size="md" onUpdate={onUpdateAvatar} key={`admin-v-${user.avatarUrl}`} />
+2143:  const adminAvatar = localStorage.getItem('ab_admin_avatar') || 'https://ui-avatars.com/api/?name=Ruben+Llego&background=0a0e1a&color=00d4ff&size=256';
+2196:                <img src={adminAvatar} alt="Ruben Llego" className="w-14 h-14 rounded-full border-2 border-brand relative z-10 object-cover" />
+3582:        if (user.role === 'super_admin' && selectedDuration !== 'none') {
+3673:                    {(u.status?.toLowerCase() !== 'active' || user?.role === 'super_admin') && (
+3805:                    {user.role === 'super_admin' ? (

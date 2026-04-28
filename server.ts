@@ -3,6 +3,9 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
 import fs from 'fs';
+import { KeyManager } from './src/backend/core/keyManager';
+import { KeyLimiter } from './src/backend/core/keyLimiter';
+import { KeyRouter } from './src/backend/core/keyRouter';
 
 async function startServer() {
   const app = express();
@@ -109,10 +112,27 @@ async function startServer() {
     });
   });
 
+  // --- AI BACKEND ---
+  const keyManager = new KeyManager([process.env.GEMINI_API_KEY || ""]);
+  const keyLimiter = new KeyLimiter();
+  const keyRouter = new KeyRouter(keyManager, keyLimiter);
+  const aiCache = new Map<string, string>();
+
   app.post('/api/ai/diagnose', async (req, res) => {
-    return res.json({
-      answer: "Frontend AI fallback triggered. Please ensure Gemini API is configured in the browser."
-    });
+    const { code, symptoms } = req.body;
+    const message = `Diagnose DTC code ${code} with symptoms ${symptoms}`;
+    
+    if (aiCache.has(message)) {
+        return res.json({ success: true, ai_data: aiCache.get(message) });
+    }
+
+    const result = await keyRouter.aiRequest(message);
+    if (result) {
+        aiCache.set(message, result);
+        return res.json({ success: true, ai_data: result });
+    }
+    
+    res.status(500).json({ error: "AI failed" });
   });
 
   app.post('/api/ai/generate', async (req, res) => {
