@@ -3,9 +3,30 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
 import fs from 'fs';
+import * as admin from 'firebase-admin';
+import * as jose from 'jose';
 import { KeyManager } from './src/backend/core/keyManager';
 import { KeyLimiter } from './src/backend/core/keyLimiter';
 import { KeyRouter } from './src/backend/core/keyRouter';
+
+// Initialize Firebase Admin for Node
+const firebaseConfig = process.env.FIREBASE_CONFIG;
+try {
+  if (firebaseConfig) {
+    const apps = admin.apps || [];
+    if (apps.length === 0) {
+      const creds = JSON.parse(firebaseConfig);
+      admin.initializeApp({
+        credential: admin.credential.cert(creds)
+      });
+      console.log("Firebase Admin initialized in Node");
+    }
+  }
+} catch (e) {
+  console.error("Error initializing Firebase Admin in Node:", e);
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || 'neural-bridge-secret-999';
 
 async function startServer() {
   const app = express();
@@ -24,6 +45,57 @@ async function startServer() {
   } catch (e) {
     console.error("Error loading DTC Master:", e);
   }
+
+  // --- AUTH ROUTES (Bridging to FastAPI structure) ---
+  app.post('/auth/exchange', async (req, res) => {
+    const { firebase_token } = req.body;
+    if (!firebase_token) return res.status(400).json({ error: "Missing token" });
+
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(firebase_token);
+      const { uid, email } = decodedToken;
+
+      const adminEmails = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'];
+      const role = (email && adminEmails.includes(email.toLowerCase())) ? 'super_admin' : 'user';
+
+      const userPayload = {
+        uid,
+        email,
+        role,
+        status: 'active',
+        subscription: null
+      };
+
+      // Create JWT using jose
+      const secret = new TextEncoder().encode(JWT_SECRET);
+      const token = await new jose.SignJWT(userPayload)
+        .setProtectedHeader({ alg: 'HS256' })
+        .setIssuedAt()
+        .setExpirationTime('12h')
+        .sign(secret);
+
+      res.json({ token, user: userPayload });
+    } catch (e: any) {
+      console.error("Auth exchange error:", e);
+      res.status(401).json({ error: "Invalid Firebase token" });
+    }
+  });
+
+  app.get('/user/profile', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+      const secret = new TextEncoder().encode(JWT_SECRET);
+      const { payload } = await jose.jwtVerify(token, secret);
+      res.json({ status: "success", user: payload });
+    } catch (e) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  });
 
   // --- SYNC ROUTES ---
   app.post('/api/sync/upload', (req, res) => {

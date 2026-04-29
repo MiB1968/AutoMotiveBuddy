@@ -9,9 +9,7 @@ def get_firebase_app():
     if not _firebase_app:
         firebase_config = os.getenv("FIREBASE_CONFIG")
         if not firebase_config:
-            # Check if we can find a local firestore if no config, 
-            # but usually we just want to fail gracefully during usage, not startup.
-            return None
+            raise Exception("MISSING CONFIG: FIREBASE_CONFIG")
         
         try:
             if not _apps:

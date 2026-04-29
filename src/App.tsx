@@ -44,6 +44,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'; // Re-imported
 import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
 import RestrictedAccountModal from './components/RestrictedAccountModal';
 import { syncData } from './sync/syncEngine';
+import axios from 'axios';
+
+const API_URL = (import.meta as any).env.VITE_API_URL || '';
 
 // --- UI Helper Components ---
 
@@ -603,47 +606,29 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('Auth state changed', user);
       if (user) {
-        // User is signed in. Fetch user details from Firestore
         try {
-          console.log('Fetching user details for', user.uid);
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            console.log('User doc found', userDoc.data());
-            const data = userDoc.data() as UserType;
-            // FORCE SUPER ADMIN FOR rubenlleg12@gmail.com or rubenllego12@gmail.com
-            const adminEmails = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'];
-            if (user.email && adminEmails.includes(user.email.toLowerCase()) && (data.role !== 'super_admin' || data.status !== 'active')) {
-                console.log('Forcing super_admin role and active status for user');
-                data.role = 'super_admin';
-                data.status = 'active';
-                await setDoc(doc(db, 'users', user.uid), { role: 'super_admin', status: 'active' }, { merge: true });
-            }
-            setCurrentUser(data);
-          } else {
-             console.log('User doc not found, creating new user');
-             // NEW USER! Create doc
-             const newUser: UserType = {
-                id: user.uid,
-                username: user.email?.split('@')[0] || 'user_' + user.uid.substr(0, 5),
-                fullName: user.displayName || 'New Member',
-                email: user.email || '',
-              role: (user.email && ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'].includes(user.email.toLowerCase())) ? 'super_admin' : 'user',
-                status: 'active',
-                createdAt: new Date().toISOString(),
-                trial_start_date: new Date().toISOString(),
-                trial_end_date: new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
-                avatarUrl: user.photoURL || '',
-             };
-             await setDoc(doc(db, 'users', user.uid), newUser);
-             setCurrentUser(newUser);
-          }
+          const idToken = await user.getIdToken();
+          console.log('Exchanging token with backend...');
+          
+          const response = await axios.post(`${API_URL}/auth/exchange`, {
+            firebase_token: idToken
+          });
+          
+          const { token, user: userData } = response.data;
+          localStorage.setItem('autobuddy_token', token);
+          
+          console.log('Backend JWT received and stored');
+          setCurrentUser(userData);
         } catch (error) {
-          console.error('Error fetching user', error);
-          handleFirestoreError(error, OperationType.GET, 'users/' + user.uid);
+          console.error('Error in auth flow', error);
+          // If backend fails, we might still want to allow client-side only access if possible,
+          // but the prompt says BACKEND = FULL AUTHORITY.
+          // So we should probably show an error or log out.
           setCurrentUser(null);
         }
       } else {
         console.log('No user signed in');
+        localStorage.removeItem('autobuddy_token');
         setCurrentUser(null);
       }
       setAuthLoading(false);
@@ -779,6 +764,7 @@ export default function App() {
   const logout = async () => {
     try {
       await logOut();
+      localStorage.removeItem('autobuddy_token');
       window.location.hash = '#home';
       window.location.reload();
     } catch (error) {

@@ -1,22 +1,20 @@
 from datetime import datetime, timedelta
+from app.core.self_heal import self_heal
 
-def create_subscription(plan: str):
-    now = datetime.utcnow()
-
+@self_heal("SUBSCRIPTION_SERVICE")
+def create_subscription_plan(plan_type: str):
     durations = {
-        "1_month": 30,
-        "3_month": 90,
-        "6_month": 180,
-        "1_year": 365
+        "monthly": 30,
+        "yearly": 365,
+        "trial": 3,
+        "guest_24h": 1
     }
-
-    days = durations.get(plan)
-    if not days:
-        raise Exception("Invalid plan")
-
+    
+    days = durations.get(plan_type, 30)
+    
     return {
-        "plan": plan,
-        "startDate": now.isoformat(),
-        "endDate": (now + timedelta(days=days)).isoformat(),
+        "plan": plan_type,
+        "startDate": datetime.utcnow().isoformat(),
+        "endDate": (datetime.utcnow() + timedelta(days=days)).isoformat(),
         "active": True
     }

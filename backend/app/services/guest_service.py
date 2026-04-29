@@ -1,25 +1,25 @@
 import random
 import string
 from datetime import datetime, timedelta
+from app.core.self_heal import self_heal
 
-def generate_guest_account():
-    number = random.randint(100, 999)
-    username = f"autobuddy-{number}@gmail.com"
-
-    password = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
-
-    now = datetime.utcnow()
-
-    subscription = {
-        "plan": "guest_24h",
-        "startDate": now.isoformat(),
-        "endDate": (now + timedelta(hours=24)).isoformat(),
-        "active": True
-    }
-
+@self_heal("GUEST_SERVICE")
+def create_guest_account():
+    num = random.randint(1000, 9999)
+    # Generate a secure 8 char password
+    password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    
     return {
-        "email": username,
-        "password": password,
+        "uid": f"guest-{num}",
+        "username": f"guest_{num}",
+        "fullName": f"Guest User {num}",
+        "email": f"guest-{num}@autobuddy.local",
         "role": "guest",
-        "subscription": subscription
+        "status": "active",
+        "subscription": {
+            "plan": "guest_24h",
+            "startDate": datetime.utcnow().isoformat(),
+            "endDate": (datetime.utcnow() + timedelta(hours=24)).isoformat(),
+            "active": True
+        }
     }

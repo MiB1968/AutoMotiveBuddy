@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = (import.meta as any).env.VITE_API_URL || '';
 
 export default function AdminDashboardProMax() {
   const [users, setUsers] = useState<any[]>([]);
@@ -16,7 +16,7 @@ export default function AdminDashboardProMax() {
   const [loading, setLoading] = useState(false);
   const [guest, setGuest] = useState<any>(null);
 
-  const token = localStorage.getItem("jwt");
+  const token = localStorage.getItem("autobuddy_token");
 
   // FETCH USERS
   const fetchUsers = async () => {

@@ -1,9 +1,16 @@
-from fastapi import APIRouter
-from app.services.auth_service import login_user
+from fastapi import APIRouter, HTTPException
+from app.services.auth_service import exchange_token
+from pydantic import BaseModel
 
 router = APIRouter()
 
-@router.post("/login")
-def login(data: dict):
-    token = login_user(data["id_token"])
-    return {"access_token": token}
+class TokenExchangeRequest(BaseModel):
+    firebase_token: str
+
+@router.post("/exchange")
+async def auth_exchange(data: TokenExchangeRequest):
+    try:
+        result = exchange_token(data.firebase_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -2,7 +2,7 @@ fastapi
 uvicorn
 python-dotenv
 firebase-admin
-python-jose
-passlib[bcrypt]
-slowapi
-python-json-logger
+python-jose[cryptography]
+psutil
+pydantic
+pydantic-settings
