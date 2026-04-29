@@ -52,11 +52,3 @@ export const registerWithEmail = async (email: string, pass: string) => {
     const result = await createUserWithEmailAndPassword(auth, email, pass);
     return result.user;
 };
-
-export const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');
-export const secondaryAuth = getAuth(secondaryApp);
-
-export const createAdminUser = async (email: string, pass: string) => {
-    const result = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
-    return result.user;
-};

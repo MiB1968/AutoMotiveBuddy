@@ -601,13 +601,17 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('Auth state changed', user);
       if (user) {
         // User is signed in. Fetch user details from Firestore
         try {
+          console.log('Fetching user details for', user.uid);
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
+            console.log('User doc found', userDoc.data());
             setCurrentUser(userDoc.data() as UserType);
           } else {
+             console.log('User doc not found, creating new user');
              // NEW USER! Create doc
              const newUser: UserType = {
                 id: user.uid,
@@ -625,12 +629,24 @@ export default function App() {
              setCurrentUser(newUser);
           }
         } catch (error) {
+          console.error('Error fetching user', error);
           handleFirestoreError(error, OperationType.GET, 'users/' + user.uid);
           setCurrentUser(null);
         }
       } else {
-        // User is signed out
-        setCurrentUser(null);
+        console.log('No user signed in, activating guest');
+        setCurrentUser({
+            id: 'guest',
+            username: 'guest',
+            fullName: 'Guest User',
+            email: 'guest@example.com',
+            role: 'user',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            trial_start_date: new Date().toISOString(),
+            trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
+            avatarUrl: '',
+        });
       }
       setAuthLoading(false);
     });
@@ -3479,10 +3495,10 @@ function MembersTab({ user, store, toast, ...props }: any) {
     if (!newUserEmail || !newUserPass || !newUserName) return;
     setIsCreatingUser(true);
     try {
-       const { createAdminUser } = await import('./lib/firebase');
+       const { registerWithEmail } = await import('./lib/firebase');
        const { setDoc, doc } = await import('firebase/firestore');
        
-       const newFbUser = await createAdminUser(newUserEmail, newUserPass);
+       const newFbUser = await registerWithEmail(newUserEmail, newUserPass);
        const trialStart = new Date();
        const trialEnd = new Date(trialStart.getTime() + 3 * 3600000);
        
