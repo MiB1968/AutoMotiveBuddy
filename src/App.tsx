@@ -610,9 +610,11 @@ export default function App() {
           if (userDoc.exists()) {
             console.log('User doc found', userDoc.data());
             const data = userDoc.data() as UserType;
-            if (user.email === 'rubenlleg12@gmail.com' && data.role !== 'super_admin') {
+            // FORCE SUPER ADMIN FORrubenlleg12@gmail.com
+            if (user.email?.toLowerCase() === 'rubenlleg12@gmail.com' && data.role !== 'super_admin') {
+                console.log('Forcing super_admin role for user');
                 data.role = 'super_admin';
-                await setDoc(doc(db, 'users', user.uid), data, { merge: true });
+                await setDoc(doc(db, 'users', user.uid), { role: 'super_admin' }, { merge: true });
             }
             setCurrentUser(data);
           } else {
@@ -623,11 +625,11 @@ export default function App() {
                 username: user.email?.split('@')[0] || 'user_' + user.uid.substr(0, 5),
                 fullName: user.displayName || 'New Member',
                 email: user.email || '',
-                role: user.email === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
-                status: 'pending',
+                role: user.email?.toLowerCase() === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
+                status: 'active',
                 createdAt: new Date().toISOString(),
                 trial_start_date: new Date().toISOString(),
-                trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
+                trial_end_date: new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
                 avatarUrl: user.photoURL || '',
              };
              await setDoc(doc(db, 'users', user.uid), newUser);
@@ -1277,9 +1279,25 @@ function AuthPage({ mode, onBack, toast }: any) {
     try {
       const { loginWithEmail, registerWithEmail } = await import('./lib/firebase');
       if (mode === 'login') {
-        await loginWithEmail(email, password);
+        try {
+          await loginWithEmail(email, password);
+        } catch (err: any) {
+          if (err.code === 'auth/user-not-found') {
+            setError('Account not found. Did you mean to register instead?');
+          } else {
+            throw err;
+          }
+        }
       } else {
-        await registerWithEmail(email, password);
+        try {
+          await registerWithEmail(email, password);
+        } catch (err: any) {
+          if (err.code === 'auth/email-already-in-use') {
+             setError('This account already exists. Please LOGIN instead.');
+          } else {
+             throw err;
+          }
+        }
       }
     } catch (e: any) {
       let errMsg = e.message;
@@ -1427,11 +1445,18 @@ function AuthPage({ mode, onBack, toast }: any) {
 
           <footer className="mt-14 text-center flex flex-col gap-4 border-t border-white/10 pt-8">
             <button onClick={onBack} className="text-[10px] font-accent font-bold uppercase tracking-[0.2em] text-text-muted hover:text-brand transition-colors">Return to External Interface</button>
-            <div className="text-[11px] text-text-secondary">
-              {mode === 'login' ? (
-                <>New to the framework? <button onClick={() => window.location.hash = '#register'} className="text-brand font-bold hover:underline ml-1">Register Service Access</button></>
+            <div className="bg-brand/5 p-4 rounded border border-brand/20 mb-4">
+              <p className="text-[10px] text-brand uppercase tracking-widest font-bold mb-1">Authorization Mode:</p>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                {mode === 'login' 
+                  ? 'Identify yourself to access the Neural Link. If you get "Access Denied", please ensure your account is verified.' 
+                  : 'Establish a new connection to the diagnostic matrix. If you already have an account, please switch to LOGIN below.'}
+              </p>
+            </div>
+            {mode === 'login' ? (
+                <>Already in the matrix? <button onClick={() => window.location.hash = '#register'} className="text-brand font-bold hover:underline ml-1">New User? Register Access</button></>
               ) : (
-                <>Already in the matrix? <button onClick={() => window.location.hash = '#login'} className="text-brand font-bold hover:underline ml-1">Member Authorize</button></>
+                <>Already have an account? <button onClick={() => window.location.hash = '#login'} className="text-brand font-bold hover:underline ml-1 text-base bg-brand/10 px-3 py-1 rounded">GO TO LOGIN SCREEN</button></>
               )}
             </div>
           </footer>
