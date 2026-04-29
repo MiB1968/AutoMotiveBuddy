@@ -610,11 +610,13 @@ export default function App() {
           if (userDoc.exists()) {
             console.log('User doc found', userDoc.data());
             const data = userDoc.data() as UserType;
-            // FORCE SUPER ADMIN FORrubenlleg12@gmail.com
-            if (user.email?.toLowerCase() === 'rubenlleg12@gmail.com' && data.role !== 'super_admin') {
-                console.log('Forcing super_admin role for user');
+            // FORCE SUPER ADMIN FOR rubenlleg12@gmail.com or rubenllego12@gmail.com
+            const adminEmails = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'];
+            if (user.email && adminEmails.includes(user.email.toLowerCase()) && (data.role !== 'super_admin' || data.status !== 'active')) {
+                console.log('Forcing super_admin role and active status for user');
                 data.role = 'super_admin';
-                await setDoc(doc(db, 'users', user.uid), { role: 'super_admin' }, { merge: true });
+                data.status = 'active';
+                await setDoc(doc(db, 'users', user.uid), { role: 'super_admin', status: 'active' }, { merge: true });
             }
             setCurrentUser(data);
           } else {
@@ -625,7 +627,7 @@ export default function App() {
                 username: user.email?.split('@')[0] || 'user_' + user.uid.substr(0, 5),
                 fullName: user.displayName || 'New Member',
                 email: user.email || '',
-                role: user.email?.toLowerCase() === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
+              role: (user.email && ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'].includes(user.email.toLowerCase())) ? 'super_admin' : 'user',
                 status: 'active',
                 createdAt: new Date().toISOString(),
                 trial_start_date: new Date().toISOString(),
@@ -1454,11 +1456,13 @@ function AuthPage({ mode, onBack, toast }: any) {
               </p>
             </div>
             {mode === 'login' ? (
-                <>Already in the matrix? <button onClick={() => window.location.hash = '#register'} className="text-brand font-bold hover:underline ml-1">New User? Register Access</button></>
+                <div className="text-[11px] text-text-secondary">New user? <button onClick={() => window.location.hash = '#register'} className="text-brand font-bold hover:underline ml-1">Register Service Access</button></div>
               ) : (
-                <>Already have an account? <button onClick={() => window.location.hash = '#login'} className="text-brand font-bold hover:underline ml-1 text-base bg-brand/10 px-3 py-1 rounded">GO TO LOGIN SCREEN</button></>
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-[11px] text-text-secondary">Already have an account?</p>
+                  <button onClick={() => window.location.hash = '#login'} className="bg-brand/20 text-brand px-6 py-2 rounded-full font-bold text-sm hover:bg-brand/30 transition-all border border-brand/50">GO TO LOGIN SCREEN</button>
+                </div>
               )}
-            </div>
           </footer>
         </div>
       </motion.div>
