@@ -881,6 +881,12 @@ export default function App() {
     const h = hash.split('?')[0];
 
     // Public
+    if (currentUser && (h === '#home' || h === '#login' || h === '#register' || h === '')) {
+      const target = (currentUser.role === 'admin' || currentUser.role === 'super_admin') ? '#admin-overview' : '#dashboard';
+      setTimeout(() => { window.location.hash = target; }, 0);
+      return null;
+    }
+
     if (h === '#home') return <LandingPage onNavigate={setHash} user={currentUser} onUpdateAvatar={updateAvatar} />;
     if (h === '#login') return <AuthPage mode="login" onBack={() => window.location.hash = '#home'} toast={addToast} />;
     if (h === '#register') return <AuthPage mode="register" onBack={() => window.location.hash = '#home'} toast={addToast} />;
@@ -1624,6 +1630,8 @@ function ChatBot({ currentUser, store, toast }: any) {
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasWelcomedRef = useRef(false);
+  const [buddyOpacity, setBuddyOpacity] = useState(1);
+  const holdTimerRef = useRef<any>(null);
 
   useEffect(() => {
     if (isOpen && !hasWelcomedRef.current) {
@@ -1642,6 +1650,35 @@ function ChatBot({ currentUser, store, toast }: any) {
       }
     }
   }, [isOpen, currentUser, store, autoSpeak]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() === 'i' && !holdTimerRef.current) {
+        holdTimerRef.current = setTimeout(() => {
+          setBuddyOpacity(prev => prev === 1 ? 0.05 : 1);
+          toast(buddyOpacity === 1 ? "Stealth Mode: AI Buddy Hidden" : "AI Buddy Visibility Restored", "info");
+          holdTimerRef.current = null;
+        }, 3000);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'i') {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [buddyOpacity, toast]);
 
   const toggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -1717,6 +1754,7 @@ function ChatBot({ currentUser, store, toast }: any) {
     <>
       <button 
         onClick={() => setIsOpen(!isOpen)}
+        style={{ opacity: buddyOpacity }}
         className="fixed bottom-24 right-6 w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-[0_0_30px_rgba(245,158,11,0.4)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-transform group"
       >
         <Wrench className="w-7 h-7 group-hover:rotate-45 transition-transform duration-500" />
@@ -2302,7 +2340,7 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
             <div className="w-full">
               <div className="border border-white/20 rounded-full py-2 px-4 shadow-[0_0_15px_rgba(0,212,255,0.2)] text-center w-full bg-white/5 backdrop-blur-md">
                 <span className="font-accent font-bold tracking-[0.2em] uppercase text-white shadow-brand">
-                  {user.role.toUpperCase() === 'ADMIN' ? 'DEVELOPER / OWNER' : `${user.role.toUpperCase()} LEVEL 01`}
+                  {(user.role === 'admin' || user.role === 'super_admin') ? 'DEVELOPER / OWNER' : `${user.role.toUpperCase()} LEVEL 01`}
                 </span>
               </div>
             </div>

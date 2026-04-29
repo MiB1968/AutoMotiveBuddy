@@ -21,14 +21,35 @@ export async function getOrCreateUser(uid: string, email: string): Promise<UserP
     throw new Error("Database Service Unavailable");
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
+  const now = new Date();
+  console.log(`[USER SERVICE] getOrCreateUser probe for: ${normalizedEmail} [${uid}]`);
+
   const userDoc = await firestore.collection('users').doc(uid).get();
 
   if (userDoc.exists) {
     const data = userDoc.data() as UserProfile;
+    const superAdmins = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com', 'rubenllego@autobuddy.pro'];
+    let needsUpdate = false;
     
+    console.log(`[USER SERVICE] Found existing record for ${normalizedEmail}. Current Role: ${data.role}`);
+
+    // AUTO-UPGRADE: Ensure whitelisted admins have correct roles
+    if (superAdmins.includes(normalizedEmail) && data.role !== 'super_admin') {
+      console.log(`[USER SERVICE] Promoting ${normalizedEmail} to Super Admin via Auto-Upgrade`);
+      data.role = 'super_admin';
+      data.subscription = {
+        plan: 'lifetime_pro',
+        startDate: data.subscription?.startDate || now.toISOString(),
+        endDate: new Date(2099, 11, 31).toISOString(),
+        active: true
+      };
+      needsUpdate = true;
+    }
+
     // AUTO-HEAL: Ensure subscription integrity for legacy or corrupted records
     if (!data.subscription || !data.subscription.plan) {
-      console.warn(`[USER SERVICE] Self-healing user record: ${email}`);
+      console.warn(`[USER SERVICE] Self-healing user record subscription: ${normalizedEmail}`);
       const now = new Date();
       const trialEnd = new Date();
       trialEnd.setHours(trialEnd.getHours() + 24);
@@ -39,22 +60,28 @@ export async function getOrCreateUser(uid: string, email: string): Promise<UserP
         endDate: trialEnd.toISOString(),
         active: true
       };
-      
-      // Update DB asynchronously to avoid blocking login if healing succeeds in memory
-      firestore.collection('users').doc(uid).update({ subscription: data.subscription }).catch(console.error);
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+      console.log(`[USER SERVICE] Committing self-healed/upgraded record for ${normalizedEmail}`);
+      await firestore.collection('users').doc(uid).update({ 
+        role: data.role,
+        subscription: data.subscription 
+      });
     }
     
     return data;
   }
 
+  console.log(`[USER SERVICE] Creating new record for ${normalizedEmail}`);
   // AUTO RECOVERY TRIAL (NEVER BLOCK LOGIN)
-  const now = new Date();
   const trialEnd = new Date();
   trialEnd.setHours(trialEnd.getHours() + 24);
 
   const newUser: UserProfile = {
     uid,
-    email,
+    email: normalizedEmail,
     role: 'user', // Default
     status: 'active',
     subscription: {
@@ -66,16 +93,17 @@ export async function getOrCreateUser(uid: string, email: string): Promise<UserP
     createdAt: now.toISOString()
   };
 
-  // Hardcode Super Admin if needed (matching prompts)
-  const superAdmins = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'];
-  if (superAdmins.includes(email.toLowerCase())) {
+  // Hardcode Super Admin if needed
+  const superAdmins = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com', 'rubenllego@autobuddy.pro'];
+  if (superAdmins.includes(normalizedEmail)) {
+    console.log(`[USER SERVICE] Assigning Super Admin role to new record: ${normalizedEmail}`);
     newUser.role = 'super_admin';
     newUser.subscription.plan = 'lifetime_pro';
     newUser.subscription.endDate = new Date(2099, 11, 31).toISOString();
   }
 
   await firestore.collection('users').doc(uid).set(newUser);
-  console.log(`[USER SERVICE] Auto-provisioned user ${email}`);
+  console.log(`[USER SERVICE] Auto-provisioned user ${normalizedEmail} successfully`);
   
   return newUser;
 }

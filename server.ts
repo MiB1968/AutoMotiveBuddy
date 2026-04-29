@@ -81,7 +81,7 @@ async function startServer() {
   // Load DTCs
   let dtcMaster: any[] = [];
   try {
-    const dataPath = path.join(process.cwd(), 'data/dtc_master.json');
+    const dataPath = path.join(process.cwd(), 'src/lib/dtc_master.json');
     if (fs.existsSync(dataPath)) {
       dtcMaster = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
     }
