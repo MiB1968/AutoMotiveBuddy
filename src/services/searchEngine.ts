@@ -8,7 +8,7 @@ export const searchLocalDB = async (query: string) => {
   const normalized = normalize(query);
 
   const wiring = await db.getAll('wiring');
-  const fuses = await db.getAll('fuses');
+  const fuses = await db.getAll('fuses'); // Since they are now all in one store though they might have fuse_box_id
   const relays = await db.getAll('relays');
 
   const results = [
@@ -16,10 +16,10 @@ export const searchLocalDB = async (query: string) => {
       normalize(w.component + ' ' + w.wire_color).includes(normalized)
     ),
     ...fuses.filter(f =>
-      normalize(f.component + ' ' + f.fuse_number).includes(normalized)
+      normalize(f.function || '' + ' ' + f.fuse_number).includes(normalized)
     ),
     ...relays.filter(r =>
-      normalize(r.name).includes(normalized)
+      normalize(r.relay_name || '' + ' ' + r.function).includes(normalized)
     )
   ];
 

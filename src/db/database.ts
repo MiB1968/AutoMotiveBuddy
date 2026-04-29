@@ -1,10 +1,32 @@
 import { openDB } from 'idb';
 
-export const dbPromise = openDB('autoMotiveBuddyDB', 2, {
-  upgrade(db) {
+export const dbPromise = openDB('autoMotiveBuddyDB', 3, {
+  upgrade(db, oldVersion) {
+    // Delete legacy structures
+    if (db.objectStoreNames.contains('fuses')) db.deleteObjectStore('fuses');
+    if (db.objectStoreNames.contains('relays')) db.deleteObjectStore('relays');
+
     // VEHICLES
     if (!db.objectStoreNames.contains('vehicles')) {
       db.createObjectStore('vehicles', { keyPath: 'id' });
+    }
+
+    // FUSE_BOXES
+    if (!db.objectStoreNames.contains('fuse_boxes')) {
+      const store = db.createObjectStore('fuse_boxes', { keyPath: 'id' });
+      store.createIndex('vehicle_id', 'vehicle_id');
+    }
+
+    // FUSES (Normalized)
+    if (!db.objectStoreNames.contains('fuses')) {
+      const store = db.createObjectStore('fuses', { keyPath: 'id' });
+      store.createIndex('fuse_box_id', 'fuse_box_id');
+    }
+
+    // RELAYS (Normalized)
+    if (!db.objectStoreNames.contains('relays')) {
+      const store = db.createObjectStore('relays', { keyPath: 'id' });
+      store.createIndex('fuse_box_id', 'fuse_box_id');
     }
 
     // WIRING
@@ -13,20 +35,6 @@ export const dbPromise = openDB('autoMotiveBuddyDB', 2, {
       store.createIndex('vehicle_id', 'vehicle_id');
       store.createIndex('component', 'component');
       store.createIndex('wire_color', 'wire_color');
-    }
-
-    // FUSES
-    if (!db.objectStoreNames.contains('fuses')) {
-      const store = db.createObjectStore('fuses', { keyPath: 'id' });
-      store.createIndex('vehicle_id', 'vehicle_id');
-      store.createIndex('fuse_number', 'fuse_number');
-    }
-
-    // RELAYS
-    if (!db.objectStoreNames.contains('relays')) {
-      const store = db.createObjectStore('relays', { keyPath: 'id' });
-      store.createIndex('vehicle_id', 'vehicle_id');
-      store.createIndex('name', 'name');
     }
 
     // CACHE (SEARCH RESULTS)

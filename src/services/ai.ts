@@ -34,8 +34,14 @@ MUST RETURN ONLY JSON using this exact schema:
   "vehicle": "${year} ${manufacturer} ${modelStr}",
   "system": "fuses",
   "confidence": 0.95,
-  "fuses": [{"id": "F1", "amperage": "15A", "color": "Blue", "circuit": "Fuel Pump"}],
-  "relays": [{"id": "R1", "function": "Starter Relay"}]
+  "fuse_boxes": [
+    {
+      "name": "Engine Bay",
+      "location_description": "Engine compartment",
+      "fuses": [{"id": "F1", "num": "F1", "amperage": 15, "function": "Fuel Pump", "status": "unknown"}],
+      "relays": [{"id": "R1", "name": "R1", "function": "Starter Relay"}]
+    }
+  ]
 }`;
     } else if (type === 'wiring') {
       systemPrompt = customPrompt || `You are an expert automotive master technician specialized in electrical diagnostics. Provide wiring color codes for ${year} ${manufacturer} ${modelStr} (${engine}). 

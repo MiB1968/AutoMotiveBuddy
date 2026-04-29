@@ -2592,46 +2592,39 @@ function FuseRelayTab({ store, user, toast }: any) {
     setResult(null);
     setActiveCategory(category);
     try {
-      const { smartCacheSearch } = await import('./services/db');
-      const queryStr = `${year} ${make} ${model} ${engine} fuses ${category}`;
-      
-      const cachedMatches = await smartCacheSearch<string>(queryStr, 'ai_data_fuses_');
-      let dataStr: string | null = null;
-      let usedCache = false;
-      let usedCacheKey = null;
+      // 1. Check if we already have it in DB
+      // Note: This relies on knowing the vehicleId (which we should have in `useVehicleStore`)
+      const { make, model, year, engine } = useVehicleStore.getState();
+      const vehicles = await fuseService.getVehicles();
+      const currentVehicle = vehicles.find((v: any) => v.make === make && v.model === model && v.year === year && v.engine === engine);
 
-      if (cachedMatches.length > 0 && cachedMatches[0].score > 0.6) {
-         dataStr = cachedMatches[0].value;
-         usedCacheKey = cachedMatches[0].key;
-         usedCache = true;
-         store.addLog(user.id, user.username, `Fuses Data Retrieval`, `Retrieved cached blueprint for ${category} (score: ${(cachedMatches[0].score * 100).toFixed(0)}%).`);
-      } else {
-         const prompt = category; // We just pass the category, systemPrompt handles the JSON schema now.
-         dataStr = await generateDynamicVehicleData('fuses', make, model, year, engine, prompt);
-         usedCacheKey = `ai_data_fuses_${make}_${model}_${year}_${engine}_${prompt}`;
-         store.addLog(user.id, user.username, `Fuses Data Generation`, `Live generated fuse box schema for ${year} ${make} ${model} [${category}].`);
+      let boxes: any[] = [];
+      if (currentVehicle) {
+        boxes = await fuseService.getVehicleFuseBoxes(currentVehicle.id);
       }
-      
-      setCurrentCacheKey(usedCacheKey);
-      
-      let parsedData;
-      try {
-          if (typeof dataStr === 'string' && dataStr.includes("### DATA TEMPORARILY UNAVAILABLE")) {
-             throw new Error(dataStr);
+
+      // 2. If not, generate and add to DB
+      if (boxes.length === 0) {
+          const dataStr = await generateDynamicVehicleData('fuses', make, model, year, engine, category);
+          
+          let parsedData;
+          try {
+              parsedData = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+          } catch (parseErr) {
+              throw new Error("Failed to parse hierarchical fuse data.");
           }
-          parsedData = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
-          if (!parsedData.confidence) parsedData.confidence = usedCache ? 0.98 : 0.95;
-      } catch (parseErr) {
-          console.error("Failed to parse AI JSON or received error message:", parseErr, dataStr);
-          throw new Error(dataStr && typeof dataStr === 'string' && dataStr.includes("###") ? dataStr : "CRITICAL: Neural uplink corrupted data format. AI hallucinated fuse schema.");
+
+          const vehicleEntry = { make, model, year, engine };
+          await fuseService.addVehicleHierarchy(vehicleEntry, parsedData.fuse_boxes || []);
+          
+          // Re-fetch boxes
+          const vehiclesAfter = await fuseService.getVehicles();
+          const newVehicle = vehiclesAfter.find((v: any) => v.make === make && v.model === model && v.year === year && v.engine === engine);
+          boxes = await fuseService.getVehicleFuseBoxes(newVehicle.id);
       }
       
-      // Strict validation layer
-      if (!parsedData.fuses && !parsedData.relays) {
-         throw new Error("Strict Validation Failed: Incomplete fuses/relays payload returned.");
-      }
-
-      setResult(parsedData);
+      // 3. Set hierarchical result
+      setResult({ fuse_boxes: boxes, confidence: 0.95 });
     } catch(err: any) {
       if (toast) toast(err.message || 'Failed to retrieve fuse/relay data', 'error');
     } finally {

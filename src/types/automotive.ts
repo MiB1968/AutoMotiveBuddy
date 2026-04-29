@@ -1,32 +1,38 @@
-export interface Wiring {
-  id: string;
-  vehicle_id: string;
-  system: string;
-  component: string;
-  wire_color: string;
-  voltage: string;
-  source: string;
-  destination: string;
-  location: string;
-  confidence: number;
+export interface Vehicle {
+  id: string | number;
+  brand: string;
+  model: string;
+  year: number;
+  engine: string;
+}
+
+export interface FuseBox {
+  id: string | number;
+  vehicle_id: string | number;
+  name: string;
+  location_description: string;
+  image_url?: string;
 }
 
 export interface Fuse {
-  id: string;
-  vehicle_id: string;
+  id: string | number;
+  fuse_box_id: string | number;
   fuse_number: string;
-  rating_amp: number;
-  component: string;
-  location: string;
-  confidence: number;
+  amperage: number;
+  function: string;
+  status: string;
 }
 
 export interface Relay {
-  id: string;
-  vehicle_id: string;
-  name: string;
-  input: string;
-  output: string;
-  location: string;
-  confidence: number;
+  id: string | number;
+  fuse_box_id: string | number;
+  relay_name: string;
+  function: string;
+}
+
+export interface FuseSystemV3 {
+  vehicles: Vehicle[];
+  fuse_boxes: FuseBox[];
+  fuses: Fuse[];
+  relays: Relay[];
 }

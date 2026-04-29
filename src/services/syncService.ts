@@ -7,7 +7,7 @@ import {
   doc
 } from 'firebase/firestore';
 
-const COLLECTIONS = ['wiring', 'fuses', 'relays'];
+const COLLECTIONS = ['vehicles', 'fuse_boxes', 'fuses', 'relays'];
 
 export const syncFromFirebase = async () => {
   const localDB = await dbPromise;
@@ -21,7 +21,7 @@ export const syncFromFirebase = async () => {
     }
   }
 
-  console.log("✅ Synced FROM Firebase → Local DB");
+  console.log("✅ Synced FROM Firebase → Local DB (Relational Structure)");
 };
 
 export const syncToFirebase = async () => {
@@ -31,12 +31,12 @@ export const syncToFirebase = async () => {
     const allData = await localDB.getAll(col);
 
     for (let item of allData) {
-      await setDoc(doc(db, col, item.id), {
+      await setDoc(doc(db, col, item.id.toString()), {
         ...item,
         updated_at: Date.now()
       });
     }
   }
 
-  console.log("☁️ Synced Local DB → Firebase");
+  console.log("☁️ Synced Local DB → Firebase (Relational Structure)");
 };
