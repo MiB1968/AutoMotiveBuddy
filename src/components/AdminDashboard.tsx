@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_URL = (import.meta as any).env.VITE_API_URL || '';
+import { BASE_API, getApiUrl as getUrl } from "../lib/config";
 
 export default function AdminDashboardProMax() {
   const [users, setUsers] = useState<any[]>([]);
@@ -20,7 +20,7 @@ export default function AdminDashboardProMax() {
 
   // FETCH USERS
   const fetchUsers = async () => {
-    const res = await fetch(`${API_URL}/admin/users`, {
+    const res = await fetch(getUrl("/api/admin/users"), {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -41,7 +41,7 @@ export default function AdminDashboardProMax() {
     if (!selectedUser) return;
     setLoading(true);
 
-    await fetch(`${API_URL}/admin/set-subscription`, {
+    await fetch(getUrl("/api/admin/set-subscription"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -60,7 +60,7 @@ export default function AdminDashboardProMax() {
 
   // DISABLE USER
   const disableUser = async (uid: string) => {
-    await fetch(`${API_URL}/admin/disable-user`, {
+    await fetch(getUrl("/api/admin/disable-user"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,7 +74,7 @@ export default function AdminDashboardProMax() {
 
   // CREATE GUEST
   const createGuest = async () => {
-    const res = await fetch(`${API_URL}/admin/create-guest`, {
+    const res = await fetch(getUrl("/api/admin/create-guest"), {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     });

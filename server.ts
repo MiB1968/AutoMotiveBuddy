@@ -3,27 +3,41 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
 import fs from 'fs';
-import * as admin from 'firebase-admin';
+import { getApps, initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import * as jose from 'jose';
 import { KeyManager } from './src/backend/core/keyManager';
 import { KeyLimiter } from './src/backend/core/keyLimiter';
 import { KeyRouter } from './src/backend/core/keyRouter';
+import authRouter from './src/backend/core/authRouter';
+import adminRouter from './src/backend/core/adminRouter';
+import { authenticateJWT } from './src/backend/middleware/auth';
+import { checkSubscription } from './src/backend/middleware/subscription';
 
 // Initialize Firebase Admin for Node
 const firebaseConfig = process.env.FIREBASE_CONFIG;
+let firebaseInitError: string | null = null;
+let adminApp: any = null;
+
 try {
   if (firebaseConfig) {
-    const apps = admin.apps || [];
+    const apps = getApps();
     if (apps.length === 0) {
-      const creds = JSON.parse(firebaseConfig);
-      admin.initializeApp({
-        credential: admin.credential.cert(creds)
+      const creds = JSON.parse(firebaseConfig) as ServiceAccount;
+      adminApp = initializeApp({
+        credential: cert(creds)
       });
-      console.log("Firebase Admin initialized in Node");
+      console.log("Firebase Admin initialized in Node (Modern SDK)");
+    } else {
+      adminApp = apps[0];
     }
+  } else {
+    firebaseInitError = "FIREBASE_CONFIG (Service Account JSON) is missing in environment variables.";
+    console.warn(firebaseInitError);
   }
-} catch (e) {
-  console.error("Error initializing Firebase Admin in Node:", e);
+} catch (e: any) {
+  firebaseInitError = `Firebase Admin Initialization Failed: ${e.message}`;
+  console.error(firebaseInitError);
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'neural-bridge-secret-999';
@@ -35,7 +49,14 @@ async function startServer() {
   app.use(cors({ origin: '*' }));
   app.use(express.json());
 
-  // Load DTCs from JSON
+  // Request logger
+  app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${req.method} ${req.url}`);
+    next();
+  });
+
+  // Load DTCs
   let dtcMaster: any[] = [];
   try {
     const dataPath = path.join(process.cwd(), 'data/dtc_master.json');
@@ -46,99 +67,43 @@ async function startServer() {
     console.error("Error loading DTC Master:", e);
   }
 
-  // --- AUTH ROUTES (Bridging to FastAPI structure) ---
-  app.post('/auth/exchange', async (req, res) => {
-    const { firebase_token } = req.body;
-    if (!firebase_token) return res.status(400).json({ error: "Missing token" });
-
-    try {
-      const decodedToken = await admin.auth().verifyIdToken(firebase_token);
-      const { uid, email } = decodedToken;
-
-      const adminEmails = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'];
-      const role = (email && adminEmails.includes(email.toLowerCase())) ? 'super_admin' : 'user';
-
-      const userPayload = {
-        uid,
-        email,
-        role,
-        status: 'active',
-        subscription: null
-      };
-
-      // Create JWT using jose
-      const secret = new TextEncoder().encode(JWT_SECRET);
-      const token = await new jose.SignJWT(userPayload)
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('12h')
-        .sign(secret);
-
-      res.json({ token, user: userPayload });
-    } catch (e: any) {
-      console.error("Auth exchange error:", e);
-      res.status(401).json({ error: "Invalid Firebase token" });
-    }
-  });
-
-  app.get('/user/profile', async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const token = authHeader.split(' ')[1];
-    try {
-      const secret = new TextEncoder().encode(JWT_SECRET);
-      const { payload } = await jose.jwtVerify(token, secret);
-      res.json({ status: "success", user: payload });
-    } catch (e) {
-      res.status(401).json({ error: "Invalid token" });
-    }
-  });
-
-  // --- SYNC ROUTES ---
-  app.post('/api/sync/upload', (req, res) => {
-    const logs = req.body.logs || [];
-    console.log(`Received ${logs.length} offline logs from client sync`);
-    res.json({ status: "received", count: logs.length });
-  });
-
-  app.get('/api/sync/download', (req, res) => {
-    res.json({
-      dtc: [
-        {
-          code: "P0101",
-          description: "Mass Air Flow Sensor Issue (Updated via Sync)",
-          system: "Powertrain",
-          symptoms: ["Check Engine Light", "Poor fuel economy"],
-          solutions: ["Replace MAF"]
-        }
-      ]
+  // --- HEALTH ---
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: "online", 
+      firebase: getApps().length > 0 ? "ready" : "not_initialized",
+      config_status: firebaseInitError || "ok"
     });
   });
 
-  // --- API ROUTES ---
+  // --- PUBLIC AUTH ---
+  app.use('/api/auth', authRouter);
 
-  // NEW: Search DTC by keyword
-  app.get('/api/dtc/search/:keyword', (req, res) => {
+  // --- PROTECTED ROUTES ---
+  const gated = [authenticateJWT, checkSubscription];
+
+  // Profile is just authenticated
+  app.get('/api/user/profile', authenticateJWT, (req: any, res) => {
+    res.json({ status: "success", user: req.user });
+  });
+
+  // ADMIN
+  app.use('/api/admin', adminRouter);
+
+  // DATA ACCESS (Gated by Subscription)
+  app.get('/api/dtc/search/:keyword', gated, (req, res) => {
     const { keyword } = req.params;
     const q = keyword.toLowerCase();
-
     const results = dtcMaster.filter(d =>
       d.code.toLowerCase().includes(q) ||
       d.description.toLowerCase().includes(q) ||
       (d.system && d.system.toLowerCase().includes(q))
     );
-
-    res.json(results.slice(0, 50)); // Limit to 50 results
+    res.json(results.slice(0, 50));
   });
 
-  // DTC Route (Multi-Layer Logic)
-  app.get('/api/dtc/:code', async (req, res) => {
+  app.get('/api/dtc/:code', gated, async (req, res) => {
     const code = req.params.code.toUpperCase();
-
-    // 1. Verified Lookups
     const dtc = dtcMaster.find(d => d.code === code);
     if (dtc) {
       return res.json({
@@ -150,97 +115,36 @@ async function startServer() {
         confidence: 1.0
       });
     }
-
-    // 2. Generic Fallback
-    const genericCodePrefix = code.substring(0, 3);
-    const generic = dtcMaster.find(d => d.code.startsWith(genericCodePrefix));
-    if (generic) {
-      return res.json({
-        code: code,
-        description: generic.description,
-        system: generic.system,
-        severity: generic.severity,
-        symptoms: [`Related to ${generic.causes}`],
-        solutions: [`Related to ${generic.solutions}`],
-        manufacturer: "Generic Fallback",
-        status: "PARTIAL",
-        confidence: 0.6
-      });
-    }
-
-    // 3. AI Fallback (Live Search Proxy)
-    // We move this to the frontend as per security guidelines.
-    // For now, return a placeholder that tells the frontend to use its own AI.
-    return res.json({
-      code: code,
-      description: `Searching for ${code} in global database...`,
-      system: "Cloud Matrix Sync",
-      severity: "medium",
-      symptoms: ["Pending live retrieval"],
-      solutions: ["System initializing search protocols"],
-      manufacturer: "SEARCH_REQUIRED",
-      status: "AI_PENDING",
-      confidence: 0.5
-    });
+    res.status(404).json({ error: "Code not found in master database" });
   });
 
-  // --- AI BACKEND ---
+  // AI DIAGNOSE (Gated)
   const keyManager = new KeyManager([process.env.GEMINI_API_KEY || ""]);
   const keyLimiter = new KeyLimiter();
   const keyRouter = new KeyRouter(keyManager, keyLimiter);
   const aiCache = new Map<string, string>();
 
-  app.post('/api/ai/diagnose', async (req, res) => {
+  app.post('/api/ai/diagnose', gated, async (req, res) => {
     const { code, symptoms } = req.body;
     const message = `Diagnose DTC code ${code} with symptoms ${symptoms}`;
     
     if (aiCache.has(message)) {
-        return res.json({ success: true, ai_data: aiCache.get(message) });
+      return res.json({ success: true, ai_data: aiCache.get(message) });
     }
 
     const result = await keyRouter.aiRequest(message);
     if (result) {
-        aiCache.set(message, result);
-        return res.json({ success: true, ai_data: result });
+      aiCache.set(message, result);
+      return res.json({ success: true, ai_data: result });
     }
-    
-    res.status(500).json({ error: "AI failed" });
+    res.status(500).json({ error: "AI reasoning failure" });
   });
 
-  app.post('/api/ai/generate', async (req, res) => {
-    return res.json({
-      result: "Frontend AI fallback triggered. Please ensure Gemini API is configured in the browser."
-    });
-  });
-
-  // Component Locator Route
-  app.post('/api/ai/component-locate', (req, res) => {
-    const { query } = req.body;
-    return res.json({
-      result: `Estimated location for [${query}]: Typically found in the engine bay or under the dashboard. Use an inspection mirror or refer to generic technical manuals for exact pinouts.`
-    });
-  });
-
-  // Live Telemetry Mock
-  app.get('/api/live/all', (req, res) => {
-    // Generate some simulated live data
+  // TELEMETRY (Gated)
+  app.get('/api/live/all', gated, (req, res) => {
     const rpm = Math.floor(800 + Math.random() * 2000);
     const temp = Math.floor(80 + Math.random() * 25);
     res.json({ rpm: rpm.toString(), temp: temp.toString() });
-  });
-
-  // Admin Logs Mock
-  app.get('/api/admin/logs', (req, res) => {
-    res.json([
-      { action: "DTC Search P0101", timestamp: new Date().toISOString() },
-      { action: "AI Diagnose Request", timestamp: new Date(Date.now() - 50000).toISOString() },
-      { action: "Live Telemetry Connected", timestamp: new Date(Date.now() - 100000).toISOString() }
-    ]);
-  });
-
-  // Unit Manuals Mock
-  app.get('/api/manual', (req, res) => {
-    res.json({ content: "### GENERAL SERVICE MANUAL\n\n1. Ensure vehicle is powered off before accessing main electronics.\n2. When servicing the high-voltage system, wear class 0 rubber gloves.\n3. Verify all DTCs using OBD-II scanner before replacing modules." });
   });
 
   // Vite integration
@@ -259,8 +163,9 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log("Server running on http://localhost:" + PORT);
+    console.log("AutoMoto Buddy Pro Backend running on http://localhost:" + PORT);
   });
 }
 
 startServer();
+

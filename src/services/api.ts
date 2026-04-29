@@ -1,22 +1,4 @@
-import axios from "axios";
-
-// This points to our backend API
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || "https://automotive-buddy-api-e5qr.onrender.com";
-
-const api = axios.create({
-  baseURL: API_BASE_URL
-});
-
-// Add a request interceptor to include the JWT token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('autobuddy_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+import api from "./apiClient";
 
 export const diagnoseDTC = async (code: string) => {
   try {

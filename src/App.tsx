@@ -46,7 +46,7 @@ import RestrictedAccountModal from './components/RestrictedAccountModal';
 import { syncData } from './sync/syncEngine';
 import axios from 'axios';
 
-const API_URL = (import.meta as any).env.VITE_API_URL || '';
+import { BASE_API, getApiUrl } from './lib/config';
 
 // --- UI Helper Components ---
 
@@ -600,6 +600,11 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hash, setHash] = useState(window.location.hash || '#home');
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
+
+  const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
   const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
 
   useEffect(() => {
@@ -608,22 +613,22 @@ export default function App() {
       if (user) {
         try {
           const idToken = await user.getIdToken();
-          console.log('Exchanging token with backend...');
+          const targetUrl = getApiUrl("/api/auth/exchange");
+          console.log(`Neural Exchange Initiated: ${targetUrl}`);
           
-          const response = await axios.post(`${API_URL}/auth/exchange`, {
+          const response = await axios.post(targetUrl, {
             firebase_token: idToken
-          });
+          }, { timeout: 20000 });
           
           const { token, user: userData } = response.data;
           localStorage.setItem('autobuddy_token', token);
           
           console.log('Backend JWT received and stored');
           setCurrentUser(userData);
-        } catch (error) {
-          console.error('Error in auth flow', error);
-          // If backend fails, we might still want to allow client-side only access if possible,
-          // but the prompt says BACKEND = FULL AUTHORITY.
-          // So we should probably show an error or log out.
+        } catch (error: any) {
+          const errMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Unknown connectivity failure";
+          console.error('Error in auth flow:', errMsg);
+          addToast(`Auth failure: ${errMsg}`, 'error');
           setCurrentUser(null);
         }
       } else {
@@ -687,9 +692,8 @@ export default function App() {
     }
   };
 
-  const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
   };
 
   useEffect(() => {

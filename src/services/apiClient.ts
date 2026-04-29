@@ -1,12 +1,13 @@
 import axios from "axios";
+import { BASE_API } from "../lib/config";
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:3000", // API is served by the same Express server
-  timeout: 10000,
+  baseURL: BASE_API,
+  timeout: 20000,
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("autobuddy_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
