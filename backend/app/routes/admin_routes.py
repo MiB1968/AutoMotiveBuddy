@@ -13,6 +13,13 @@ def get_users(user=Depends(require_super_admin)):
     users = [doc.to_dict() for doc in db.collection('users').stream()]
     return users
 
+@router.post("/set-admin")
+def set_admin(data: dict, user=Depends(require_super_admin)):
+    email = data.get("email")
+    db.collection('users').document(email).update({"role": "super_admin"})
+    log_admin_action(user["uid"], "SET_ADMIN", email)
+    return {"message": f"User {email} is now super_admin"}
+
 @router.post("/set-subscription")
 def set_subscription(data: dict, user=Depends(require_super_admin)):
     sub = create_subscription(data["plan"])
