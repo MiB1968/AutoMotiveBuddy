@@ -609,7 +609,12 @@ export default function App() {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             console.log('User doc found', userDoc.data());
-            setCurrentUser(userDoc.data() as UserType);
+            const data = userDoc.data() as UserType;
+            if (user.email === 'rubenlleg12@gmail.com' && data.role !== 'super_admin') {
+                data.role = 'super_admin';
+                await setDoc(doc(db, 'users', user.uid), data, { merge: true });
+            }
+            setCurrentUser(data);
           } else {
              console.log('User doc not found, creating new user');
              // NEW USER! Create doc
@@ -618,7 +623,7 @@ export default function App() {
                 username: user.email?.split('@')[0] || 'user_' + user.uid.substr(0, 5),
                 fullName: user.displayName || 'New Member',
                 email: user.email || '',
-                role: 'user',
+                role: user.email === 'rubenlleg12@gmail.com' ? 'super_admin' : 'user',
                 status: 'pending',
                 createdAt: new Date().toISOString(),
                 trial_start_date: new Date().toISOString(),
@@ -634,19 +639,8 @@ export default function App() {
           setCurrentUser(null);
         }
       } else {
-        console.log('No user signed in, activating guest');
-        setCurrentUser({
-            id: 'guest',
-            username: 'guest',
-            fullName: 'Guest User',
-            email: 'guest@example.com',
-            role: 'user',
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            trial_start_date: new Date().toISOString(),
-            trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
-            avatarUrl: '',
-        });
+        console.log('No user signed in');
+        setCurrentUser(null);
       }
       setAuthLoading(false);
     });
