@@ -14,7 +14,7 @@ import {
   Info, X, Crown, ShieldCheck, Mail, Lock, 
   Zap, Activity, Send, Menu, Filter, Save, Globe, 
   BookOpen, Truck, Tractor, Bike, Car, Download, CloudDownload,
-  Calendar, FileText, ChevronDown, Search, ArrowRight,
+  Calendar, FileText, ChevronDown, ChevronLeft, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer, Cable,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
   Mic, MicOff, Camera, Loader2, Brain, ThumbsUp, ThumbsDown
@@ -45,6 +45,8 @@ import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
 import RestrictedAccountModal from './components/RestrictedAccountModal';
 import { syncData } from './sync/syncEngine';
 import axios from 'axios';
+import { startSyncEngine } from './lib/sync';
+import { smartRequest } from './lib/smartApi';
 
 import { BASE_API, getApiUrl } from './lib/config';
 
@@ -366,6 +368,78 @@ function AIMaintenanceTab({ user, store }: any) {
   );
 }
 
+function DiagnosticTab({ toast }: any) {
+  const [symptom, setSymptom] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [diagnosis, setDiagnosis] = useState<any>(null);
+
+  const handleDiagnose = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!symptom) return;
+    setLoading(true);
+    try {
+      const res = await smartRequest("/ai/diagnose", { 
+        symptom,
+        vehicle: "Universal Node"
+      });
+      
+      if (res.offline) {
+        toast("Diagnosis queued for sync when online", "info");
+      } else {
+        setDiagnosis(res);
+      }
+    } catch (e) {
+      toast("AI Uplink Failed", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <HUDPanel className="p-6">
+        <form onSubmit={handleDiagnose} className="space-y-4">
+          <label className="text-[10px] text-brand uppercase tracking-widest font-bold">Neural Symptom Entry</label>
+          <textarea 
+            value={symptom}
+            onChange={(e) => setSymptom(e.target.value)}
+            placeholder="Describe behavior: e.g. Rough idle when cold, clicking sound on turns..."
+            className="w-full bg-black/40 border border-white/10 rounded-lg p-4 text-sm text-white h-32 focus:outline-none focus:border-brand/50 transition-all font-mono"
+          />
+          <button type="submit" disabled={loading} className="w-full btn-primary py-4 font-bold tracking-widest">
+            {loading ? "INITIALIZING NEURAL SCRUTINY..." : "EXECUTE AI DIAGNOSIS"}
+          </button>
+        </form>
+      </HUDPanel>
+
+      {diagnosis && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-brand/10 border border-brand/30 p-6 rounded-xl space-y-4"
+        >
+          <div className="flex justify-between items-center bg-brand/20 -mx-6 -mt-6 p-4 rounded-t-xl">
+             <div className="flex items-center gap-2">
+                <Brain className="text-brand" size={20} />
+                <span className="text-xs font-bold text-white uppercase tracking-widest">Diagnostic Verdict</span>
+             </div>
+             <span className="text-[10px] font-bold text-brand bg-white/10 px-2 py-0.5 rounded italic">
+                Confidence: {diagnosis.confidence}
+             </span>
+          </div>
+
+          <div>
+             <h3 className="text-white font-bold text-lg mb-2">{diagnosis.issue}</h3>
+             <div className="p-4 bg-black/40 rounded border border-white/5 font-mono text-xs text-text-secondary leading-relaxed">
+                {diagnosis.recommendation}
+             </div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 function UnitManualsTab() {
   const [manual, setManual] = useState("");
   const [loading, setLoading] = useState(false);
@@ -609,30 +683,42 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('Auth state changed', user);
+      console.log('--- AUTH STATE CHANGE ---', user?.email || 'No User');
+      setAuthLoading(true); // Ensure loading is shown during exchange
+      
       if (user) {
         try {
-          const idToken = await user.getIdToken();
+          console.log(`[AUTH] Fetching ID Token for ${user.email}...`);
+          const idToken = await user.getIdToken(true); // Force refresh
+          
           const targetUrl = getApiUrl("/api/auth/exchange");
-          console.log(`Neural Exchange Initiated: ${targetUrl}`);
+          console.log(`[AUTH] Neural Exchange Initiated: ${targetUrl}`);
           
           const response = await axios.post(targetUrl, {
             firebase_token: idToken
-          }, { timeout: 20000 });
+          }, { timeout: 30000 });
+          
+          console.log(`[AUTH] Backend Response:`, response.status);
           
           const { token, user: userData } = response.data;
-          localStorage.setItem('autobuddy_token', token);
+          if (!token) throw new Error("Backend did not return an authorization token");
           
-          console.log('Backend JWT received and stored');
+          localStorage.setItem('autobuddy_token', token);
+          console.log('[AUTH] Neural Link Established. User Role:', userData.role);
+          
           setCurrentUser(userData);
+          addToast(`Access Granted: Welcome ${userData.email}`, 'success');
+          
+          // Start Sync Engine
+          startSyncEngine();
         } catch (error: any) {
-          const errMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Unknown connectivity failure";
-          console.error('Error in auth flow:', errMsg);
-          addToast(`Auth failure: ${errMsg}`, 'error');
+          const errMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Unknown identity bridge failure";
+          console.error('[AUTH] Flow Critical Error:', errMsg);
+          addToast(`Auth Failure: ${errMsg}`, 'error');
           setCurrentUser(null);
         }
       } else {
-        console.log('No user signed in');
+        console.log('[AUTH] No Firebase Session Found');
         localStorage.removeItem('autobuddy_token');
         setCurrentUser(null);
       }
@@ -640,9 +726,22 @@ export default function App() {
     });
     
     async function init() {
-        await fuseService.ensureSeedData();
-        await initFuseSearchEngine();
-        setReady(true);
+        try {
+          console.log("[INIT] System Boot Sequence Initiated...");
+          // Reduced blocking calls to minimum
+          await Promise.race([
+            Promise.all([
+              fuseService.ensureSeedData(),
+              initFuseSearchEngine()
+            ]),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Init Timeout")), 10000))
+          ]);
+          console.log("[INIT] System Ready");
+        } catch (e) {
+          console.warn("[INIT] System initialization partially failed or timed out", e);
+        } finally {
+          setReady(true);
+        }
     }
     init();
 
@@ -732,7 +831,8 @@ export default function App() {
     if (currentUser) {
       try {
         const updated = { ...currentUser, avatarUrl: newUrl };
-        await setDoc(doc(db, 'users', currentUser.id), { avatarUrl: newUrl }, { merge: true });
+        const userId = currentUser.uid || currentUser.id;
+        await setDoc(doc(db, 'users', userId), { avatarUrl: newUrl }, { merge: true });
         setCurrentUser(updated);
         
         // If Ruben updates his avatar, also save it specifically so the public page can easily see it if needed
@@ -743,7 +843,7 @@ export default function App() {
         addToast('Profile avatar updated.', 'success');
       } catch (error: any) {
         try {
-          handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.id}`);
+          handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.uid || currentUser.id}`);
         } catch (wrappedError: any) {
           let errMsg = wrappedError.message || String(wrappedError);
           try {
@@ -1968,6 +2068,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
       <nav className="sidebar-nav overflow-y-auto space-y-1 md:space-y-2">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
+        <NavItem icon={Brain} label="AI Diagnostics" active={activeTab === 'diagnose'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('diagnose')} />
         <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={Cable} label="Wiring Color Coding" active={activeTab === 'wiring'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('wiring')} />
         <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
@@ -2081,6 +2182,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
             <AnimatePresence mode="wait">
               {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
+              {activeTab === 'diagnose' && <DiagnosticTab key="mbr-diag" toast={toast} />}
               {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
               {activeTab === 'wiring' && <WiringColorTab key="mbr-wiring" store={store} user={user} toast={toast} />}
               {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
@@ -2394,225 +2496,144 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
 
 // --- Wiring Color Coding Tab Component ---
 function WiringColorTab({ store, user, toast }: any) {
-  const globalVehicle = useVehicleStore();
-  const [make, setMake] = useState(globalVehicle.make);
-  const [model, setModel] = useState(globalVehicle.model);
-  const [year, setYear] = useState(globalVehicle.year);
-  const [engine, setEngine] = useState(globalVehicle.engine);
-  const [result, setResult] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [color, setColor] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
-  const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
-
-  const handleFeedback = async (isAccurate: boolean) => {
-     if (!currentCacheKey) return;
-     try {
-        const { updateCacheConfidence } = await import('./services/db');
-        const updated = await updateCacheConfidence(currentCacheKey, isAccurate);
-        if (updated) {
-           toast(`Feedback recorded. Neural matrix updated!`, 'success');
-           setResult((prev: any) => ({ ...prev, confidence: isAccurate ? Math.min(1.0, prev.confidence + 0.05) : Math.max(0.1, prev.confidence - 0.20) }));
-        }
-     } catch (e) { }
-  };
-
-  const handleSearch = async () => {
-    setIsLoading(true);
-    setResult(null);
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setLoading(true);
     try {
-      const { smartCacheSearch } = await import('./services/db');
-      const queryStr = `${year} ${make} ${model} ${engine} wiring`;
-      
-      // Layer 2: Cached Smart Search
-      let dataStr: string | null = null;
-      let usedCache = false;
-      let usedCacheKey = null;
-
-      const cachedMatches = await smartCacheSearch<string>(queryStr, 'ai_data_wiring_');
-      if (cachedMatches.length > 0 && cachedMatches[0].score > 0.6) {
-         dataStr = cachedMatches[0].value;
-         usedCacheKey = cachedMatches[0].key;
-         usedCache = true;
-         // Store log
-         store.addLog(user.id, user.username, `Wiring Data Retreival`, `Retrieved cached blueprint (score: ${(cachedMatches[0].score * 100).toFixed(0)}%) for ${year} ${make} ${model}.`);
-      } else {
-         // Layer 3: Live AI Generation
-         const prompt = `Provide standardized wiring color codes for ${make} ${model} ${year} ${engine}. Focus on common circuits (e.g., Ground, Ignition, Constant Power, CAN Bus). Format as JSON: { "circuits": [{"intent": "e.g. Ground", "color": "e.g. Black", "note": "Commonly connects to chassis"} ] }`;
-         dataStr = await generateDynamicVehicleData('wiring', make, model, year, engine, prompt);
-         usedCacheKey = `ai_data_wiring_${make}_${model}_${year}_${engine}_${prompt}`;
-         store.addLog(user.id, user.username, `Wiring Data Generation`, `Live decoded wiring schema for ${year} ${make} ${model}.`);
+      const res = await api.get(`/wiring/search`, {
+        params: { query, color }
+      });
+      setResults(res.data.results || []);
+      if (res.data.results?.length > 0) {
+        toast(`Found ${res.data.results.length} wiring matches`, "success");
       }
-      
-      setCurrentCacheKey(usedCacheKey);
-      
-      let parsedData;
-      try {
-          if (typeof dataStr === 'string' && dataStr.includes("### DATA TEMPORARILY UNAVAILABLE")) {
-             throw new Error(dataStr);
-          }
-          parsedData = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
-          if (!parsedData.confidence) parsedData.confidence = usedCache ? 0.98 : 0.95;
-      } catch (parseErr) {
-          console.error("Failed to parse AI JSON or received error message:", parseErr, dataStr);
-          throw new Error(dataStr && typeof dataStr === 'string' && dataStr.includes("###") ? dataStr : "CRITICAL: Neural uplink corrupted data format. AI hallucinated wiring schema.");
-      }
-      
-      // Strict validation layer
-      if (!parsedData.circuits || !Array.isArray(parsedData.circuits) || parsedData.circuits.length === 0) {
-         throw new Error("Strict Validation Failed: Incomplete circuits payload returned by neural matrix.");
-      }
-
-      setResult(parsedData);
-    } catch(err: any) {
-      if (toast) toast(err.message || 'Failed to retrieve wiring data', 'error');
+    } catch (e) {
+      console.error("Wiring search failed", e);
+      toast("Wiring Database Connection Failed", "error");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  const wireColors = [
+    { name: "Black", code: "BK", hex: "#000000" },
+    { name: "Red", code: "RD", hex: "#FF0000" },
+    { name: "Blue", code: "BU", hex: "#0000FF" },
+    { name: "Green", code: "GN", hex: "#00FF00" },
+    { name: "Yellow", code: "YE", hex: "#FFFF00" },
+    { name: "White", code: "WH", hex: "#FFFFFF" },
+    { name: "Brown", code: "BN", hex: "#8B4513" },
+    { name: "Orange", code: "OR", hex: "#FFA500" },
+    { name: "Purple", code: "VT", hex: "#800080" },
+    { name: "Grey", code: "GY", hex: "#808080" },
+  ];
+
   return (
-    <div className="max-w-5xl mx-auto -mt-8 md:mt-0 pt-4">
-      <div className="w-full mx-auto min-h-[80vh] flex flex-col font-sans text-white pb-12 relative overflow-hidden">
-        {/* Background Glows */}
-        <div className="absolute top-[-10%] left-[-10%] w-full h-[40%] bg-brand/5 blur-[120px] rounded-full -z-10" />
-        <div className="absolute bottom-[-5%] right-[-10%] w-full h-[30%] bg-brand-dark/5 blur-[100px] rounded-full -z-10" />
-
-        {/* Header */}
-        <header className="px-6 pb-2 md:pb-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex-1 flex justify-center w-full">
-            <h2 className="text-xl md:text-2xl font-bold font-display tracking-widest text-center uppercase relative">
-              <span className="text-brand">Wiring</span> Color Coding
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-brand/50 rounded-full" />
-            </h2>
-          </div>
-        </header>
-
-        <main className="flex-1 px-6 py-4 overflow-y-auto custom-scrollbar">
-           <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
-             <div className="md:col-span-2">
-               <div className="diag-card group">
-                 {/* Accent Top Line */}
-                 <div className="absolute top-0 left-0 w-full h-[2px] overflow-hidden">
-                   <div className="w-1/3 h-full bg-brand animate-[shimmer_infinite_3s] opacity-0 group-hover:opacity-100 transition-opacity" />
-                 </div>
-                 
-                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Make</label>
-                        <input className="diag-input" list="wiring-makes" placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
-                        <datalist id="wiring-makes">
-                          {vehicleDatabase.manufacturers.map(mfr => (
-                            <option key={mfr.id} value={mfr.name} />
-                          ))}
-                        </datalist>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model</label>
-                        <input className="diag-input" list="wiring-models" placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
-                        <datalist id="wiring-models">
-                          {selectedMfr?.models.map(mdl => (
-                            <option key={mdl.id} value={mdl.name} />
-                          ))}
-                        </datalist>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Year</label>
-                        <input className="diag-input" list="wiring-years" placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
-                        <datalist id="wiring-years">
-                          {selectedMod?.years.map(yr => (
-                            <option key={yr} value={yr} />
-                          ))}
-                        </datalist>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Engine</label>
-                        <input className="diag-input" list="wiring-engines" placeholder="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} />
-                        <datalist id="wiring-engines">
-                          {(selectedMod?.engines || []).map(eng => (
-                            <option key={eng} value={eng} />
-                          ))}
-                        </datalist>
-                      </div>
-                    </div>
-
-                    <button 
-                          onClick={handleSearch}
-                          disabled={isLoading}
-                          className="diag-primary-btn group mt-4 w-full"
-                    >
-                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Cable size={16} />}
-                      {isLoading ? "RETRIEVING CODES..." : "ANALYZE CIRCUIT INTENT"}
-                      {!isLoading && <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform ml-auto" />}
-                    </button>
-                 </div>
-               </div>
-             </div>
-             
-             <div className="md:col-span-3">
-               {isLoading ? (
-                <div className="flex justify-center p-10">
-                    <Loader2 className="animate-spin text-purple-500" size={32} />
-                </div>
-              ) : result ? (
-                <motion.div 
-                   initial={{ opacity: 0, y: 20 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   className="space-y-4"
-                >
-                    <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 p-3 rounded-xl mb-4">
-                       <div className="flex items-center gap-3">
-                          <Brain size={16} className={result.confidence >= 0.9 ? "text-green-500" : "text-yellow-500"} />
-                          <div>
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Confidence Score</div>
-                            <div className={`text-sm font-bold ${result.confidence >= 0.9 ? "text-green-500" : "text-yellow-500"}`}>{(result.confidence * 100).toFixed(0)}% Match</div>
-                          </div>
-                       </div>
-                       <div className="flex items-center gap-2">
-                          <button onClick={() => handleFeedback(true)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-green-500 transition-colors" title="Accurate"><ThumbsUp size={14}/></button>
-                          <button onClick={() => handleFeedback(false)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-500 transition-colors" title="Inaccurate"><ThumbsDown size={14}/></button>
-                       </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {result.circuits?.map((c: any, i: number) => (
-                          <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 hover:border-brand/30 transition-colors">
-                              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-[10px] uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{color: c.color?.toLowerCase() === 'black' ? 'white' : 'black', backgroundColor: c.color?.toLowerCase() === 'black' ? '#222' : c.color?.toLowerCase() || 'gray'}}>
-                                  {c.color}
-                              </div>
-                              <div className="flex-1">
-                                  <div className="text-sm font-bold text-white">{c.intent}</div>
-                                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{c.note}</div>
-                              </div>
-                          </div>
-                      ))}
-                    </div>
-                </motion.div>
-               ) : (
-                <div className="diag-card h-full min-h-[250px] flex items-center justify-center text-center">
-                    <div className="flex flex-col items-center">
-                      {isLoading ? (
-                        <>
-                          <div className="w-10 h-10 border-4 border-brand/20 border-t-brand rounded-full animate-spin mb-4" />
-                          <h3 className="text-sm font-bold text-brand uppercase tracking-widest animate-pulse">Scanning Blueprint...</h3>
-                        </>
-                      ) : (
-                        <>
-                          <Cable size={32} className="text-zinc-600 mb-4" />
-                          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Wiring Data Ready</h3>
-                          <p className="text-[10px] text-zinc-600 max-w-[200px] mt-2 uppercase tracking-wide leading-relaxed">Enter vehicle details and analyze circuit intent to load standardized wiring color references.</p>
-                        </>
-                      )}
-                    </div>
-                </div>
-               )}
-             </div>
-           </div>
-        </main>
+    <div className="max-w-5xl mx-auto -mt-8 md:mt-0 pt-4 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-3 mb-6 bg-brand/10 p-4 rounded-xl border border-brand/20">
+        <Cable size={24} className="text-brand" />
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">Electrical Schematic & Wiring Database</h2>
+          <p className="text-[10px] text-brand uppercase tracking-[0.2em] font-bold">Production-Grade Electrical Lookup</p>
+        </div>
       </div>
+
+      <HUDPanel className="p-6">
+        <form onSubmit={handleSearch} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] text-brand uppercase tracking-widest font-bold">Function / Sensor / Circuit</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                <input 
+                  type="text" 
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. Ground, ECU, Fuel Pump..."
+                  className="w-full bg-black/40 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-brand/50 transition-all font-mono"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] text-brand uppercase tracking-widest font-bold">Standard Color</label>
+              <select 
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-lg py-3 px-4 text-sm text-white focus:outline-none focus:border-brand/50 transition-all font-mono capitalize"
+              >
+                <option value="">All Master Colors</option>
+                {wireColors.map(c => (
+                  <option key={c.code} value={c.name}>{c.name} ({c.code})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button type="submit" disabled={loading} className="w-full btn-primary py-4 text-xs tracking-widest font-bold shadow-lg">
+            {loading ? "DECODING SCHEMATICS..." : "INITIALIZE CIRCUIT IDENTIFICATION"}
+          </button>
+        </form>
+      </HUDPanel>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+        <AnimatePresence mode="popLayout">
+          {results.map((w, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              layout
+              className="bg-black/40 border border-white/10 rounded-xl overflow-hidden hover:border-brand/30 transition-all group shadow-2xl"
+            >
+              <div className="h-1.5 w-full bg-white/5 relative">
+                <div 
+                  className="absolute inset-0 transition-transform duration-500 group-hover:scale-x-110 origin-left"
+                  style={{ backgroundColor: wireColors.find(c => c.name === w.color)?.hex || '#555' }}
+                />
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="text-white font-bold text-[13px] tracking-tight mb-1">{w.circuit}</h3>
+                    <p className="text-[9px] text-text-muted uppercase tracking-widest font-bold">{w.system}</p>
+                  </div>
+                  <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${
+                    w.risk_level === 'critical' ? 'bg-red-500 text-white animate-pulse' :
+                    w.risk_level === 'high' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                    'bg-brand/20 text-brand border border-brand/30'
+                  }`}>
+                    {w.risk_level} Risk
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between text-[10px] items-center border-b border-white/5 pb-2">
+                    <span className="text-text-muted uppercase tracking-wider font-bold">Standard Color</span>
+                    <span className="text-white font-mono font-bold tracking-widest">{w.color} [{w.code}]</span>
+                  </div>
+                  
+                  <div className="bg-white/5 p-3 rounded-lg border border-brand/10 transition-colors group-hover:bg-brand/5">
+                    <p className="text-xs text-text-secondary leading-relaxed italic">
+                      "{w.function}"
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {results.length === 0 && !loading && (
+        <div className="text-center py-32 opacity-20 flex flex-col items-center gap-4">
+           <Cpu size={64} className="animate-pulse" />
+           <p className="text-xs font-bold uppercase tracking-[0.3em]">Neural Matrix Standby</p>
+        </div>
+      )}
     </div>
   );
 }

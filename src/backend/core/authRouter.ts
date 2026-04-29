@@ -1,44 +1,50 @@
-import express from 'express';
-import { getAuth } from 'firebase-admin/auth';
-import * as jose from 'jose';
-import { DB } from './db';
+import { Router } from "express";
+import { getAuth } from "firebase-admin/auth";
+import * as jose from "jose";
+import { getOrCreateUser } from "../services/userService";
 
-const router = express.Router();
+const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'neural-bridge-secret-999';
+const secret = new TextEncoder().encode(JWT_SECRET);
 
-router.post('/exchange', async (req, res) => {
+router.post("/exchange", async (req, res) => {
   const { firebase_token } = req.body;
-  if (!firebase_token) return res.status(400).json({ error: "Missing token" });
+  if (!firebase_token) return res.status(400).json({ error: "Missing identity token" });
 
   try {
+    // 1. Verify Identity
     const decodedToken = await getAuth().verifyIdToken(firebase_token);
     const { uid, email } = decodedToken;
     
-    if (!email) return res.status(400).json({ error: "Email is required for identity" });
+    if (!email) {
+      console.error("[AUTH] Token missing email for UID:", uid);
+      return res.status(400).json({ error: "Email verified identity required" });
+    }
 
-    // Roles Logic
-    const adminEmails = ['rubenlleg12@gmail.com', 'rubenllego12@gmail.com'];
-    const role = adminEmails.includes(email.toLowerCase()) ? 'super_admin' : 'user';
+    // 2. Fetch or Sync User (Auto-Recovery System to ensure ZERO login failure)
+    const user = await getOrCreateUser(uid, email);
 
-    // Upsert user in our local DB
-    const user = DB.upsertUser({
-      uid,
-      email,
-      role: role as any
-    });
-
-    // Sign JWT
-    const secret = new TextEncoder().encode(JWT_SECRET);
-    const token = await new jose.SignJWT({ ...user })
+    // 3. Issue Production JWT (Single Authority)
+    const token = await new jose.SignJWT({ 
+        uid: user.uid, 
+        email: user.email, 
+        role: user.role,
+        subscription: user.subscription?.plan || 'trial_24h'
+      })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('12h')
+      .setExpirationTime('72h') 
       .sign(secret);
 
+    console.log(`[AUTH] Neural Link Established: ${email} [${user.role}]`);
     res.json({ token, user });
   } catch (e: any) {
-    console.error("[AUTH] Exchange error:", e.message);
-    res.status(401).json({ error: "Invalid identity token" });
+    console.error("[AUTH] Exchange Critical Failure:", e.message);
+    res.status(401).json({ 
+        error: "Identity Exchange Failed", 
+        message: e.message,
+        recovery_hint: "Ensure FIREBASE_CONFIG is set and browser allows connectivity"
+    });
   }
 });
 

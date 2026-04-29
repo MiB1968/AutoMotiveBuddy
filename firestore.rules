@@ -1,8 +1,52 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Check if user is a Super Admin in the system
+    function isSuperAdmin() {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+    }
+
+    // Default Deny
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // --- USERS ---
+    match /users/{userId} {
+      // Allow user to read their own record or Super Admin to read all
+      allow read, list: if isOwner(userId) || isSuperAdmin();
+      
+      // Allow creation during initial token exchange (handled by backend usually, but for frontend fallback)
+      allow create: if isOwner(userId) && 
+        incoming().role == 'user' && 
+        incoming().status == 'active';
+        
+      // Allow Super Admin to update everything
+      // Allow User to update only non-critical fields
+      allow update: if isSuperAdmin() || (
+        isOwner(userId) && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['avatarUrl', 'username', 'fullName'])
+      );
+    }
+
+    // --- LOGS ---
+    match /logs/{logId} {
+      allow read, list, write: if isSuperAdmin();
+    }
+
+    // --- SAVED ITEMS ---
+    match /saved_items/{itemId} {
+      allow read, list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
   }
 }

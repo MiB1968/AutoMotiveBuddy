@@ -1,105 +1,40 @@
 {
   "entities": {
     "User": {
-      "title": "User",
-      "description": "System users and mechanics",
+      "title": "User Profile",
+      "description": "System operative profile with role and subscription status",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "username": { "type": "string" },
-        "fullName": { "type": "string" },
+        "uid": { "type": "string" },
         "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "member"] },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "createdAt": { "type": "string" },
-        "avatarUrl": { "type": "string" }
+        "role": { "type": "string", "enum": ["user", "admin", "super_admin"] },
+        "status": { "type": "string", "enum": ["active", "disabled", "pending"] },
+        "subscription": {
+          "type": "object",
+          "properties": {
+            "plan": { "type": "string" },
+            "startDate": { "type": "string", "format": "date-time" },
+            "endDate": { "type": "string", "format": "date-time" },
+            "active": { "type": "boolean" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "username", "role", "createdAt"]
-    },
-    "Wiring": {
-      "title": "Wiring",
-      "description": "Wiring information",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "vehicle_id": { "type": "string" },
-        "system": { "type": "string" },
-        "component": { "type": "string" },
-        "wire_color": { "type": "string" },
-        "voltage": { "type": "string" },
-        "source": { "type": "string" },
-        "destination": { "type": "string" },
-        "location": { "type": "string" },
-        "confidence": { "type": "number" }
-      },
-      "required": ["id", "vehicle_id", "component"]
-    },
-    "Fuse": {
-      "title": "Fuse",
-      "description": "Fuse information",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "vehicle_id": { "type": "string" },
-        "fuse_number": { "type": "string" },
-        "rating_amp": { "type": "number" },
-        "component": { "type": "string" },
-        "location": { "type": "string" },
-        "confidence": { "type": "number" }
-      },
-      "required": ["id", "vehicle_id", "fuse_number"]
-    },
-    "Relay": {
-      "title": "Relay",
-      "description": "Relay information",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "vehicle_id": { "type": "string" },
-        "name": { "type": "string" },
-        "input": { "type": "string" },
-        "output": { "type": "string" },
-        "location": { "type": "string" },
-        "confidence": { "type": "number" }
-      },
-      "required": ["id", "vehicle_id", "name"]
-    },
-    "Cache": {
-      "title": "Cache",
-      "description": "System cache",
-      "type": "object",
-      "properties": {
-        "query": { "type": "string" },
-        "results": { "type": "object" },
-        "timestamp": { "type": "number" }
-      },
-      "required": ["query", "timestamp"]
+      "required": ["uid", "email", "role", "status"]
     }
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": { "$ref": "#/entities/User" },
-      "description": "User profiles"
+      "schema": "User",
+      "description": "User profile document"
     },
     "/logs/{logId}": {
-      "schema": { "$ref": "#/entities/Log" },
-      "description": "System activity logs"
+      "schema": "object",
+      "description": "System audit logs"
     },
-    "/wiring/{wiringId}": {
-      "schema": { "$ref": "#/entities/Wiring" },
-      "description": "Wiring info"
-    },
-    "/fuses/{fuseId}": {
-      "schema": { "$ref": "#/entities/Fuse" },
-      "description": "Fuse info"
-    },
-    "/relays/{relayId}": {
-      "schema": { "$ref": "#/entities/Relay" },
-      "description": "Relay info"
-    },
-    "/cache/{query}": {
-      "schema": { "$ref": "#/entities/Cache" },
-      "description": "System cache"
+    "/saved_items/{itemId}": {
+      "schema": "object",
+      "description": "User saved diagnostics"
     }
   }
 }

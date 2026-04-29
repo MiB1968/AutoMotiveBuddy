@@ -5,12 +5,17 @@ import cors from 'cors';
 import fs from 'fs';
 import { getApps, initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as jose from 'jose';
 import { KeyManager } from './src/backend/core/keyManager';
 import { KeyLimiter } from './src/backend/core/keyLimiter';
 import { KeyRouter } from './src/backend/core/keyRouter';
 import authRouter from './src/backend/core/authRouter';
 import adminRouter from './src/backend/core/adminRouter';
+import wiringRouter from './src/backend/core/wiringRouter';
+import dtcRouter from './src/backend/core/dtcRouter';
+import aiRouter from './src/backend/core/aiRouter';
+import syncRouter from './src/backend/core/syncRouter';
 import { authenticateJWT } from './src/backend/middleware/auth';
 import { checkSubscription } from './src/backend/middleware/subscription';
 
@@ -18,6 +23,7 @@ import { checkSubscription } from './src/backend/middleware/subscription';
 const firebaseConfig = process.env.FIREBASE_CONFIG;
 let firebaseInitError: string | null = null;
 let adminApp: any = null;
+let firestore: any = null;
 
 try {
   if (firebaseConfig) {
@@ -31,6 +37,20 @@ try {
     } else {
       adminApp = apps[0];
     }
+    let firestoreDbId: string | undefined = undefined;
+    try {
+      const appConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(appConfigPath)) {
+        const appConfig = JSON.parse(fs.readFileSync(appConfigPath, 'utf-8'));
+        firestoreDbId = appConfig.firestoreDatabaseId;
+        if (firestoreDbId) console.log(`[FIREBASE] Using database: ${firestoreDbId}`);
+      }
+    } catch (e) {
+      console.warn("Could not read firebase-applet-config.json for databaseId context");
+    }
+
+    // @ts-ignore
+    firestore = getFirestore(adminApp, firestoreDbId);
   } else {
     firebaseInitError = "FIREBASE_CONFIG (Service Account JSON) is missing in environment variables.";
     console.warn(firebaseInitError);
@@ -39,6 +59,8 @@ try {
   firebaseInitError = `Firebase Admin Initialization Failed: ${e.message}`;
   console.error(firebaseInitError);
 }
+
+export { firestore };
 
 const JWT_SECRET = process.env.JWT_SECRET || 'neural-bridge-secret-999';
 
@@ -90,55 +112,17 @@ async function startServer() {
   // ADMIN
   app.use('/api/admin', adminRouter);
 
-  // DATA ACCESS (Gated by Subscription)
-  app.get('/api/dtc/search/:keyword', gated, (req, res) => {
-    const { keyword } = req.params;
-    const q = keyword.toLowerCase();
-    const results = dtcMaster.filter(d =>
-      d.code.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      (d.system && d.system.toLowerCase().includes(q))
-    );
-    res.json(results.slice(0, 50));
-  });
+  // WIRING (Gated)
+  app.use('/api/wiring', gated, wiringRouter);
 
-  app.get('/api/dtc/:code', gated, async (req, res) => {
-    const code = req.params.code.toUpperCase();
-    const dtc = dtcMaster.find(d => d.code === code);
-    if (dtc) {
-      return res.json({
-        ...dtc,
-        causes: Array.isArray(dtc.causes) ? dtc.causes : (typeof dtc.causes === 'string' ? dtc.causes.split(',') : []),
-        symptoms: Array.isArray(dtc.symptoms) ? dtc.symptoms : (typeof dtc.symptoms === 'string' ? dtc.symptoms.split(',') : []),
-        solutions: Array.isArray(dtc.solutions) ? dtc.solutions : (typeof dtc.solutions === 'string' ? dtc.solutions.split(',') : []),
-        status: "VERIFIED",
-        confidence: 1.0
-      });
-    }
-    res.status(404).json({ error: "Code not found in master database" });
-  });
+  // DTC (Gated)
+  app.use('/api/dtc', gated, dtcRouter);
 
-  // AI DIAGNOSE (Gated)
-  const keyManager = new KeyManager([process.env.GEMINI_API_KEY || ""]);
-  const keyLimiter = new KeyLimiter();
-  const keyRouter = new KeyRouter(keyManager, keyLimiter);
-  const aiCache = new Map<string, string>();
+  // AI (Gated)
+  app.use('/api/ai', gated, aiRouter);
 
-  app.post('/api/ai/diagnose', gated, async (req, res) => {
-    const { code, symptoms } = req.body;
-    const message = `Diagnose DTC code ${code} with symptoms ${symptoms}`;
-    
-    if (aiCache.has(message)) {
-      return res.json({ success: true, ai_data: aiCache.get(message) });
-    }
-
-    const result = await keyRouter.aiRequest(message);
-    if (result) {
-      aiCache.set(message, result);
-      return res.json({ success: true, ai_data: result });
-    }
-    res.status(500).json({ error: "AI reasoning failure" });
-  });
+  // SYNC (Gated)
+  app.use('/api/sync', gated, syncRouter);
 
   // TELEMETRY (Gated)
   app.get('/api/live/all', gated, (req, res) => {

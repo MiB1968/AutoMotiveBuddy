@@ -75,16 +75,22 @@ export interface VehicleUnit {
 }
 
 export interface User {
-  id: string;
-  username: string;
-  fullName: string;
-  email?: string;
-  password?: string;
-  role: 'user' | 'admin' | 'super_admin';
-  status: 'pending' | 'active' | 'blocked';
+  id: string; // fallback
+  uid: string; // backend primary
+  username?: string;
+  fullName?: string;
+  email: string;
+  role: 'user' | 'admin' | 'super_admin' | 'guest';
+  status: 'pending' | 'active' | 'blocked' | 'disabled';
   createdAt: string;
-  trial_start_date: string;
-  trial_end_date: string;
+  subscription?: {
+    plan: '1_month' | '3_month' | '6_month' | '1_year' | 'guest_24h' | 'none';
+    startDate: string;
+    endDate: string;
+  } | null;
+  // Legacy fields for UI compatibility
+  trial_start_date?: string;
+  trial_end_date?: string;
   account_start_date?: string;
   account_end_date?: string;
   avatarUrl?: string;
@@ -140,9 +146,10 @@ const getSafeAvatar = () => {
 // Initial Admin
 const INITIAL_ADMIN: User = {
   id: 'admin-001',
+  uid: 'admin-uid-001',
   username: 'rubenllego',
   fullName: 'Ruben Llego O.',
-  password: 'admin123',
+  email: 'rubenllego@autobuddy.pro',
   role: 'super_admin',
   status: 'active',
   createdAt: new Date().toISOString(),

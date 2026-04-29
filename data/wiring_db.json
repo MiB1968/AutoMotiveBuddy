@@ -1,0 +1,58 @@
+{
+  "vehicles": [
+    {
+      "id": "universal",
+      "name": "Universal Automotive Wiring",
+      "systems": [
+        {
+          "system": "Lighting System",
+          "circuits": [
+            {
+              "name": "Headlight Circuit",
+              "wires": [
+                { "color": "Black", "code": "BK", "function": "Ground / Earth connection", "risk_level": "low" },
+                { "color": "Red", "code": "RD", "function": "Power supply to headlight relay", "risk_level": "high" },
+                { "color": "Yellow", "code": "YE", "function": "Low beam / signal line", "risk_level": "medium" },
+                { "color": "White", "code": "WH", "function": "High beam supply", "risk_level": "medium" }
+              ]
+            },
+            {
+              "name": "Turn Signal Circuit",
+              "wires": [
+                { "color": "Green", "code": "GN", "function": "Left turn indicator signal", "risk_level": "medium" },
+                { "color": "Green/White", "code": "GN/WH", "function": "Right turn indicator signal", "risk_level": "medium" }
+              ]
+            }
+          ]
+        },
+        {
+          "system": "Engine Management",
+          "circuits": [
+            {
+              "name": "ECU Power Circuit",
+              "wires": [
+                { "color": "Brown", "code": "BN", "function": "Ignition power feed (15)", "risk_level": "high" },
+                { "color": "Blue", "code": "BU", "function": "Sensor signal return line", "risk_level": "medium" },
+                { "color": "Orange", "code": "OR", "function": "CAN Bus High", "risk_level": "medium" },
+                { "color": "Orange/Black", "code": "OR/BK", "function": "CAN Bus Low", "risk_level": "medium" }
+              ]
+            }
+          ]
+        },
+        {
+          "system": "Charging System",
+          "circuits": [
+            {
+              "name": "Alternator Circuit",
+              "wires": [
+                { "color": "Red", "code": "RD", "function": "Battery charging output (B+)", "risk_level": "critical" },
+                { "color": "Black", "code": "BK", "function": "Ground return path", "risk_level": "low" },
+                { "color": "Blue/White", "code": "BU/WH", "function": "Alternator exciting / warning lamp", "risk_level": "medium" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
