@@ -26,7 +26,9 @@ const dtcMasterData: any = dtcMasterDataRaw;
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { initFuseSearchEngine, searchFuses, buildFuseSearchIndex } from './services/fuseSearch';
 import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch } from './services/ai';
+import { fuseService } from './backend/services/fuseService';
 
 import DiagnosticInterface from './components/DiagnosticInterface';
 import api, { diagnoseDTC } from './services/api';
@@ -36,9 +38,9 @@ import { Card, Badge, ProgressBar, Button } from './components/ui';
 import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
 import { syncFromFirebase } from './services/syncService';
 import { startAutoSync } from './services/networkSync';
-import { auth, db, signInWithGoogle, logOut } from './lib/firebase';
+import { db, auth, signInWithGoogle, logOut } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore'; // Re-imported
 import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
 import RestrictedAccountModal from './components/RestrictedAccountModal';
 import { syncData } from './sync/syncEngine';
@@ -587,34 +589,60 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 
 export default function App() {
   const store = useStore();
+  const [ready, setReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  
   const [flowStep, setFlowStep] = useState<'landing' | 'app'>('landing');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hash, setHash] = useState(window.location.hash || '#home');
-  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
   const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
 
   useEffect(() => {
-    // Disable Firebase Auth check and bypass login
-    const mockUser: UserType = {
-        id: 'guest_user_123',
-        username: 'guest',
-        fullName: 'Guest User',
-        email: 'guest@example.com',
-        role: 'user',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        trial_start_date: new Date().toISOString(),
-        trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
-        avatarUrl: '',
-    };
-    setCurrentUser(mockUser);
-    setAuthLoading(false);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is signed in. Fetch user details from Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setCurrentUser(userDoc.data() as UserType);
+          } else {
+             // NEW USER! Create doc
+             const newUser: UserType = {
+                id: user.uid,
+                username: user.email?.split('@')[0] || 'user_' + user.uid.substr(0, 5),
+                fullName: user.displayName || 'New Member',
+                email: user.email || '',
+                role: 'user',
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                trial_start_date: new Date().toISOString(),
+                trial_end_date: new Date(Date.now() + 3 * 3600000).toISOString(),
+                avatarUrl: user.photoURL || '',
+             };
+             await setDoc(doc(db, 'users', user.uid), newUser);
+             setCurrentUser(newUser);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, 'users/' + user.uid);
+          setCurrentUser(null);
+        }
+      } else {
+        // User is signed out
+        setCurrentUser(null);
+      }
+      setAuthLoading(false);
+    });
+    
+    async function init() {
+        await fuseService.ensureSeedData();
+        await initFuseSearchEngine();
+        setReady(true);
+    }
+    init();
 
-  useEffect(() => {
-    if (!authLoading && currentUser) {                
+    if (ready && currentUser) {
         syncFromFirebase(); // initial load
         startAutoSync();    // background sync
     }
@@ -641,6 +669,7 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
+      unsubscribe();
       window.removeEventListener('hashchange', handleHash);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
@@ -735,16 +764,9 @@ export default function App() {
 
   const logout = async () => {
     try {
-      if (currentUser) {
-        await setDoc(doc(db, 'logs', Math.random().toString(36).substr(2, 9)), {
-          id: Math.random().toString(36).substr(2, 9),
-          userId: currentUser.id, username: currentUser.username,
-          action: 'Logout', details: 'User session terminated',
-          timestamp: new Date().toISOString()
-        });
-      }
       await logOut();
       window.location.hash = '#home';
+      window.location.reload();
     } catch (error) {
       console.error(error);
     }
@@ -758,15 +780,15 @@ export default function App() {
     if (h === '#home') return <LandingPage onNavigate={setHash} user={currentUser} onUpdateAvatar={updateAvatar} />;
     if (h === '#login') return <AuthPage mode="login" onBack={() => window.location.hash = '#home'} toast={addToast} />;
     if (h === '#register') return <AuthPage mode="register" onBack={() => window.location.hash = '#home'} toast={addToast} />;
-
+    
     // Wait until firebase auth is initialized before deciding what protected view to show
     if (authLoading) return <div className="h-screen w-full flex items-center justify-center font-display uppercase tracking-widest text-text-secondary animate-pulse gap-3"><Loader2 className="animate-spin" size={24}/> Establishing Neural Link...</div>;
 
     // Protected
     if (!currentUser) {
-      // Redirect to login safely inside a setTimeout to avoid React warnings about side effects during render
-      setTimeout(() => { if (window.location.hash !== '#login') window.location.hash = '#login'; }, 0);
-      return null;
+        // Redirect to login safely inside a setTimeout to avoid React warnings about side effects during render
+        setTimeout(() => { if (window.location.hash !== '#login') window.location.hash = '#login'; }, 0);
+        return null;
     }
 
     if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
@@ -801,6 +823,10 @@ export default function App() {
        </>
     );
   };
+
+  if (!ready) {
+    return <div className="h-screen w-full flex items-center justify-center font-display uppercase tracking-widest text-text-secondary animate-pulse gap-3"><Loader2 className="animate-spin" size={24}/> Initializing Systems...</div>;
+  }
 
   return (
     <div className="relative">
@@ -2499,7 +2525,11 @@ function WiringColorTab({ store, user, toast }: any) {
              </div>
              
              <div className="md:col-span-3">
-               {result ? (
+               {isLoading ? (
+                <div className="flex justify-center p-10">
+                    <Loader2 className="animate-spin text-purple-500" size={32} />
+                </div>
+              ) : result ? (
                 <motion.div 
                    initial={{ opacity: 0, y: 20 }}
                    animate={{ opacity: 1, y: 0 }}
@@ -2593,10 +2623,9 @@ function FuseRelayTab({ store, user, toast }: any) {
     setActiveCategory(category);
     try {
       // 1. Check if we already have it in DB
-      // Note: This relies on knowing the vehicleId (which we should have in `useVehicleStore`)
       const { make, model, year, engine } = useVehicleStore.getState();
       const vehicles = await fuseService.getVehicles();
-      const currentVehicle = vehicles.find((v: any) => v.make === make && v.model === model && v.year === year && v.engine === engine);
+      const currentVehicle = vehicles.find((v: any) => v.brand === make && v.model === model && v.year === year && v.engine === engine);
 
       let boxes: any[] = [];
       if (currentVehicle) {
@@ -2614,12 +2643,12 @@ function FuseRelayTab({ store, user, toast }: any) {
               throw new Error("Failed to parse hierarchical fuse data.");
           }
 
-          const vehicleEntry = { make, model, year, engine };
+          const vehicleEntry = { brand: make, model, year, engine };
           await fuseService.addVehicleHierarchy(vehicleEntry, parsedData.fuse_boxes || []);
           
           // Re-fetch boxes
           const vehiclesAfter = await fuseService.getVehicles();
-          const newVehicle = vehiclesAfter.find((v: any) => v.make === make && v.model === model && v.year === year && v.engine === engine);
+          const newVehicle = vehiclesAfter.find((v: any) => v.brand === make && v.model === model && v.year === year && v.engine === engine);
           boxes = await fuseService.getVehicleFuseBoxes(newVehicle.id);
       }
       
@@ -2629,6 +2658,8 @@ function FuseRelayTab({ store, user, toast }: any) {
       if (toast) toast(err.message || 'Failed to retrieve fuse/relay data', 'error');
     } finally {
       setIsLoading(false);
+      // Ensure index is updated after potential data generation
+      await buildFuseSearchIndex();
     }
   };
 
@@ -2741,38 +2772,51 @@ function FuseRelayTab({ store, user, toast }: any) {
                         <button onClick={() => handleFeedback(false)} className="p-2 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-500 transition-colors" title="Inaccurate"><ThumbsDown size={14}/></button>
                      </div>
                   </div>
-                  {result.fuses && result.fuses.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
-                        <Zap size={10} className="text-purple-500" />
-                        Relevant Fuses
-                      </h3>
-                      {result.fuses.map((f: any, i: number) => (
-                          <div key={i} className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-purple-500/30 transition-colors">
-                              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-xs uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{backgroundColor: f.color?.toLowerCase() || 'gray'}}>
-                                  {f.amperage}
-                              </div>
-                              <div className="flex-1">
-                                  <div className="text-sm font-bold text-white">{f.id}</div>
-                                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{f.circuit}</div>
-                              </div>
-                          </div>
+                  {result.fuse_boxes && result.fuse_boxes.length > 0 ? (
+                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                      {result.fuse_boxes.map((box: any, boxIdx: number) => (
+                        <div key={boxIdx} className="space-y-4 mb-6">
+                            <h4 className="text-[11px] font-bold text-white uppercase tracking-widest bg-zinc-800 p-2 rounded-lg">{box.name}</h4>
+                            
+                            {box.fuses && box.fuses.length > 0 && (
+                                <div className="space-y-2">
+                                <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
+                                    <Zap size={10} className="text-purple-500" />
+                                    Fuses
+                                </h3>
+                                {box.fuses.map((f: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-purple-500/30 transition-colors">
+                                        <div className="w-12 h-12 rounded-lg flex items-center justify-center text-xs uppercase font-bold shadow-inner bg-zinc-900 border border-zinc-800 shrink-0" style={{backgroundColor: 'gray'}}>
+                                            {f.amperage}A
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-bold text-white">{f.fuse_number || f.id}</div>
+                                            <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{f.function}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                </div>
+                            )}
+                            
+                            {box.relays && box.relays.length > 0 && (
+                                <div className="space-y-2">
+                                <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
+                                    <Activity size={10} className="text-blue-500" />
+                                    Relays
+                                </h3>
+                                {box.relays.map((r: any, i: number) => (
+                                    <div key={i} className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-blue-500/30 transition-colors">
+                                        <div className="text-sm font-bold text-white">{r.relay_name || r.id}</div>
+                                        <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{r.function}</div>
+                                    </div>
+                                ))}
+                                </div>
+                            )}
+                        </div>
                       ))}
                     </div>
-                  )}
-                  {result.relays && result.relays.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest ml-1 flex items-center gap-2">
-                        <Activity size={10} className="text-blue-500" />
-                        Relevant Relays
-                      </h3>
-                      {result.relays.map((r: any, i: number) => (
-                          <div key={i} className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 hover:border-blue-500/30 transition-colors">
-                             <div className="text-sm font-bold text-white">{r.id}</div>
-                             <div className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{r.function}</div>
-                          </div>
-                      ))}
-                    </div>
+                  ) : (
+                    <div className="text-zinc-600 text-center py-4 text-xs font-bold uppercase tracking-widest">No fuses found for this selection.</div>
                   )}
               </motion.div>
              ) : !isLoading && (

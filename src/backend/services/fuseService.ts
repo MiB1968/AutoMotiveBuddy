@@ -44,5 +44,15 @@ export const fuseService = {
     
     await tx.done;
     return vehicleId;
+  },
+
+  async ensureSeedData() {
+    const vehicles = await this.getVehicles();
+    if (vehicles.length === 0) {
+      // Import AI engine here if needed, or define simple seeder
+      // For now, assume a basic seeder or logic would exist or be added
+      console.log('Seeding initial data...');
+      // Logic for seeding would go here
+    }
   }
 };

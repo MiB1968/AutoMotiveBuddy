@@ -228,7 +228,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
         </div>
       </header>
 
-      <main className="flex-1 px-6 py-2 overflow-y-auto custom-scrollbar">
+      <main className="flex-1 px-6 py-2 overflow-y-auto custom-scrollbar flex flex-col">
         {/* Global Datalists for Autocomplete */}
         <datalist id="brand-suggestions">
           {currentSuggestions.brands.map(b => <option key={b} value={b} />)}
@@ -710,7 +710,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6 pb-20"
             >
-              <div className="fuses-relays-section">
+              <div className="fuses-relays-section flex-1 overflow-y-auto pr-2 custom-scrollbar">
                 <h1 className="fuses-relays-title">
                   <Zap size={22} className="text-amber-500" />
                   Fuses & Relays
