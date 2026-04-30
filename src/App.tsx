@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useVehicleStore } from './store/vehicleStore';
 import { 
@@ -31,7 +31,7 @@ import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearc
 import { fuseService } from './backend/services/fuseService';
 
 import DiagnosticInterface from './components/DiagnosticInterface';
-import api, { diagnoseDTC } from './services/api';
+import api from './services/api';
 import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
 import { Card, Badge, ProgressBar, Button } from './components/ui';
@@ -368,77 +368,6 @@ function AIMaintenanceTab({ user, store }: any) {
   );
 }
 
-function DiagnosticTab({ toast }: any) {
-  const [symptom, setSymptom] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<any>(null);
-
-  const handleDiagnose = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!symptom) return;
-    setLoading(true);
-    try {
-      const res = await smartRequest("/ai/diagnose", { 
-        symptom,
-        vehicle: "Universal Node"
-      });
-      
-      if (res.offline) {
-        toast("Diagnosis queued for sync when online", "info");
-      } else {
-        setDiagnosis(res);
-      }
-    } catch (e) {
-      toast("AI Uplink Failed", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <HUDPanel className="p-6">
-        <form onSubmit={handleDiagnose} className="space-y-4">
-          <label className="text-[10px] text-brand uppercase tracking-widest font-bold">Neural Symptom Entry</label>
-          <textarea 
-            value={symptom}
-            onChange={(e) => setSymptom(e.target.value)}
-            placeholder="Describe behavior: e.g. Rough idle when cold, clicking sound on turns..."
-            className="w-full bg-black/40 border border-white/10 rounded-lg p-4 text-sm text-white h-32 focus:outline-none focus:border-brand/50 transition-all font-mono"
-          />
-          <button type="submit" disabled={loading} className="w-full btn-primary py-4 font-bold tracking-widest">
-            {loading ? "INITIALIZING NEURAL SCRUTINY..." : "EXECUTE AI DIAGNOSIS"}
-          </button>
-        </form>
-      </HUDPanel>
-
-      {diagnosis && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-brand/10 border border-brand/30 p-6 rounded-xl space-y-4"
-        >
-          <div className="flex justify-between items-center bg-brand/20 -mx-6 -mt-6 p-4 rounded-t-xl">
-             <div className="flex items-center gap-2">
-                <Brain className="text-brand" size={20} />
-                <span className="text-xs font-bold text-white uppercase tracking-widest">Diagnostic Verdict</span>
-             </div>
-             <span className="text-[10px] font-bold text-brand bg-white/10 px-2 py-0.5 rounded italic">
-                Confidence: {diagnosis.confidence}
-             </span>
-          </div>
-
-          <div>
-             <h3 className="text-white font-bold text-lg mb-2">{diagnosis.issue}</h3>
-             <div className="p-4 bg-black/40 rounded border border-white/5 font-mono text-xs text-text-secondary leading-relaxed">
-                {diagnosis.recommendation}
-             </div>
-          </div>
-        </motion.div>
-      )}
-    </div>
-  );
-}
 
 function UnitManualsTab() {
   const [manual, setManual] = useState("");
@@ -675,6 +604,17 @@ export default function App() {
   const [hash, setHash] = useState(window.location.hash || '#home');
   const [toasts, setToasts] = useState<{ id: string; message: string; type: any }[]>([]);
 
+  // Navigation Redirects
+  useEffect(() => {
+    const h = hash.split('?')[0];
+    if (currentUser && (h === '#home' || h === '#login' || h === '#register' || h === '')) {
+      const target = (currentUser.role === 'admin' || currentUser.role === 'super_admin') ? '#admin-overview' : '#dashboard';
+      window.location.hash = target;
+    } else if (!currentUser && h && h !== '#login' && h !== '#register' && h !== '#home' && h !== '') {
+      window.location.hash = '#login';
+    }
+  }, [currentUser, hash]);
+
   const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
     setToasts(prev => [...prev, { id, message, type }]);
@@ -882,9 +822,7 @@ export default function App() {
 
     // Public
     if (currentUser && (h === '#home' || h === '#login' || h === '#register' || h === '')) {
-      const target = (currentUser.role === 'admin' || currentUser.role === 'super_admin') ? '#admin-overview' : '#dashboard';
-      setTimeout(() => { window.location.hash = target; }, 0);
-      return null;
+      return <div className="h-screen w-full bg-[#0a0e1a]" />; // Empty state while effect redirects
     }
 
     if (h === '#home') return <LandingPage onNavigate={setHash} user={currentUser} onUpdateAvatar={updateAvatar} />;
@@ -896,9 +834,7 @@ export default function App() {
 
     // Protected
     if (!currentUser) {
-        // Redirect to login safely inside a setTimeout to avoid React warnings about side effects during render
-        setTimeout(() => { if (window.location.hash !== '#login') window.location.hash = '#login'; }, 0);
-        return null;
+        return <div className="h-screen w-full bg-[#0a0e1a]" />; // Empty state while effect redirects
     }
 
     if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
@@ -1077,7 +1013,7 @@ function LandingPage({ onNavigate, user, onUpdateAvatar }: { onNavigate: (h: str
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               { icon: Database, title: '500+ DTC Protocols', desc: 'Full fault code database with symptoms, causes, step-by-step DIY fix guides and estimated repair costs, featuring Offline and Online sync.' },
-              { icon: Cpu, title: 'Neural AI Diagnostics', desc: 'Direct access to the Neural DB for advanced real-time fault analysis, live chat support, and predictive failure modeling.' },
+
               { icon: Zap, title: 'Integrated Fuses & Relays', desc: 'Complete fuse box layouts and relay locations directly tied into the DTC database for seamless electrical fault tracing.' },
               { icon: Cable, title: 'Circuit Intent Analysis', desc: 'Advanced wiring color coding reference tool to identify circuit intent and electrical paths.' },
               { icon: Activity, title: 'Multi-System Support', desc: 'Diagnostic logic adapted specifically for standard light vehicles, heavy trucks, and complex heavy equipment.' },
@@ -1568,6 +1504,7 @@ function AuthPage({ mode, onBack, toast }: any) {
 
 // --- Shared Utilities ---
 const isTagalog = (text: string) => {
+  if (!text) return false;
   const commonTagalog = [
     'ang', 'ng', 'mga', 'sa', 'ay', 'may', 'ito', 'siya', 'ako', 'po', 'opo', 'ano', 'saan', 'kailan', 'bakit', 'paano', 'salamat', 'kamusta', 'tagalog',
     'kumusta', 'mabuti', 'natin', 'inyo', 'kami', 'tayo', 'sila', 'ito', 'iyon', 'doon', 'dito', 'gaano', 'alin', 'sino', 'kanino', 'nasaan',
@@ -1596,7 +1533,7 @@ const speakText = (text: string, enabled: boolean) => {
     if (isTagalogText) {
       utterance.lang = 'tl-PH';
       // Priority: Natural/Google voices usually sound better
-      const filVoices = voices.filter(v => v.lang.includes('tl') || v.lang.includes('fil') || v.name.toLowerCase().includes('tagalog') || v.name.toLowerCase().includes('filipino'));
+      const filVoices = voices.filter(v => v.lang.includes('tl') || v.lang.includes('fil') || (v.name && v.name.toLowerCase().includes('tagalog')) || (v.name && v.name.toLowerCase().includes('filipino')));
       const bestFil = filVoices.find(v => v.name.includes('Google') || v.name.includes('Natural')) || filVoices[0];
       if (bestFil) utterance.voice = bestFil;
       utterance.rate = 1.0; 
@@ -1632,6 +1569,34 @@ function ChatBot({ currentUser, store, toast }: any) {
   const hasWelcomedRef = useRef(false);
   const [buddyOpacity, setBuddyOpacity] = useState(1);
   const holdTimerRef = useRef<any>(null);
+  const hasTriggeredRef = useRef(false);
+
+  const startStealthTimer = useCallback(() => {
+    if (holdTimerRef.current) return;
+    hasTriggeredRef.current = false;
+    holdTimerRef.current = setTimeout(() => {
+      setBuddyOpacity(prev => {
+        const next = prev === 1 ? 0.05 : 1;
+        // Schedule the toast for the next tick to avoid side-effects in updaters
+        setTimeout(() => {
+          toast(next === 0.05 ? "Stealth Mode: AI Buddy Hidden" : "AI Buddy Visibility Restored", "info");
+        }, 100);
+        return next;
+      });
+      hasTriggeredRef.current = true;
+    }, 3000);
+  }, [toast]);
+
+  const cancelStealthTimer = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    // Reset hasTriggered after a short delay so onClick can check it
+    setTimeout(() => {
+      hasTriggeredRef.current = false;
+    }, 150);
+  }, []);
 
   useEffect(() => {
     if (isOpen && !hasWelcomedRef.current) {
@@ -1654,21 +1619,14 @@ function ChatBot({ currentUser, store, toast }: any) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key.toLowerCase() === 'i' && !holdTimerRef.current) {
-        holdTimerRef.current = setTimeout(() => {
-          setBuddyOpacity(prev => prev === 1 ? 0.05 : 1);
-          toast(buddyOpacity === 1 ? "Stealth Mode: AI Buddy Hidden" : "AI Buddy Visibility Restored", "info");
-          holdTimerRef.current = null;
-        }, 3000);
+      if (e.key.toLowerCase() === 'i') {
+        startStealthTimer();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'i') {
-        if (holdTimerRef.current) {
-          clearTimeout(holdTimerRef.current);
-          holdTimerRef.current = null;
-        }
+        cancelStealthTimer();
       }
     };
 
@@ -1678,7 +1636,7 @@ function ChatBot({ currentUser, store, toast }: any) {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [buddyOpacity, toast]);
+  }, [startStealthTimer, cancelStealthTimer]);
 
   const toggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -1753,9 +1711,17 @@ function ChatBot({ currentUser, store, toast }: any) {
   return (
     <>
       <button 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (hasTriggeredRef.current) return;
+          setIsOpen(!isOpen);
+        }}
+        onMouseDown={startStealthTimer}
+        onMouseUp={cancelStealthTimer}
+        onMouseLeave={cancelStealthTimer}
+        onTouchStart={startStealthTimer}
+        onTouchEnd={cancelStealthTimer}
         style={{ opacity: buddyOpacity }}
-        className="fixed bottom-24 right-6 w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-[0_0_30px_rgba(245,158,11,0.4)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-transform group"
+        className="fixed bottom-24 right-6 w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-[0_0_30px_rgba(245,158,11,0.4)] z-[500] flex items-center justify-center animate-pulse-glow hover:scale-110 transition-all duration-500 group"
       >
         <Wrench className="w-7 h-7 group-hover:rotate-45 transition-transform duration-500" />
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-zinc-900" />
@@ -2070,9 +2036,9 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
             {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} user={user} toast={toast} />}
             {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
             {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
-            {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
-            {activeTab === 'announcements' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
-            {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
+            {activeTab === 'profile' && <ProfileTab key="adm-profile" user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
+            {activeTab === 'announcements' && <div key="adm-announcements" className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
+            {activeTab === 'settings' && <div key="adm-settings" className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
           </AnimatePresence>
         </div>
       </main>
@@ -2106,7 +2072,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
       <nav className="sidebar-nav overflow-y-auto space-y-1 md:space-y-2">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
-        <NavItem icon={Brain} label="AI Diagnostics" active={activeTab === 'diagnose'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('diagnose')} />
+
         <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={Cable} label="Wiring Color Coding" active={activeTab === 'wiring'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('wiring')} />
         <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
@@ -2220,7 +2186,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
             <AnimatePresence mode="wait">
               {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
-              {activeTab === 'diagnose' && <DiagnosticTab key="mbr-diag" toast={toast} />}
+
               {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
               {activeTab === 'wiring' && <WiringColorTab key="mbr-wiring" store={store} user={user} toast={toast} />}
               {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
@@ -2263,7 +2229,7 @@ function LandingScreen({ onEnter }: { onEnter: () => void }) {
         
         <div>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-white/80">
-             <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Neural AI Diagnostics</span>
+
              <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">500+ DTC Support</span>
              <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Offline & Online Modes</span>
              <span className="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-full backdrop-blur-sm shadow-[0_0_10px_rgba(0,212,255,0.1)]">Wiring & Relays</span>
@@ -2340,7 +2306,7 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
             <div className="w-full">
               <div className="border border-white/20 rounded-full py-2 px-4 shadow-[0_0_15px_rgba(0,212,255,0.2)] text-center w-full bg-white/5 backdrop-blur-md">
                 <span className="font-accent font-bold tracking-[0.2em] uppercase text-white shadow-brand">
-                  {(user.role === 'admin' || user.role === 'super_admin') ? 'DEVELOPER / OWNER' : `${user.role.toUpperCase()} LEVEL 01`}
+                  {(user.role === 'admin' || user.role === 'super_admin') ? 'DEVELOPER / OWNER' : `${(user.role || '').toUpperCase()} LEVEL 01`}
                 </span>
               </div>
             </div>
@@ -2351,7 +2317,7 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
               <span className="text-text-secondary">Joined:</span> {new Date(user.createdAt).toLocaleDateString()}
             </div>
             <div className="px-4 py-2 bg-white/5 border border-border-glass rounded-lg text-[10px] font-bold uppercase tracking-widest">
-              <span className="text-text-secondary">Status:</span> <span className="text-green-400">{user.status.toUpperCase()}</span>
+              <span className="text-text-secondary">Status:</span> <span className="text-green-400">{(user.status || '').toUpperCase()}</span>
             </div>
           </div>
         </div>
@@ -2412,8 +2378,8 @@ function StatItem({ label, value }: any) {
 function GlobalVehicleSelector() {
   const { make, model, year, engine, setVehicle } = useVehicleStore();
 
-  const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
-  const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
+  const selectedMfr = vehicleDatabase.manufacturers.find(m => (m.name || '').toLowerCase() === (make || '').toLowerCase());
+  const selectedMod = selectedMfr?.models.find(m => (m.name || '').toLowerCase() === (model || '').toLowerCase());
 
   return (
     <div className="glass-panel border-brand/20 bg-brand/5 p-6 md:p-8 mb-8">
@@ -2532,149 +2498,218 @@ function DTCLookupTab({ store, toast, user, ...props }: any) {
 
 
 
-// --- Wiring Color Coding Tab Component ---
+// --- Wiring Intelligence / Color Coding Tab Component ---
 function WiringColorTab({ store, user, toast }: any) {
   const [query, setQuery] = useState("");
   const [color, setColor] = useState("");
+  const [risk, setRisk] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
 
-  const handleSearch = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const wireColors = useMemo(
+    () => [
+      { name: "Black", code: "BK", hex: "#000000" },
+      { name: "Red", code: "RD", hex: "#FF0000" },
+      { name: "Blue", code: "BU", hex: "#3B82F6" },
+      { name: "Green", code: "GN", hex: "#22C55E" },
+      { name: "Yellow", code: "YE", hex: "#FACC15" },
+      { name: "White", code: "WH", hex: "#FFFFFF" },
+      { name: "Brown", code: "BN", hex: "#8B4513" },
+      { name: "Orange", code: "OR", hex: "#F97316" },
+      { name: "Purple", code: "VT", hex: "#A855F7" },
+      { name: "Grey", code: "GY", hex: "#9CA3AF" },
+    ],
+    []
+  );
+
+  const runSearch = async () => {
+    if (!query && !color) return;
+
     setLoading(true);
     try {
-      const res = await api.get(`/wiring/search`, {
-        params: { query, color }
+      const res = await api.get("/wiring/search", {
+        params: { query, color, risk },
       });
-      setResults(res.data.results || []);
-      if (res.data.results?.length > 0) {
-        toast(`Found ${res.data.results.length} wiring matches`, "success");
-      }
+
+      const data = res.data.results || [];
+      setResults(data);
+
+      if (query) setHistory((h) => [query, ...h.slice(0, 4)]);
+
+      toast(`${data.length} circuit matches decoded`, "success");
     } catch (e) {
-      console.error("Wiring search failed", e);
-      toast("Wiring Database Connection Failed", "error");
+      toast("Signal lost: wiring DB unreachable", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const wireColors = [
-    { name: "Black", code: "BK", hex: "#000000" },
-    { name: "Red", code: "RD", hex: "#FF0000" },
-    { name: "Blue", code: "BU", hex: "#0000FF" },
-    { name: "Green", code: "GN", hex: "#00FF00" },
-    { name: "Yellow", code: "YE", hex: "#FFFF00" },
-    { name: "White", code: "WH", hex: "#FFFFFF" },
-    { name: "Brown", code: "BN", hex: "#8B4513" },
-    { name: "Orange", code: "OR", hex: "#FFA500" },
-    { name: "Purple", code: "VT", hex: "#800080" },
-    { name: "Grey", code: "GY", hex: "#808080" },
-  ];
+  const clearFilters = () => {
+    setQuery("");
+    setColor("");
+    setRisk("");
+  };
+
+  const getRiskStyle = (riskLevel: string) => {
+    switch (riskLevel) {
+      case "critical":
+        return "bg-red-500 text-white animate-pulse";
+      case "high":
+        return "bg-orange-500/20 text-orange-300 border border-orange-500/30";
+      default:
+        return "bg-orange-500/10 text-orange-400 border border-orange-500/20";
+    }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto -mt-8 md:mt-0 pt-4 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3 mb-6 bg-brand/10 p-4 rounded-xl border border-brand/20">
-        <Cable size={24} className="text-brand" />
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary">Electrical Schematic & Wiring Database</h2>
-          <p className="text-[10px] text-brand uppercase tracking-[0.2em] font-bold">Production-Grade Electrical Lookup</p>
-        </div>
-      </div>
-
-      <HUDPanel className="p-6">
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] text-brand uppercase tracking-widest font-bold">Function / Sensor / Circuit</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
-                <input 
-                  type="text" 
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. Ground, ECU, Fuel Pump..."
-                  className="w-full bg-black/40 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-brand/50 transition-all font-mono"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] text-brand uppercase tracking-widest font-bold">Standard Color</label>
-              <select 
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg py-3 px-4 text-sm text-white focus:outline-none focus:border-brand/50 transition-all font-mono capitalize"
-              >
-                <option value="">All Master Colors</option>
-                {wireColors.map(c => (
-                  <option key={c.code} value={c.name}>{c.name} ({c.code})</option>
-                ))}
-              </select>
-            </div>
+    <div className="min-h-screen w-full bg-[#0b0c10] text-white flex flex-col -mx-4 md:-mx-8 -mt-8 md:mt-0 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-t-3xl md:rounded-none">
+      {/* HEADER / DTC STYLE */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-800">
+        <div className="flex items-center gap-3">
+          <Zap className="text-orange-500" />
+          <div>
+            <h1 className="text-lg font-bold tracking-wide">Wiring Intelligence Matrix</h1>
+            <p className="text-[10px] text-white/50 uppercase">DTC-Style Circuit Lookup Engine</p>
           </div>
-          <button type="submit" disabled={loading} className="w-full btn-primary py-4 text-xs tracking-widest font-bold shadow-lg">
-            {loading ? "DECODING SCHEMATICS..." : "INITIALIZE CIRCUIT IDENTIFICATION"}
-          </button>
-        </form>
-      </HUDPanel>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
-        <AnimatePresence mode="popLayout">
-          {results.map((w, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              layout
-              className="bg-black/40 border border-white/10 rounded-xl overflow-hidden hover:border-brand/30 transition-all group shadow-2xl"
-            >
-              <div className="h-1.5 w-full bg-white/5 relative">
-                <div 
-                  className="absolute inset-0 transition-transform duration-500 group-hover:scale-x-110 origin-left"
-                  style={{ backgroundColor: wireColors.find(c => c.name === w.color)?.hex || '#555' }}
-                />
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="text-white font-bold text-[13px] tracking-tight mb-1">{w.circuit}</h3>
-                    <p className="text-[9px] text-text-muted uppercase tracking-widest font-bold">{w.system}</p>
-                  </div>
-                  <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${
-                    w.risk_level === 'critical' ? 'bg-red-500 text-white animate-pulse' :
-                    w.risk_level === 'high' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                    'bg-brand/20 text-brand border border-brand/30'
-                  }`}>
-                    {w.risk_level} Risk
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between text-[10px] items-center border-b border-white/5 pb-2">
-                    <span className="text-text-muted uppercase tracking-wider font-bold">Standard Color</span>
-                    <span className="text-white font-mono font-bold tracking-widest">{w.color} [{w.code}]</span>
-                  </div>
-                  
-                  <div className="bg-white/5 p-3 rounded-lg border border-brand/10 transition-colors group-hover:bg-brand/5">
-                    <p className="text-xs text-text-secondary leading-relaxed italic">
-                      "{w.function}"
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        </div>
+        <button
+          onClick={clearFilters}
+          className="text-xs flex items-center gap-1 text-white/60 hover:text-white"
+        >
+          <X size={14} /> Reset
+        </button>
       </div>
 
-      {results.length === 0 && !loading && (
-        <div className="text-center py-32 opacity-20 flex flex-col items-center gap-4">
-           <Cpu size={64} className="animate-pulse" />
-           <p className="text-xs font-bold uppercase tracking-[0.3em]">Neural Matrix Standby</p>
+      {/* SEARCH BAR PANEL */}
+      <div className="p-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex-1 flex items-center bg-[#15171c] rounded-xl px-3 py-2 border border-gray-800 focus-within:border-orange-500/50 transition-all">
+            <Search className="text-gray-400 w-5 h-5" />
+            <input
+              className="bg-transparent flex-1 px-3 outline-none text-sm text-white"
+              placeholder="Search circuit / ECU / sensor / CAN bus..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button
+              onClick={runSearch}
+              disabled={loading}
+              className="bg-orange-500 hover:bg-orange-600 px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20"
+            >
+              {loading ? "Scanning..." : "Scan"}
+            </button>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="bg-[#15171c] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50"
+            >
+              <option value="">All Colors</option>
+              {wireColors.map((c) => (
+                <option key={c.code} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={risk}
+              onChange={(e) => setRisk(e.target.value)}
+              className="bg-[#15171c] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500/50"
+            >
+              <option value="">All Risk Levels</option>
+              <option value="low">Low</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* CONTENT AREA */}
+      <div className="flex-1 p-4 space-y-4 overflow-y-auto custom-scrollbar pb-24">
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+             {[1, 2, 3, 4, 5, 6].map((i) => (
+               <div key={i} className="h-40 bg-[#15171c] animate-pulse rounded-xl border border-gray-800" />
+             ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence>
+              {results.map((w, i) => {
+                const wire = wireColors.find((c) => c.name === w.color);
+                return (
+                  <motion.div
+                    key={w.id || i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="bg-[#15171c] border border-gray-800 rounded-2xl overflow-hidden hover:border-orange-500/30 transition-all group"
+                  >
+                    <div className="h-1" style={{ backgroundColor: wire?.hex || "#333" }} />
+                    <div className="p-5 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-bold text-sm text-white group-hover:text-orange-500 transition-colors">{w.circuit}</p>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">{w.system}</p>
+                        </div>
+                        <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-tighter ${getRiskStyle(w.risk_level)}`}>
+                          {w.risk_level}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] bg-black/40 p-3 rounded-xl border border-gray-800 text-blue-400 font-mono leading-relaxed">
+                        {w.function}
+                      </div>
+
+                      <div className="flex justify-between items-center text-[10px] text-gray-400 pt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: wire?.hex || "#333" }} />
+                          <span className="font-bold">{w.color} [{w.code}]</span>
+                        </div>
+                        <span className="text-orange-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                          <CheckCircle2 size={10} /> Signal Protocol OK
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {!loading && results.length === 0 && (
+          <div className="text-center py-32 opacity-20 flex flex-col items-center gap-4">
+             <Cpu size={64} className="text-orange-500 animate-pulse" />
+             <p className="text-sm font-bold uppercase tracking-[0.5em]">Awaiting Diagnostic Input</p>
+          </div>
+        )}
+
+        {/* RECENT QUERIES */}
+        {!loading && history.length > 0 && results.length === 0 && (
+           <div className="max-w-md mx-auto text-center space-y-3">
+              <p className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-bold">Recent Neural Queries</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                 {history.map((h, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => { setQuery(h); runSearch(); }}
+                      className="px-4 py-2 bg-[#15171c] border border-gray-800 rounded-full text-[10px] text-gray-400 hover:text-orange-500 hover:border-orange-500/30 transition-all font-bold uppercase"
+                    >
+                      {h}
+                    </button>
+                 ))}
+              </div>
+           </div>
+        )}
+      </div>
     </div>
   );
 }
+
 
 // --- Fuse & Relay Tab Component ---
 function FuseRelayTab({ store, user, toast }: any) {
@@ -2688,8 +2723,8 @@ function FuseRelayTab({ store, user, toast }: any) {
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
 
-  const selectedMfr = vehicleDatabase.manufacturers.find(m => m.name.toLowerCase() === (make || '').toLowerCase());
-  const selectedMod = selectedMfr?.models.find(m => m.name.toLowerCase() === (model || '').toLowerCase());
+  const selectedMfr = vehicleDatabase.manufacturers.find(m => (m.name || '').toLowerCase() === (make || '').toLowerCase());
+  const selectedMod = selectedMfr?.models.find(m => (m.name || '').toLowerCase() === (model || '').toLowerCase());
 
   const categories = ['Engine Bay', 'Interior Cabin', 'Lighting', 'Power Distribution', 'Ignition/Starting'];
 
@@ -3053,7 +3088,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
         (u.make && u.make.toLowerCase().includes(searchStr)) || 
         (u.model && u.model.toLowerCase().includes(searchStr)) ||
         (u.specs && Object.values(u.specs).some(v => v && String(v).toLowerCase().includes(searchStr))) ||
-        (u.commonIssues && u.commonIssues.some(i => i.toLowerCase().includes(searchStr)));
+        (u.commonIssues && u.commonIssues.some(i => i && i.toLowerCase().includes(searchStr)));
       
       const matchYear = !filter.year || (u.yearRange && (
         u.yearRange.includes(filter.year) || 
@@ -3697,7 +3732,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <td className="p-6">
                   <div className="flex gap-2">
                     {(u.status?.toLowerCase() !== 'active' || user?.role === 'super_admin') && (
-                      <>
+                      <React.Fragment key="approve-reject-group">
                         <button 
                           onClick={() => {
                              setApproveModalUser(u);
@@ -3715,10 +3750,10 @@ function MembersTab({ user, store, toast, ...props }: any) {
                         >
                           <X size={14} />
                         </button>
-                      </>
+                      </React.Fragment>
                     )}
                     {u.status?.toLowerCase() === 'active' && (
-                       <button onClick={() => handleReject(u)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer" title="Block Access"><X size={14} /></button>
+                       <button key="block-access-btn" onClick={() => handleReject(u)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer" title="Block Access"><X size={14} /></button>
                     )}
                   </div>
                 </td>
@@ -3731,12 +3766,14 @@ function MembersTab({ user, store, toast, ...props }: any) {
       <AnimatePresence>
         {isModalOpen && (
           <motion.div
+            key="create-user-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           >
             <motion.div
+              key="create-user-modal-content"
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -3805,12 +3842,14 @@ function MembersTab({ user, store, toast, ...props }: any) {
         
         {approveModalUser && (
           <motion.div
+            key="approve-user-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           >
             <motion.div
+              key="approve-user-modal-content"
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -3980,7 +4019,7 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
     const dtcMatches = store.dtcs.filter((d: any) => 
       (d.code || '').toLowerCase().includes(q) || 
       (d.description || '').toLowerCase().includes(q) ||
-      (Array.isArray(d.symptoms) ? d.symptoms.some((s: string) => s.toLowerCase().includes(q)) : false)
+      (Array.isArray(d.symptoms) ? d.symptoms.some((s: string) => s && s.toLowerCase().includes(q)) : false)
     ).map((d: any) => ({ ...d, gType: 'DTC' }));
 
     const vehicleMatches = store.units.filter((u: any) => 

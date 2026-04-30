@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 // Types
 export interface DTC {
@@ -1486,7 +1486,7 @@ export function useStore() {
     setSearchHistory(searchHistory.filter(h => h.userId !== userId));
   };
 
-  return {
+  return useMemo(() => ({
     users, addUser, updateUser, deleteUser,
     dtcs, addDtc, updateDtc, deleteDtc,
     units,
@@ -1496,6 +1496,8 @@ export function useStore() {
     favorites, toggleFavorite,
     savedItems, addSavedItem, removeSavedItem,
     searchHistory, addSearchHistory, clearSearchHistory
-  };
+  }), [
+    users, dtcs, units, announcements, logs, chatLogs, favorites, savedItems, searchHistory
+  ]);
 }
 

@@ -14,15 +14,19 @@ router.post("/exchange", async (req, res) => {
   try {
     // 1. Verify Identity
     const decodedToken = await getAuth().verifyIdToken(firebase_token);
-    const { uid, email } = decodedToken;
+    const { uid, email, email_verified } = decodedToken;
     
-    if (!email) {
-      console.error("[AUTH] Token missing email for UID:", uid);
-      return res.status(400).json({ error: "Email verified identity required" });
+    console.log(`[AUTH] Verifying token for UID: ${uid}, Email: ${email}, Verified: ${email_verified}`);
+
+    const effectiveEmail = email || `${uid}@not-provided.com`;
+    
+    // We should still prefer verified emails for security, but not block login if email exists
+    if (!email && !uid) {
+      return res.status(400).json({ error: "Invalid identity credentials" });
     }
 
     // 2. Fetch or Sync User (Auto-Recovery System to ensure ZERO login failure)
-    const user = await getOrCreateUser(uid, email);
+    const user = await getOrCreateUser(uid, effectiveEmail);
 
     // 3. Issue Production JWT (Single Authority)
     const token = await new jose.SignJWT({ 

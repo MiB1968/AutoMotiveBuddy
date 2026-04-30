@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-python-dotenv
-firebase-admin
-python-jose[cryptography]
-psutil
-pydantic
-pydantic-settings
