@@ -164,7 +164,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
   };
 
   const getSeverityColor = (sev: string = 'medium') => {
-    switch (sev.toLowerCase()) {
+    switch ((sev || 'medium').toLowerCase()) {
       case 'critical': return 'text-red-500 bg-red-500/10 border-red-500/20';
       case 'high': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
       case 'low': return 'text-green-500 bg-green-500/10 border-green-500/20';

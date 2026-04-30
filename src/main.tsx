@@ -3,6 +3,19 @@ import {createRoot} from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register service worker with auto-update
+const updateSW = registerSW({
+  onNeedRefresh() {
+    if (confirm('New content available. Reload?')) {
+      updateSW(true);
+    }
+  },
+  onOfflineReady() {
+    console.log('App ready to work offline');
+  },
+});
 
 const queryClient = new QueryClient();
 
@@ -76,12 +89,6 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
     }
     return this.props.children;
   }
-}
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register("/sw.js").catch(console.error);
-  });
 }
 
 createRoot(document.getElementById('root')!).render(

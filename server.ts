@@ -3,6 +3,10 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 import { getApps, initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -69,7 +73,8 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors({ origin: '*' }));
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Request logger
   app.use((req, res, next) => {

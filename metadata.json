@@ -1,6 +1,6 @@
 {
-  "name": "AutoMoto Buddy Pro",
-  "description": "Production-grade automotive SaaS platform with DTC lookup, AI diagnostics, RBAC, and subscription management.",
-  "requestFramePermissions": ["microphone"],
+  "name": "AutoMotive Buddy",
+  "description": "Production-grade automotive SaaS platform with OpenClaw AI Lens, DTC diagnostics, and offline synchronization.",
+  "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": []
 }

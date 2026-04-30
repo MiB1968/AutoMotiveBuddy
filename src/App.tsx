@@ -17,7 +17,7 @@ import {
   Calendar, FileText, ChevronDown, ChevronLeft, Search, ArrowRight,
   Phone, Eye, EyeOff, Check, Heart, Clock, Printer, Cable,
   Share2, Wrench as ToolIcon, CreditCard, Award, MousePointer2, Volume2, VolumeX,
-  Mic, MicOff, Camera, Loader2, Brain, ThumbsUp, ThumbsDown
+  Mic, MicOff, Camera, Image as ImageIcon, Loader2, Brain, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import { useStore, User as UserType, DTC, VehicleUnit, SavedItem, SearchHistory, Announcement, ActivityLog, ChatMessage } from './lib/store';
 import { vehicleDatabase, fordDTCDatabase, otherMfrDTCs, genericDTCs, komatsuDTCs } from './lib/dtcData';
@@ -620,6 +620,30 @@ export default function App() {
     setToasts(prev => [...prev, { id, message, type }]);
   };
   const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      addToast('System Alert: Browser does not support terminal broadcasts.', 'error');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        addToast('Broadcast link established. AutoBuddy can now send alerts.', 'success');
+        // Future: Subscribe to push service here
+      } else {
+        addToast('Broadcast link rejected by user.', 'warning');
+      }
+    } catch (error) {
+      console.error('Notification Error:', error);
+      addToast('Telemetry failure: Could not request broadcast permissions.', 'error');
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -653,9 +677,24 @@ export default function App() {
           startSyncEngine();
         } catch (error: any) {
           const errMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Unknown identity bridge failure";
+          const recoveryHint = error.response?.data?.recovery_hint;
           console.error('[AUTH] Flow Critical Error:', errMsg);
-          addToast(`Auth Failure: ${errMsg}`, 'error');
+          
+          // Clear any stale session
           setCurrentUser(null);
+          localStorage.removeItem('autobuddy_token');
+          
+          // More helpful error for admin
+          if (recoveryHint) {
+             addToast(`Auth Failure: ${errMsg}. ${recoveryHint}`, 'error');
+          } else {
+             addToast(`Auth Failure: ${errMsg}`, 'error');
+          }
+          
+          // Return to login if not already there
+          if (window.location.hash !== '#login' && window.location.hash !== '#home' && window.location.hash !== '') {
+            window.location.hash = '#login';
+          }
         }
       } else {
         console.log('[AUTH] No Firebase Session Found');
@@ -688,17 +727,6 @@ export default function App() {
     if (ready && currentUser) {
         syncFromFirebase(); // initial load
         startAutoSync();    // background sync
-    }
-
-    // Register Service Worker
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(reg => {
-          console.log('SW registered');
-        }).catch(err => {
-          console.log('SW failed', err);
-        });
-      });
     }
 
     const handleHash = () => setHash(window.location.hash || '#home');
@@ -838,7 +866,18 @@ export default function App() {
     }
 
     if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
-      return <AdminDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />;
+      return (
+        <AdminDashboard 
+          h={hash} 
+          user={currentUser} 
+          store={store} 
+          onLogout={logOut} 
+          toast={addToast} 
+          onInstall={handleInstallApp} 
+          showInstall={!!deferredPrompt} 
+          onUpdateAvatar={setCurrentUser} 
+        />
+      );
     }
 
     if (currentUser.status === 'blocked') {
@@ -864,7 +903,19 @@ export default function App() {
              </div>
           )}
           <div className={currentUser.status === 'active' && !currentUser.account_end_date ? 'pt-6' : ''}>
-             <MemberDashboard h={h} user={currentUser} store={store} onLogout={logout} toast={addToast} onInstall={handleInstallApp} showInstall={!!deferredPrompt} onUpdateAvatar={updateAvatar} />
+             <MemberDashboard 
+               h={hash} 
+               user={currentUser} 
+               store={store} 
+               onLogout={logOut} 
+               toast={addToast} 
+               onInstall={handleInstallApp} 
+               showInstall={!!deferredPrompt} 
+               onUpdateAvatar={setCurrentUser}
+               notificationPermission={notificationPermission}
+               requestNotificationPermission={requestNotificationPermission}
+               deferredPrompt={deferredPrompt}
+             />
           </div>
        </>
     );
@@ -1931,6 +1982,7 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
 
       <nav className="sidebar-nav overflow-y-auto space-y-2">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'overview'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('overview')} />
+        <NavItem icon={Cpu} label="OpenClaw AI" active={activeTab === 'claw'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('claw')} />
         <NavItem icon={Users} label="Member Core" active={activeTab === 'members'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('members')} />
         <NavItem icon={Database} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={Activity} label="Audit Registry" active={activeTab === 'logs'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('logs')} />
@@ -2033,12 +2085,55 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
 
           <AnimatePresence mode="wait">
             {activeTab === 'overview' && <OverviewTab key="adm-ov" user={user} store={store} />}
+            {activeTab === 'claw' && <AIChatTab user={user} store={store} toast={toast} />}
             {activeTab === 'members' && <MembersTab key="adm-mbr" store={store} user={user} toast={toast} />}
             {activeTab === 'dtc' && <DTCLookupTab key="adm-dtc" store={store} user={user} toast={toast} />}
             {activeTab === 'logs' && <LogsTab key="adm-log" store={store} />}
             {activeTab === 'profile' && <ProfileTab key="adm-profile" user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
             {activeTab === 'announcements' && <div key="adm-announcements" className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Announcements Module - Interface Integration Pending</div>}
-            {activeTab === 'settings' && <div key="adm-settings" className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">Settings Module - Configuration Lock Engaged</div>}
+            {activeTab === 'settings' && (
+              <div key="adm-settings" className="space-y-6">
+                 <div className="glass-panel p-8">
+                    <h3 className="text-xl font-display font-medium text-brand uppercase tracking-widest mb-6">Environment Configuration</h3>
+                    <div className="space-y-4 max-w-2xl">
+                       <div className="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                          <div>
+                             <div className="text-[10px] text-text-secondary uppercase font-bold tracking-widest mb-1">Railway Project ID</div>
+                             <div className="text-sm font-mono text-text-primary">{(import.meta as any).env?.VITE_RAILWAY_PROJECT_ID || 'Not Configured (Add to .env)'}</div>
+                          </div>
+                          <Badge className="bg-brand/10 text-brand border-brand/20 uppercase tracking-widest border">{(import.meta as any).env?.VITE_RAILWAY_PROJECT_ID ? 'ACTIVE' : 'MISSING'}</Badge>
+                       </div>
+                       
+                       <div className="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                          <div>
+                             <div className="text-[10px] text-text-secondary uppercase font-bold tracking-widest mb-1">API Backend Node</div>
+                             <div className="text-sm font-mono text-text-primary">{BASE_API || 'Built-in (Relative)'}</div>
+                          </div>
+                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20 uppercase tracking-tighter border">Connected</Badge>
+                       </div>
+
+                       <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                          <div className="text-[10px] text-text-secondary uppercase font-bold tracking-widest mb-1">Fleet Access Node</div>
+                          <div className="text-sm font-mono text-text-primary">{window.location.origin}</div>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="glass-panel p-8 border-amber-500/20 bg-amber-500/5">
+                    <div className="flex items-center gap-4 mb-4">
+                       <ShieldCheck className="text-amber-500" size={32} />
+                       <div>
+                          <h4 className="text-lg font-display font-medium text-white uppercase tracking-widest">Master Admin Override</h4>
+                          <p className="text-xs text-text-secondary tracking-wide">Critical system parameters and protocol overrides.</p>
+                       </div>
+                    </div>
+                    <div className="flex gap-4">
+                       <button className="btn-secondary px-6 py-2 opacity-50 cursor-not-allowed">Reset DTC Cache</button>
+                       <button className="btn-secondary px-6 py-2 opacity-50 cursor-not-allowed">Flush Audit Logs</button>
+                    </div>
+                 </div>
+              </div>
+            )}
           </AnimatePresence>
         </div>
       </main>
@@ -2047,7 +2142,10 @@ function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstal
   );
 }
 
-function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInstall, onUpdateAvatar }: any) {
+function MemberDashboard({ 
+  h, user, store, onLogout, toast, onInstall, showInstall, onUpdateAvatar,
+  notificationPermission, requestNotificationPermission, deferredPrompt
+}: any) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -2072,7 +2170,7 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
       <nav className="sidebar-nav overflow-y-auto space-y-1 md:space-y-2">
         <NavItem icon={LayoutDashboard} label="Overview" active={activeTab === 'dashboard'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dashboard')} />
-
+        <NavItem icon={Cpu} label="OpenClaw AI" active={activeTab === 'claw'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('claw')} />
         <NavItem icon={Search} label="DTC Database" active={activeTab === 'dtc'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('dtc')} />
         <NavItem icon={Cable} label="Wiring Color Coding" active={activeTab === 'wiring'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('wiring')} />
         <NavItem icon={Star} label="Neural Library" active={activeTab === 'saved'} collapsed={sidebarCollapsed && !mobileMenuOpen} onClick={() => navigateTo('saved')} />
@@ -2186,12 +2284,70 @@ function MemberDashboard({ h, user, store, onLogout, toast, onInstall, showInsta
 
             <AnimatePresence mode="wait">
               {activeTab === 'dashboard' && <OverviewTab key="mbr-ov" user={user} store={store} />}
-
+              {activeTab === 'claw' && <AIChatTab user={user} store={store} toast={toast} />}
               {activeTab === 'dtc' && <DTCLookupTab key="mbr-dtc" store={store} user={user} toast={toast} />}
               {activeTab === 'wiring' && <WiringColorTab key="mbr-wiring" store={store} user={user} toast={toast} />}
               {activeTab === 'saved' && <SavedItemsTab key="mbr-saved" user={user} store={store} />}
               {activeTab === 'profile' && <ProfileTab user={user} store={store} onUpdateAvatar={onUpdateAvatar} />}
-              {activeTab === 'settings' && <div className="glass-panel text-center py-20 opacity-50 uppercase tracking-widest text-[10px]">User Preferences Interface Pending</div>}
+              {activeTab === 'settings' && (
+                <div key="mbr-settings" className="space-y-6">
+                  <div className="glass-panel p-8">
+                     <h3 className="text-xl font-display font-medium text-brand uppercase tracking-widest mb-6">User Preferences</h3>
+                     <p className="text-sm text-text-secondary mb-8">Personalize your diagnostic experience and interface settings.</p>
+                     
+                     <div className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                           <div className="flex items-center gap-4">
+                              <Bell className="text-brand" size={20} />
+                              <div>
+                                 <div className="text-xs font-bold text-white uppercase tracking-wider">Smart Broadcasts</div>
+                                 <div className="text-[10px] text-text-secondary font-medium">Get critical maintenance and system alerts.</div>
+                              </div>
+                           </div>
+                           <button 
+                             onClick={requestNotificationPermission}
+                             disabled={notificationPermission === 'granted'}
+                             className={`px-6 py-2 text-[10px] uppercase font-bold rounded-md transition-all ${
+                               notificationPermission === 'granted' 
+                               ? 'bg-green-500/20 text-green-500 border border-green-500/30' 
+                               : 'btn-secondary'
+                             }`}
+                           >
+                             {notificationPermission === 'granted' ? 'Enabled' : 'Activate'}
+                           </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                           <div className="flex items-center gap-4">
+                              <Download className="text-brand" size={20} />
+                              <div>
+                                 <div className="text-xs font-bold text-white uppercase tracking-wider">Application Mode</div>
+                                 <div className="text-[10px] text-text-secondary font-medium">Use AutoBuddy as a standalone system.</div>
+                              </div>
+                           </div>
+                           {deferredPrompt ? (
+                             <button onClick={onInstall} className="btn-primary px-6 py-2 text-[10px] uppercase font-bold">Install</button>
+                           ) : (
+                             <Badge className="bg-brand/10 text-brand border-brand/20 uppercase text-[9px] tracking-widest">
+                               {window.matchMedia('(display-mode: standalone)').matches ? 'STANDALONE ACTIVE' : 'OPTIMIZED'}
+                             </Badge>
+                           )}
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                           <div className="flex items-center gap-4">
+                              <ShieldCheck className="text-brand" size={20} />
+                              <div>
+                                 <div className="text-xs font-bold text-white uppercase tracking-wider">Account Integrity</div>
+                                 <div className="text-[10px] text-text-secondary font-medium">Secure Neural Link Status.</div>
+                              </div>
+                           </div>
+                           <Badge className="bg-green-500/10 text-green-500 border-green-500/20 uppercase text-[9px] tracking-widest">Verified</Badge>
+                        </div>
+                     </div>
+                  </div>
+                </div>
+              )}
             </AnimatePresence>
             </div>
           </main>
@@ -3477,8 +3633,14 @@ function AIChatTab({ user, store, ...props }: any) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { make, model, year, engine } = useVehicleStore();
+  const addToast = props.toast;
 
   const myMessages = store.chatLogs.filter((m: any) => m.userId === user.id);
 
@@ -3486,25 +3648,160 @@ function AIChatTab({ user, store, ...props }: any) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [myMessages, loading]);
 
+  // Handle Image Selection with Compression
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        addToast('File too large (Max 20MB). Reducing payload size...', 'warning');
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimension 1280px for AI vision
+          const MAX_SIZE = 1280;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Compress as JPEG at 0.7 quality
+          const compressed = canvas.toDataURL('image/jpeg', 0.7);
+          setSelectedImage(compressed);
+          addToast('Visual Telemetry Optimized. Ready for Lens Inspection.', 'success');
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: any) => {
+        const lastResult = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        console.log('Voice Detected:', lastResult);
+
+        // Wake word detection: "hey autobuddy"
+        if (lastResult.includes('hey autobuddy') || lastResult.includes('hey auto buddy')) {
+          const query = lastResult.replace(/hey auto\s?buddy/g, '').trim();
+          if (query) {
+            handleVoiceQuery(query);
+          } else {
+            speakText("Listening... How can I help with your diagnostic?", true);
+            // After wake word, we might wait for the actual query in the next result
+          }
+        } else if (voiceActive) {
+          // If already in a conversation flow or just always listening
+          handleVoiceQuery(lastResult);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech Recognition Error:', event.error);
+        if (event.error === 'not-allowed') {
+          setIsListening(false);
+          setVoiceActive(false);
+        }
+      };
+
+      recognition.onend = () => {
+        if (voiceActive) recognition.start(); // Keep listening if active
+        else setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, [voiceActive]);
+
+  const handleVoiceQuery = (query: string) => {
+    if (!query || loading) return;
+    setInput(query);
+    setTimeout(() => sendVoice(query), 500);
+  };
+
   const send = async (e?: any) => {
     if (e) e.preventDefault();
-    if (!input.trim() || loading) return;
-
+    if ((!input.trim() && !selectedImage) || loading) return;
     const userText = input.trim();
+    const currentImage = selectedImage;
+    
     setInput("");
-    store.addChatMessage(user.id, 'user', userText);
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    
+    await sendVoice(userText, currentImage);
+  };
+
+  const sendVoice = async (text: string, image?: string | null) => {
+    if ((!text.trim() && !image) || loading) return;
+    const userText = text.trim() || (image ? "Explain what you see in this image." : "");
+    
+    // Add message with image metadata if present
+    store.addChatMessage(user.id, 'user', userText, { image: image });
     setLoading(true);
 
     try {
-      const resp = await askAutomotiveAssistant(userText, { make, model, year, engine });
+      const resp = await askAutomotiveAssistant(userText, { make, model, year, engine }, image as string);
       store.addChatMessage(user.id, 'ai', resp);
-      if (autoSpeak) speakText(resp, true);
+      speakText(resp, true);
     } catch (err: any) {
-      const errMsg = `Uplink synchronization failure: ${err?.message?.includes('404') ? 'Model Mismatch' : 'Network Interruption'}. Attempting local diagnostic fallback...`;
+      const errMsg = "Link failure. Diagnostic offline.";
       store.addChatMessage(user.id, 'ai', errMsg);
-      if (autoSpeak) speakText(errMsg, true);
+      speakText(errMsg, true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleVoiceMode = () => {
+    if (!recognitionRef.current) {
+      addToast('System Alert: Browser does not support Vocal Uplink.', 'error');
+      return;
+    }
+
+    if (voiceActive) {
+      recognitionRef.current.stop();
+      setVoiceActive(false);
+      setIsListening(false);
+      window.speechSynthesis.cancel();
+      addToast('Neural Radio Disconnected.', 'warning');
+    } else {
+      recognitionRef.current.start();
+      setVoiceActive(true);
+      setIsListening(true);
+      setAutoSpeak(true);
+      addToast('Neural Radio Linked. Say "Hey AutoBuddy" for hands-free diagnostics.', 'success');
     }
   };
 
@@ -3529,7 +3826,14 @@ function AIChatTab({ user, store, ...props }: any) {
                 </div>
               )}
               <div className={`p-3 md:p-4 rounded-2xl text-xs md:text-sm leading-relaxed ${m.role === 'user' ? 'bg-brand/10 border border-brand/20 text-white rounded-tr-none' : 'bg-white/5 border border-border-glass text-text-primary rounded-tl-none'}`}>
-                {m.content}
+                {m.metadata?.image && (
+                  <div className="mb-3 rounded-lg overflow-hidden border border-white/10 group cursor-zoom-in">
+                    <img referrerPolicy="no-referrer" src={m.metadata.image} alt="Diagnostic Feed" className="w-full max-h-[300px] object-cover transition-transform group-hover:scale-105" />
+                  </div>
+                )}
+                <div className="prose prose-invert prose-xs max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -3541,32 +3845,81 @@ function AIChatTab({ user, store, ...props }: any) {
         )}
       </div>
       <div className="p-4 md:p-6 border-t border-border-glass bg-white/5">
-        <form onSubmit={send} className="relative">
-          <input 
-            type="text" 
-            placeholder="QUERY VEHICLE SYSTEM..." 
-            className="input-field pr-32 h-[50px] md:h-[56px] text-xs font-accent uppercase tracking-widest" 
-            value={input} 
-            onChange={e => setInput(e.target.value)} 
-            disabled={loading} 
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        {selectedImage && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 relative w-32 h-32 group">
+            <img referrerPolicy="no-referrer" src={selectedImage} alt="Preview" className="w-full h-full object-cover rounded-lg border-2 border-brand" />
             <button 
-              type="button" 
-              onClick={() => {
-                setAutoSpeak(!autoSpeak);
-                if (autoSpeak) window.speechSynthesis.cancel();
-              }}
-              title={autoSpeak ? "Voice Response ON" : "Voice Response OFF"}
-              className={`w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center transition-colors ${autoSpeak ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-text-muted hover:text-white'}`}
+              onClick={removeImage}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors"
             >
-              {autoSpeak ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              <X size={12} />
             </button>
-            <button type="submit" disabled={!input.trim() || loading} className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-brand text-white flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-              <Send size={18} />
-            </button>
+            <div className="absolute inset-0 bg-brand/10 animate-pulse rounded-lg pointer-events-none"></div>
+          </motion.div>
+        )}
+        <form onSubmit={send} className="relative mb-3 flex items-center gap-2">
+          <input 
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleImageChange}
+          />
+          <button 
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="OpenClaw Lens - Visual AI"
+            className="w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center bg-white/5 text-text-muted hover:text-brand hover:bg-brand/10 transition-all border border-white/10 shrink-0"
+          >
+            <Camera size={20} />
+          </button>
+          <div className="relative flex-1">
+            <input 
+              type="text" 
+              placeholder={selectedImage ? "ANALYZE THIS COMPONENT..." : "QUERY VEHICLE SYSTEM..."} 
+              className="input-field pr-32 h-[50px] md:h-[56px] text-xs font-accent uppercase tracking-widest w-full" 
+              value={input} 
+              onChange={e => setInput(e.target.value)} 
+              disabled={loading} 
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <button 
+                type="button" 
+                onClick={() => {
+                  setAutoSpeak(!autoSpeak);
+                  if (autoSpeak) window.speechSynthesis.cancel();
+                }}
+                title={autoSpeak ? "Voice Response ON" : "Voice Response OFF"}
+                className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors ${autoSpeak ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-text-muted hover:text-white'}`}
+              >
+                {autoSpeak ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              </button>
+              <button 
+                type="submit" 
+                disabled={(!input.trim() && !selectedImage) || loading} 
+                className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-brand text-white flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                <Send size={16} />
+              </button>
+            </div>
           </div>
         </form>
+        
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={toggleVoiceMode}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] transition-all ${voiceActive ? 'bg-brand text-white animate-pulse' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
+            >
+              {voiceActive ? <Mic size={14} /> : <MicOff size={14} />}
+              {voiceActive ? "Hands-Free Active" : "Mechanic's Choice Mode"}
+            </button>
+            {voiceActive && (
+               <div className="text-[8px] text-brand font-bold uppercase tracking-widest animate-pulse">Listening for "Hey AutoBuddy"...</div>
+            )}
+          </div>
+          <div className="text-[8px] text-text-muted font-accent uppercase">Audio Diagnostics Enabled via WebSpeech Uplink</div>
+        </div>
       </div>
     </div>
   );
@@ -3591,7 +3944,10 @@ function MembersTab({ user, store, toast, ...props }: any) {
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const uDocs: UserType[] = [];
-      snapshot.forEach(d => uDocs.push(d.data() as UserType));
+      snapshot.forEach(d => {
+        const data = d.data() as UserType;
+        uDocs.push({ ...data, id: d.id }); // Ensure document ID is and used
+      });
       setUsers(uDocs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'users'));
     return () => unsubscribe();
@@ -3732,7 +4088,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                 <td className="p-6">
                   <div className="flex gap-2">
                     {(u.status?.toLowerCase() !== 'active' || user?.role === 'super_admin') && (
-                      <React.Fragment key="approve-reject-group">
+                      <React.Fragment key={`approve-reject-group-${u.id}`}>
                         <button 
                           onClick={() => {
                              setApproveModalUser(u);
@@ -3753,7 +4109,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
                       </React.Fragment>
                     )}
                     {u.status?.toLowerCase() === 'active' && (
-                       <button key="block-access-btn" onClick={() => handleReject(u)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer" title="Block Access"><X size={14} /></button>
+                       <button key={`block-access-btn-${u.id}`} onClick={() => handleReject(u)} className="p-2 bg-red-500/20 text-red-500 rounded hover:scale-110 transition-all cursor-pointer" title="Block Access"><X size={14} /></button>
                     )}
                   </div>
                 </td>
@@ -3870,12 +4226,12 @@ function MembersTab({ user, store, toast, ...props }: any) {
                     {user.role === 'super_admin' ? (
                        <div>
                          <label className="text-[10px] text-text-secondary font-accent uppercase tracking-widest block mb-2">Assign Account Duration</label>
-                          <div className="grid grid-cols-2 gap-2">
-                             <button type="button" onClick={() => setSelectedDuration('1_month')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '1_month' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>1 Month</button>
-                             <button type="button" onClick={() => setSelectedDuration('3_months')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '3_months' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>3 Months</button>
-                             <button type="button" onClick={() => setSelectedDuration('6_months')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '6_months' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>6 Months</button>
-                             <button type="button" onClick={() => setSelectedDuration('1_year')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '1_year' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>1 Year</button>
-                           </div>
+                         <div className="grid grid-cols-2 gap-2">
+                              <button key="dur-1m" type="button" onClick={() => setSelectedDuration('1_month')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '1_month' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>1 Month</button>
+                              <button key="dur-3m" type="button" onClick={() => setSelectedDuration('3_months')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '3_months' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>3 Months</button>
+                              <button key="dur-6m" type="button" onClick={() => setSelectedDuration('6_months')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '6_months' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>6 Months</button>
+                              <button key="dur-1y" type="button" onClick={() => setSelectedDuration('1_year')} className={`py-2 px-1 text-[10px] uppercase font-bold border rounded-md ${selectedDuration === '1_year' ? 'border-brand bg-brand/20 text-white' : 'border-zinc-700 bg-zinc-800 text-white'}`}>1 Year</button>
+                          </div>
                        </div>
                     ) : (
                        <p className="text-xs text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 p-3 rounded">

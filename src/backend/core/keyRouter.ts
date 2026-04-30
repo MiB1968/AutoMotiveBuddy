@@ -21,11 +21,11 @@ export class KeyRouter {
       try {
         const ai = new GoogleGenAI({ apiKey });
         const result = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-flash-latest",
           contents: prompt,
         });
         this.keyLimiter.record(apiKey);
-        return result.text;
+        return result.text || null;
       } catch (e: any) {
         if (e.status === 429) {
           await this.keyLimiter.triggerCooldown(apiKey);
