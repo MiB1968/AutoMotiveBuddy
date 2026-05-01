@@ -652,8 +652,11 @@ export default function App() {
       
       if (user) {
         try {
+          if (!navigator.onLine) {
+            throw new Error("Device is offline. Please check your internet connection.");
+          }
           console.log(`[AUTH] Fetching ID Token for ${user.email}...`);
-          const idToken = await user.getIdToken(true); // Force refresh
+          const idToken = await user.getIdToken(); // Use cached token if available
           
           const targetUrl = getApiUrl("/api/auth/exchange");
           console.log(`[AUTH] Neural Exchange Initiated: ${targetUrl}`);
