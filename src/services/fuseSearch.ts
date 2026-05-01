@@ -64,16 +64,16 @@ export async function buildFuseSearchIndex() {
 export function searchFuses(query: string) {
   if (!isReady) return [];
   
-  const q = query.toLowerCase().trim();
+  const q = (query || "").toLowerCase().trim();
   if (!q) return [];
 
   return fuseSearchIndex.filter(item => {
     return (
-      item.fuseNumber.toLowerCase().includes(q) ||
-      item.function.toLowerCase().includes(q) ||
-      item.vehicleName.toLowerCase().includes(q) ||
-      item.fuseBoxName.toLowerCase().includes(q) ||
-      item.keywords.some(k => k.toLowerCase().includes(q))
+      (item.fuseNumber || '').toLowerCase().includes(q) ||
+      (item.function || '').toLowerCase().includes(q) ||
+      (item.vehicleName || '').toLowerCase().includes(q) ||
+      (item.fuseBoxName || '').toLowerCase().includes(q) ||
+      item.keywords.some(k => (k || '').toLowerCase().includes(q))
     );
   });
 }

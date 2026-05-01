@@ -22,11 +22,26 @@ import {
   Wrench,
   WifiOff,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Loader2
 } from 'lucide-react';
 import { diagnoseDTC } from '../services/api';
 import { performDeepDTCSearch } from '../services/ai';
-import { getDTCOffline, saveDTCOffline, addOfflineLog } from '../services/db';
+import { 
+  DTCRecord, 
+  getDTCOffline, 
+  saveDTCOffline, 
+  addOfflineLog, 
+  DiagnosticSession, 
+  DiagnosticStep as DBStep,
+  Equipment,
+  getAllEquipment
+} from '../services/db';
+import { SessionService } from '../services/sessionService';
+import { v4 as uuidv4 } from 'uuid';
+import { EquipmentRegistry } from './EquipmentRegistry';
+import { BASE_API } from '../lib/config';
+import { LiveDiagnosticTimeline, DiagnosticStep } from './DiagnosticTimeline';
 
 interface DiagnosticInterfaceProps {
   onRunDiagnostics?: (data: { vehicleType: string, brand: string, model: string, year: string, codes: string }) => void;
@@ -42,6 +57,11 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
   const [codes, setCodes] = useState('');
   const [activeTab, setActiveTab] = useState('diagnose');
   const [selectedCircuit, setSelectedCircuit] = useState<string | null>(null);
+  
+  // Session State
+  const [currentSession, setCurrentSession] = useState<DiagnosticSession | null>(null);
+  const [missingTools, setMissingTools] = useState<string[]>([]);
+  const [feasibilityStatus, setFeasibilityStatus] = useState<'proceed' | 'limited' | 'specialist_required'>('proceed');
   
   // Categorized Suggestions
   const suggestions = {
@@ -68,6 +88,10 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
   const [isScanning, setIsScanning] = useState(false);
   const [results, setResults] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [steps, setSteps] = useState<DiagnosticStep[]>([]);
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+  const [fixConfirmed, setFixConfirmed] = useState(false);
+  const [fixDescription, setFixDescription] = useState('');
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
@@ -92,19 +116,122 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
     setIsScanning(true);
     setError(null);
     setResults(null);
+    
+    const caseId = `case-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    setCurrentCaseId(caseId);
 
     const firstCode = codes.split(',')[0].trim().toUpperCase();
+    const initialSteps: DiagnosticStep[] = [
+      { id: '1', type: 'observation', title: 'Reading Inputs', status: 'streaming', content: `Detected DTC sequence: ${codes}. Vehicle: ${year} ${brand} ${model}` }
+    ];
+    setSteps(initialSteps);
+
+    const updateStep = (id: string, updates: Partial<DiagnosticStep>) => {
+      setSteps(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    };
+
+    const addStep = (step: Omit<DiagnosticStep, 'status'>) => {
+      const newStep = { ...step, status: 'streaming' as const };
+      setSteps(prev => {
+        const last = prev[prev.length - 1];
+        if (last) last.status = 'done';
+        return [...prev, newStep];
+      });
+      return newStep.id;
+    };
+
+    const handleTestResult = async (stepId: string, actionIndex: number, result: string) => {
+      setSteps(prev => prev.map(s => {
+        if (s.id === stepId) {
+          const newActions = [...s.metadata.actions];
+          newActions[actionIndex] = { ...newActions[actionIndex], result };
+          return { ...s, metadata: { ...s.metadata, actions: newActions } };
+        }
+        return s;
+      }));
+
+      const targetStep = steps.find(s => s.id === stepId);
+      const action = targetStep?.metadata?.actions?.[actionIndex];
+      if (!action) return;
+
+      const loopStepId = addStep({
+        id: `loop-${Date.now()}`,
+        type: 'reasoning',
+        title: 'Evaluating Result',
+        content: `Refining diagnostic model based on ${result.toUpperCase()} result for: "${action.instruction}"`
+      });
+
+      try {
+        const response = await fetch(`${BASE_API}/api/ai/process-result`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionStorage.getItem('jwt')}`
+          },
+          body: JSON.stringify({ 
+            testAction: action.instruction, 
+            result,
+            previousContext: results?.hypothesis || results?.description || "" ,
+            vehicle: { brand, model, year }
+          })
+        });
+        const data = await response.json();
+        
+        updateStep(loopStepId, { 
+          status: 'done', 
+          content: data.hypothesis || "Updating strategy...",
+          metadata: { actions: data.actions } 
+        });
+
+        if (data.actions && data.actions.length > 0) {
+          const nextActionId = `loop-action-${Date.now()}`;
+          addStep({
+            id: nextActionId,
+            type: 'action',
+            title: 'Refined Procedures',
+            content: 'Follow these adjusted points to pinpoint the failure.',
+            metadata: { 
+              actions: data.actions,
+              onResult: (idx: number, res: string) => handleTestResult(nextActionId, idx, res)
+            }
+          });
+        }
+
+        if (data.conclusion) {
+          addStep({
+            id: `conclusion-${Date.now()}`,
+            type: 'conclusion',
+            title: 'Refined Verdict',
+            content: data.conclusion
+          });
+        }
+      } catch (err) {
+        console.error("Loop Fail", err);
+        updateStep(loopStepId, { status: 'error', content: 'Connection timed out during session update.' });
+      }
+    };
 
     try {
       addOfflineLog({ level: 'info', message: `Started diagnostic scan for ${firstCode}`, context: { brand, model, year } });
       
-      let data;
+      // Step 1 Finish
+      await new Promise(r => setTimeout(r, 800));
+      updateStep('1', { status: 'done', content: `Uplink established. Target vehicle profile loaded: ${year} ${brand} ${model}.` });
 
+      // Step 2: Tool Registry
+      const toolStepId = addStep({ 
+        id: '2', 
+        type: 'tool', 
+        title: 'Registry Search', 
+        content: `Searching master DTC database for ${firstCode}...`,
+        metadata: { skill: 'dtc_lookup', input: { keyword: firstCode } }
+      });
+
+      let data;
       if (isOffline) {
-        // Offline Mode: Check local database ONLY
         const offlineCache = await getDTCOffline(firstCode);
+        await new Promise(r => setTimeout(r, 600));
         if (offlineCache && offlineCache.description) {
-          // Map from DB schema back to UI expectation
           data = {
             code: offlineCache.code,
             description: offlineCache.description,
@@ -112,30 +239,108 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             system: offlineCache.system || 'Vehicle System',
             causes: offlineCache.possibleCauses?.map(c => ({ item: c, probability: null })) || [],
             fixes: offlineCache.recommendedActions || [],
-            confidence: 0.95, // Assumed high for cached
+            confidence: 0.95,
             time_est: 'Saved Locally'
           };
-          setResults(data);
-          if (toast) toast("Loaded from offline database", "success");
+          updateStep(toolStepId, { status: 'done', content: `Found matching protocol in local device cache.` });
         } else {
+          updateStep(toolStepId, { status: 'error', content: `Code not found in local cache. Neural uplink required.` });
           throw new Error("Offline Mode Active: This code is not in your local database.");
         }
       } else {
-        // Online Mode: Fetch from API, then save to local database
         try {
           data = await diagnoseDTC(firstCode);
+          await new Promise(r => setTimeout(r, 1000));
+          if (data) {
+            updateStep(toolStepId, { status: 'done', content: `Neural DB returned validated protocol for ${firstCode}.` });
+          }
         } catch (err) {
-          console.warn("Backend fail, moving to AI matrix");
+          updateStep(toolStepId, { status: 'done', content: `Backend registry search failed. Moving to AI reasoning matrix.` });
         }
 
-        // Deep AI search fallback
         if (!data || !data.fixes || data.fixes.length === 0) {
+          const aiStepId = addStep({ 
+            id: '3', 
+            type: 'reasoning', 
+            title: 'Decision Engine', 
+            content: `Analyzing failure vectors and determining priority tests...` 
+          });
+          
           data = await performDeepDTCSearch(firstCode, { make: brand, model, year });
+          await new Promise(r => setTimeout(r, 1200));
+          
+          if (data && data.actions) {
+             updateStep(aiStepId, { 
+                status: 'done', 
+                content: `Synthesis complete. Identified ${data.actions.length} priority diagnostic procedures.`,
+                metadata: { actions: data.actions }
+             });
+
+             // Step 4: Decision/Action
+             const pTestId = 'p-tests-initial';
+             addStep({ 
+                id: pTestId,
+                type: 'action', 
+                title: 'Priority Tests', 
+                content: 'Perform the following procedural tests to validate the hypothesis.',
+                metadata: { 
+                  actions: data.actions,
+                  onResult: (idx: number, res: string) => handleTestResult(pTestId, idx, res)
+                }
+             });
+          } else {
+             updateStep(aiStepId, { status: 'done', content: `Reasoning complete. No specific actions generated.` });
+          }
         }
+
+        // Final Conclusion
+        addStep({ 
+          id: '5', 
+          type: 'conclusion', 
+          title: 'Final Verdict', 
+          content: `${data.hypothesis || data.description || 'Scan complete.'} Recommended Fix: ${data.conclusion || data.fixes?.[0] || 'Refer to service manual.'}` 
+        });
+        await new Promise(r => setTimeout(r, 500));
+        setSteps(prev => prev.map(s => ({...s, status: 'done'})));
         
         setResults(data);
 
-        // Save fresh results locally so they are available when offline
+        // Start a diagnostic session automatically if we have actions
+        if (data && (data.actions || data.workflow)) {
+           const session = await SessionService.startSession(data, currentCaseId || uuidv4());
+           setCurrentSession(session);
+           
+           // Check equipment feasibility
+           const equipCheck = await SessionService.checkEquipmentFeasibility(session);
+           setMissingTools(equipCheck.missingTools);
+           setFeasibilityStatus(data.feasibility || (equipCheck.hasRequiredTools ? 'proceed' : 'limited'));
+        }
+
+        // Log to backend for learning
+        if (!isOffline) {
+          fetch(`${BASE_API}/api/ai/log-case`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionStorage.getItem('jwt')}`
+            },
+            body: JSON.stringify({
+              caseId,
+              vehicle: { make: brand, model, year: parseInt(year) || 0 },
+              initialInput: { dtcCodes: [firstCode], symptoms: codes },
+              steps: steps.map(s => ({
+                stepId: s.id,
+                action: s.title,
+                result: s.metadata?.actions?.[0]?.result || 'not_sure'
+              })),
+              finalDiagnosis: {
+                hypothesis: data.hypothesis || data.description,
+                confidence: data.confidence || 0.9
+              }
+            })
+          }).catch(console.error);
+        }
+
         if (data && data.description) {
           await saveDTCOffline({
             code: firstCode,
@@ -143,11 +348,12 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             severity: data.severity,
             system: data.system || 'Powertrain',
             manufacturer: brand,
-            possibleCauses: data.causes?.map((c: any) => typeof c === 'string' ? c : c.item) || [],
+            possibleCauses: data.causes?.map((c: any) => {
+              if (typeof c === 'string') return c;
+              return c?.item || '';
+            }) || [],
             recommendedActions: data.fixes || []
           });
-          addOfflineLog({ level: 'info', message: `Saved ${firstCode} diagnostic to offline DB.` });
-          if (toast) toast("Search complete & saved for offline use.", "success");
         }
       }
 
@@ -156,6 +362,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred during the scan.");
+      setSteps(prev => prev.map(s => s.status === 'streaming' ? { ...s, status: 'error', content: err.message } : s));
       addOfflineLog({ level: 'error', message: err.message, context: { firstCode } });
       if (toast) toast(err.message, 'error');
     } finally {
@@ -423,10 +630,57 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                 <h2 className="font-display font-medium text-lg">Scan Results</h2>
               </div>
 
+              {/* Sticky Vehicle Info Bar */}
+              <div className="sticky top-0 z-20 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 mb-6 flex items-center justify-between shadow-2xl">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center border border-brand/20">
+                    <Car size={20} className="text-brand" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-tight">
+                      {year || 'Universal'} {brand || 'Auto'} {model || 'Buddy'}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`} />
+                      <span className="text-[10px] text-zinc-500 font-accent uppercase tracking-widest">
+                        {isOffline ? 'Offline Cache' : 'Cloud Synchronized'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-6 pr-2">
+                  <div className="text-right hidden sm:block">
+                    <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">DTC_TARGET</div>
+                    <div className="text-xs font-mono text-brand font-bold">{codes || 'NONE'}</div>
+                  </div>
+                  <div className="w-px h-8 bg-white/10 hidden sm:block" />
+                  <div className="text-right">
+                    <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">OBD_STATUS</div>
+                    <div className="text-xs font-bold text-green-500">CONNECTED</div>
+                  </div>
+                </div>
+              </div>
+
               {isScanning ? (
-                <div className="diag-card py-20 flex flex-col items-center justify-center space-y-4">
-                  <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-                  <p className="text-[10px] uppercase font-bold tracking-[0.3em] text-amber-500 animate-pulse">Establishing Neural Link...</p>
+                <div className="diag-card py-6 flex flex-col items-center">
+                  <div className="w-full flex items-center justify-between mb-8 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center">
+                        <Activity size={18} className="text-brand" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-white/90">Diagnostic Matrix</h3>
+                        <p className="text-[8px] text-zinc-500 font-accent uppercase tracking-tighter">Live Neural Synthesis In Progress</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                      <Loader2 size={12} className="animate-spin text-brand" />
+                      <span className="text-[10px] font-mono text-brand uppercase">Step {steps.filter(s => s.status === 'done').length + 1}/4</span>
+                    </div>
+                  </div>
+                  
+                  <LiveDiagnosticTimeline steps={steps} />
                 </div>
               ) : results ? (
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-start">
@@ -435,9 +689,27 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                     <div className="diag-card">
                       <div className="flex justify-between items-start mb-6">
                         <div className="space-y-1">
-                          <div className="text-3xl font-display font-bold text-amber-500">{results.code}</div>
-                          <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border ${getSeverityColor(results.severity)} inline-block`}>
-                            {results.severity || 'Medium'} Severity
+                          <div className="text-3xl font-display font-bold text-amber-500 flex items-center gap-2">
+                             {results.code}
+                             {results.feasibility && (
+                                <div className={`text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-tighter ${
+                                   results.feasibility === 'proceed' ? 'bg-green-500/20 text-green-500' :
+                                   results.feasibility === 'limited' ? 'bg-blue-500/20 text-blue-500' :
+                                   'bg-red-500/20 text-red-500'
+                                }`}>
+                                   {results.feasibility.replace('_', ' ')}
+                                </div>
+                             )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                             <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border ${getSeverityColor(results.severity)} inline-block`}>
+                               {results.severity || 'Medium'} Severity
+                             </div>
+                             {results.sourceType && (
+                                <div className="px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border border-zinc-700 bg-zinc-800 text-zinc-400 inline-block">
+                                   Source: {results.sourceType.replace('_', ' ')}
+                                </div>
+                             )}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -458,7 +730,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                                <Clock size={12} className="text-zinc-500" />
                                <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-widest">Time Est.</span>
                             </div>
-                            <div className="text-xs font-bold">{results.time_est || '30 - 60 Min'}</div>
+                            <div className="text-xs font-bold">{results.time_est || results.timeEstimate || '30 - 60 Min'}</div>
                           </div>
                           <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl flex flex-col justify-between">
                             <div>
@@ -500,6 +772,13 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                             </div>
                           </div>
                         </div>
+
+                        {results.operationalAction && (
+                          <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Operational Protocol</div>
+                            <div className="text-xs font-bold text-amber-500">{results.operationalAction}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -516,10 +795,10 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                                  <span className="text-amber-500 font-bold text-xs">{idx + 1}</span>
                               </div>
                               <div className="space-y-1 flex-1">
-                                 <div className="text-xs font-bold">{typeof cause === 'string' ? cause : cause.item}</div>
-                                 {cause.probability && (
+                                 <div className="text-xs font-bold">{typeof cause === 'string' ? cause : (cause?.item || 'Unknown Cause')}</div>
+                                 {cause?.probability && (
                                     <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
-                                       <div className="h-full bg-amber-500 rounded-full" style={{ width: `${cause.probability * 100}%` }} />
+                                       <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(cause?.probability || 0) * 100}%` }} />
                                     </div>
                                  )}
                               </div>
@@ -542,6 +821,71 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                         </div>
                       </div>
                     )}
+
+                    {/* Learning Section: Confirm Fix */}
+                    {!isOffline && results && (
+                      <div className="p-6 bg-brand/5 border border-brand/20 rounded-[24px] space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Brain size={20} className="text-brand" />
+                          <div>
+                            <h3 className="text-sm font-bold uppercase tracking-tight">Diagnostic Decision Learning</h3>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Help improve the accuracy for this {brand} {model}</p>
+                          </div>
+                        </div>
+
+                        {!fixConfirmed ? (
+                          <div className="space-y-4">
+                            <p className="text-xs text-zinc-400">Did one of these fixes solve the issue? Confirming high-value cases helps train the next diagnostic session.</p>
+                            <div className="flex flex-col gap-3">
+                              <textarea 
+                                placeholder="What was the actual fix? (e.g., Replaced O2 sensor Bank 1)"
+                                value={fixDescription}
+                                onChange={(e) => setFixDescription(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs min-h-[80px] focus:border-brand/40 outline-none transition-colors"
+                              />
+                              <button 
+                                onClick={async () => {
+                                  if (!fixDescription.trim()) {
+                                    if (toast) toast("Please describe the fix", "warning");
+                                    return;
+                                  }
+                                  try {
+                                    const res = await fetch(`${BASE_API}/api/ai/confirm-fix`, {
+                                      method: 'POST',
+                                      headers: { 
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${sessionStorage.getItem('jwt')}`
+                                      },
+                                      body: JSON.stringify({ 
+                                        caseId: currentCaseId, 
+                                        fixDescription 
+                                      })
+                                    });
+                                    if (res.ok) {
+                                      setFixConfirmed(true);
+                                      if (toast) toast("Case logged! The DDE engine has learned from this repair.", "success");
+                                    }
+                                  } catch (e) {
+                                    if (toast) toast("Failed to sync fix data.", "error");
+                                  }
+                                }}
+                                className="w-full py-3 bg-brand text-black font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-brand/80 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <CheckCircle2 size={14} />
+                                CONFIRM & TRAIN ENGINE
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 py-4 text-green-500">
+                             <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
+                               <CheckCircle2 size={16} />
+                             </div>
+                             <span className="text-xs font-bold uppercase tracking-widest">Repair Data Synchronized</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : error ? (
@@ -561,9 +905,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                 </div>
               )}
             </motion.div>
-          )}
-
-          {activeTab === 'repair' && (
+          )}          {activeTab === 'repair' && (
             <motion.div 
               key="repair"
               initial={{ opacity: 0, x: 20 }}
@@ -577,128 +919,139 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                       <Wrench size={20} className="text-amber-500" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-display font-bold uppercase tracking-tight leading-none">Repair Protocols</h3>
-                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">Advanced Service Guide</p>
+                      <h3 className="text-lg font-display font-bold uppercase tracking-tight leading-none">Diagnostic Workflow</h3>
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">Guided Execution Engine</p>
                     </div>
                   </div>
-                  {results && (
+                  {currentSession && (
                     <div className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full font-mono text-[10px] text-amber-500 font-bold">
-                      {results.code}
+                       STEP {currentSession.currentStepIndex + 1}/{currentSession.steps.length}
                     </div>
                   )}
                </div>
- 
-               {results ? (
+
+               {currentSession ? (
                  <div className="space-y-6">
-                    {/* Diagnostic Summary */}
-                    <div className="diag-card p-0 overflow-hidden bg-zinc-900/30 border-zinc-800/50">
-                       <div className="p-4 bg-zinc-900/50 border-b border-zinc-800 flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Target Component</span>
-                          <span className="text-xs font-bold text-white uppercase">{results.system || 'Engine Management'}</span>
-                       </div>
-                       <div className="p-4">
-                          <p className="text-xs text-zinc-400 leading-relaxed italic">
-                            "{results.description}"
-                          </p>
-                       </div>
-                    </div>
- 
-                    {/* Causes Grid */}
-                    <div className="space-y-3">
-                       <div className="flex items-center gap-2 px-1">
-                          <Activity size={14} className="text-amber-500" />
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Differential Diagnosis</span>
-                       </div>
-                       <div className="grid grid-cols-1 gap-2">
-                          {results.causes?.map((cause: any, idx: number) => {
-                             const causeText = typeof cause === 'string' ? cause : cause.item;
-                             const prob = typeof cause === 'object' ? cause.probability : null;
-                             return (
-                               <div key={idx} className="p-4 bg-zinc-900/80 border border-zinc-800 rounded-2xl group hover:border-amber-500/30 transition-colors">
-                                  <div className="flex justify-between items-start mb-2">
-                                     <span className="text-xs font-bold text-zinc-200">{causeText}</span>
-                                     {prob && <span className="text-[10px] font-mono text-amber-500">{(prob * 100).toFixed(0)}%</span>}
+                    {/* Feasibility Alert */}
+                    {(feasibilityStatus !== 'proceed' || missingTools.length > 0) && (
+                      <div className={`p-4 rounded-2xl border ${feasibilityStatus === 'specialist_required' ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                         <div className="flex items-center gap-2 mb-2">
+                            <ShieldAlert size={14} className={feasibilityStatus === 'specialist_required' ? 'text-red-500' : 'text-amber-500'} />
+                            <span className={`text-[10px] font-bold uppercase tracking-widest ${feasibilityStatus === 'specialist_required' ? 'text-red-500' : 'text-amber-500'}`}>
+                                {feasibilityStatus === 'specialist_required' ? 'Mission Critical Refusal' : 'Limited Operational Capability'}
+                            </span>
+                         </div>
+                         <p className="text-[10px] text-zinc-400 leading-relaxed mb-3">
+                            {feasibilityStatus === 'specialist_required' 
+                               ? 'This procedure involves high-risk systems (HV/ADAS/SGW) that require specialized certification and OEM-level equipment. Proceeding without these may cause permanent system damage or physical injury.'
+                               : 'User equipment registry indicates missing specialized tools required for this precise diagnostic path.'}
+                         </p>
+                         {missingTools.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                               {missingTools.map(t => (
+                                  <div key={t} className="px-2 py-1 bg-black/40 rounded text-[9px] font-mono text-zinc-500 border border-white/5">
+                                     MISSING: {t}
                                   </div>
-                                  {prob && (
-                                     <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                        <motion.div 
-                                          initial={{ width: 0 }}
-                                          animate={{ width: `${prob * 100}%` }}
-                                          className="h-full bg-amber-500" 
-                                        />
-                                     </div>
-                                  )}
-                               </div>
-                             );
-                          })}
-                       </div>
-                    </div>
- 
-                    {/* Execution Protocol */}
-                    <div className="space-y-3">
-                       <div className="flex items-center gap-2 px-1">
-                          <Zap size={14} className="text-blue-500" />
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Repair Execution</span>
-                       </div>
-                       <div className="space-y-2">
-                          {results.fixes?.map((fix: string, idx: number) => (
-                             <div key={idx} className="flex gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-2xl relative overflow-hidden group">
-                                <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5 border border-blue-500/20">
-                                   <span className="text-[10px] font-bold text-blue-500">{idx + 1}</span>
+                               ))}
+                            </div>
+                         )}
+                      </div>
+                    )}
+
+                    {/* Step-by-Step UI */}
+                    <div className="space-y-4">
+                       {currentSession.steps.map((step, idx) => (
+                          <div 
+                             key={step.id} 
+                             className={`p-5 rounded-2xl border transition-all ${
+                                idx === currentSession.currentStepIndex 
+                                ? 'bg-zinc-900 border-amber-500/50 shadow-lg shadow-amber-500/5 scale-[1.02]' 
+                                : idx < currentSession.currentStepIndex 
+                                ? 'bg-zinc-950 border-emerald-500/20 opacity-60'
+                                : 'bg-zinc-950 border-zinc-800 opacity-40 grayscale'
+                             }`}
+                          >
+                             <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-3">
+                                   <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold border ${
+                                      idx === currentSession.currentStepIndex ? 'bg-amber-500 text-black border-amber-600' : 
+                                      idx < currentSession.currentStepIndex ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' :
+                                      'bg-zinc-800 text-zinc-500 border-zinc-700'
+                                   }`}>
+                                      {idx + 1}
+                                   </div>
+                                   <h4 className="text-xs font-bold text-zinc-200">{step.title}</h4>
                                 </div>
-                                <div className="text-xs leading-relaxed text-zinc-400 group-hover:text-zinc-200 transition-colors">{fix}</div>
-                                <div className="absolute left-0 top-0 w-[2px] h-full bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                {idx < currentSession.currentStepIndex && <CheckCircle2 size={16} className="text-emerald-500" />}
+                                {idx === currentSession.currentStepIndex && <Loader2 size={16} className="text-amber-500 animate-spin" />}
                              </div>
-                          ))}
-                       </div>
+
+                             <p className="text-xs text-zinc-400 leading-relaxed mb-4">{step.instruction}</p>
+
+                             {step.toolRequired && (
+                                <div className="flex items-center gap-2 mb-4 px-3 py-1.5 bg-black/40 rounded-lg border border-white/5 inline-flex">
+                                   <Wrench size={10} className="text-zinc-500" />
+                                   <span className="text-[9px] font-mono text-zinc-500 uppercase">{step.toolRequired}</span>
+                                </div>
+                             )}
+
+                             {idx === currentSession.currentStepIndex && (
+                                <div className="flex gap-2">
+                                   <button 
+                                      onClick={() => SessionService.updateStep(currentSession.id, step.id, { status: 'completed' }).then(s => s && setCurrentSession({...s}))}
+                                      className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold uppercase rounded-xl transition-all"
+                                   >
+                                      Check: Pass / Solid
+                                   </button>
+                                   <button 
+                                      onClick={() => SessionService.updateStep(currentSession.id, step.id, { status: 'failed' }).then(s => s && setCurrentSession({...s}))}
+                                      className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold uppercase rounded-xl transition-all"
+                                   >
+                                      Fail / Out-of-Spec
+                                   </button>
+                                </div>
+                             )}
+                          </div>
+                       ))}
                     </div>
- 
-                    {/* Technical Advisory */}
-                    <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-2xl space-y-2">
-                       <div className="flex items-center gap-2">
-                          <ShieldAlert size={14} className="text-red-500" />
-                          <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Technical Warning</span>
-                       </div>
-                       <p className="text-[10px] leading-relaxed text-zinc-400">
-                          Failure to address {results.code} may lead to {results.severity === 'critical' ? 'immediate engine failure or safety risks' : 'reduced fuel efficiency and potential catalyst damage'}. Professional tools required for calibration.
-                       </p>
-                    </div>
+
+                    {currentSession.status === 'completed' && (
+                       <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-center space-y-3"
+                       >
+                          <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
+                             <CheckCircle2 className="text-emerald-500" size={24} />
+                          </div>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-widest">Workflow Concluded</h3>
+                          <p className="text-[10px] text-zinc-400">Diagnostic path exhausted. Please review results and log fix if successful.</p>
+                          <button 
+                             onClick={() => setActiveTab('results')}
+                             className="px-6 py-2 bg-emerald-500 text-black text-[10px] font-bold uppercase rounded-lg hover:bg-emerald-400"
+                          >
+                             Review Summary
+                          </button>
+                       </motion.div>
+                    )}
                  </div>
                ) : (
-                 <div className="space-y-8 py-10">
-                    <div className="diag-card py-16 text-center border-dashed border-zinc-800 bg-transparent">
-                       <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mx-auto mb-4 border border-zinc-800 shadow-inner">
-                          <Database size={24} className="text-zinc-700" />
-                       </div>
-                       <p className="text-xs font-bold uppercase tracking-widest text-zinc-600">No Active Protocol</p>
-                       <p className="text-[10px] text-zinc-800 mt-2 lowercase italic">Enter DTC in diagnostics to generate manual</p>
-                    </div>
- 
-                    <div className="space-y-4">
-                       <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest ml-1">Knowledge Archive</h4>
-                       <div className="grid grid-cols-1 gap-2">
-                          {[
-                             { code: 'P0300', title: 'RANDOM MISFIRE', tag: 'ENGINE' },
-                             { code: 'P0420', title: 'CATALYST SYSTEM', tag: 'EMISSIONS' },
-                             { code: 'U0100', title: 'ECM COMM LOSS', tag: 'NETWORK' }
-                          ].map(item => (
-                             <div key={item.code} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-zinc-900/50 transition-all">
-                                <div className="flex items-center gap-3">
-                                   <div className="w-12 h-8 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-center font-mono text-[10px] text-amber-500 font-bold group-hover:border-amber-500/30 transition-colors">
-                                      {item.code}
-                                   </div>
-                                   <div>
-                                      <div className="text-[10px] font-bold text-zinc-300 uppercase">{item.title}</div>
-                                      <div className="text-[8px] text-zinc-600 uppercase font-bold tracking-tighter">{item.tag} SPECIALIZED</div>
-                                   </div>
-                                </div>
-                                <ChevronRight size={14} className="text-zinc-800 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
-                             </div>
-                          ))}
-                       </div>
-                    </div>
-                 </div>
+                  <div className="diag-card py-20 text-center border-dashed border-zinc-800">
+                     <p className="text-xs text-zinc-600 italic">No active diagnostic session. Run a scan to begin guided workflow.</p>
+                  </div>
                )}
+            </motion.div>
+          )}
+
+          {activeTab === 'toolbox' && (
+            <motion.div 
+              key="toolbox"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6 pb-20"
+            >
+               <EquipmentRegistry />
             </motion.div>
           )}
 
@@ -822,21 +1175,19 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             </motion.div>
           )}
         </AnimatePresence>
-      </main>
-
-      {/* Navigation */}
+      </main>      {/* Navigation */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
-        <nav className="bg-[#0a0a0a]/95 backdrop-blur-3xl border-t border-zinc-800/50 px-2 py-4 grid grid-cols-4 relative shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <nav className="bg-[#0a0a0a]/95 backdrop-blur-3xl border-t border-zinc-800/50 px-2 py-4 grid grid-cols-5 relative shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
           <button 
             onClick={() => setActiveTab('diagnose')}
             className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'diagnose' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
           >
-            <LayoutDashboard size={20} strokeWidth={activeTab === 'diagnose' ? 2.5 : 1.5} />
-            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'diagnose' ? 'opacity-100' : 'opacity-60'}`}>Diagnose</span>
+            <LayoutDashboard size={18} strokeWidth={activeTab === 'diagnose' ? 2.5 : 1.5} />
+            <span className={`text-[7px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'diagnose' ? 'opacity-100' : 'opacity-60'}`}>Diagnose</span>
             {activeTab === 'diagnose' && (
               <motion.div 
                 layoutId="nav-glow" 
-                className="absolute -bottom-4 w-10 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
+                className="absolute -bottom-4 w-8 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
               />
             )}
           </button>
@@ -845,12 +1196,12 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             onClick={() => setActiveTab('results')}
             className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'results' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
           >
-            <Search size={20} strokeWidth={activeTab === 'results' ? 2.5 : 1.5} />
-            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'results' ? 'opacity-100' : 'opacity-60'}`}>Results</span>
+            <Search size={18} strokeWidth={activeTab === 'results' ? 2.5 : 1.5} />
+            <span className={`text-[7px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'results' ? 'opacity-100' : 'opacity-60'}`}>Results</span>
             {activeTab === 'results' && (
               <motion.div 
                 layoutId="nav-glow" 
-                className="absolute -bottom-4 w-10 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
+                className="absolute -bottom-4 w-8 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
               />
             )}
           </button>
@@ -859,12 +1210,12 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             onClick={() => setActiveTab('repair')}
             className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'repair' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
           >
-            <Wrench size={20} strokeWidth={activeTab === 'repair' ? 2.5 : 1.5} />
-            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'repair' ? 'opacity-100' : 'opacity-60'}`}>Repair</span>
+            <Wrench size={18} strokeWidth={activeTab === 'repair' ? 2.5 : 1.5} />
+            <span className={`text-[7px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'repair' ? 'opacity-100' : 'opacity-60'}`}>Workflow</span>
             {activeTab === 'repair' && (
               <motion.div 
                 layoutId="nav-glow" 
-                className="absolute -bottom-4 w-10 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
+                className="absolute -bottom-4 w-8 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
               />
             )}
           </button>
@@ -873,12 +1224,26 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
             onClick={() => setActiveTab('fuses')}
             className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'fuses' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
           >
-            <Zap size={20} strokeWidth={activeTab === 'fuses' ? 2.5 : 1.5} />
-            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'fuses' ? 'opacity-100' : 'opacity-60'}`}>Fuses</span>
+            <Zap size={18} strokeWidth={activeTab === 'fuses' ? 2.5 : 1.5} />
+            <span className={`text-[7px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'fuses' ? 'opacity-100' : 'opacity-60'}`}>Fuses</span>
             {activeTab === 'fuses' && (
               <motion.div 
                 layoutId="nav-glow" 
-                className="absolute -bottom-4 w-10 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
+                className="absolute -bottom-4 w-8 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
+              />
+            )}
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('toolbox')}
+            className={`flex flex-col items-center justify-center gap-1.5 transition-all duration-300 relative ${activeTab === 'toolbox' ? 'text-amber-500' : 'text-zinc-600 hover:text-zinc-400'}`}
+          >
+            <Settings size={18} strokeWidth={activeTab === 'toolbox' ? 2.5 : 1.5} />
+            <span className={`text-[7px] font-bold uppercase tracking-[0.1em] transition-opacity ${activeTab === 'toolbox' ? 'opacity-100' : 'opacity-60'}`}>Toolbox</span>
+            {activeTab === 'toolbox' && (
+              <motion.div 
+                layoutId="nav-glow" 
+                className="absolute -bottom-4 w-8 h-1 bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] rounded-t-full" 
               />
             )}
           </button>

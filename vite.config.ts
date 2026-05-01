@@ -12,7 +12,7 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'logo-icon.png', 'horizontal-logo.png'],
+        includeAssets: ['logo-icon.png', 'horizontal-logo.png'],
         manifest: {
           name: 'AutoMotive Buddy',
           short_name: 'AutoBuddy',
@@ -87,6 +87,7 @@ export default defineConfig(({mode}) => {
       },
     },
     build: {
+      outDir: 'dist',
       chunkSizeWarningLimit: 1000,
     },
     server: {

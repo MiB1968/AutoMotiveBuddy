@@ -3,7 +3,7 @@
 // ==============================
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 import { BASE_API, getApiUrl as getUrl } from "../lib/config";
 
@@ -33,7 +33,7 @@ export default function AdminDashboardProMax() {
 
   // FILTER USERS
   const filtered = users.filter((u) =>
-    u.email.toLowerCase().includes(search.toLowerCase())
+    (u.email || "").toLowerCase().includes((search || "").toLowerCase())
   );
 
   // SET SUBSCRIPTION

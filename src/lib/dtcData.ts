@@ -288,6 +288,27 @@ export const vehicleDatabase = {
       ]
     },
     {
+      id: 'tesla',
+      name: 'Tesla',
+      logo: '⚡',
+      color: '#E31937',
+      models: [
+        { id: 'modely', name: 'Model Y', years: [2020, 2021, 2022, 2023, 2024], engines: ['Dual Motor AWD', 'Single Motor RWD'], dtcPrefix: 'TSL' },
+        { id: 'model3', name: 'Model 3', years: [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], engines: ['Dual Motor AWD', 'Long Range', 'Standard Plus'], dtcPrefix: 'TSL' }
+      ]
+    },
+    {
+      id: 'byd',
+      name: 'BYD',
+      logo: '🔋',
+      color: '#0055A4',
+      models: [
+        { id: 'atto3', name: 'Atto 3 / Yuan Plus', years: [2022, 2023, 2024], engines: ['Electric 150kW'], dtcPrefix: 'BYD' },
+        { id: 'seal', name: 'Seal', years: [2023, 2024], engines: ['Long Range AWD', 'Design RWD'], dtcPrefix: 'BYD' },
+        { id: 'dolphin', name: 'Dolphin', years: [2023, 2024], engines: ['Electric 70kW', 'Electric 150kW'], dtcPrefix: 'BYD' }
+      ]
+    },
+    {
       id: 'komatsu',
       name: 'Komatsu',
       logo: '🏗️',
@@ -630,6 +651,9 @@ export const genericDTCs = [
       'STEP 4: Test ignition coils using multimeter',
       'STEP 5: Check EGR system functionality'
     ],
+    toolRequirements: ['Basic Scan Tool', 'Multimeter', 'Fuel Pressure Gauge', 'Spark Plug Socket'],
+    safetyPrecaution: 'Risk of fire from fuel pressure testing. Work in well-ventilated area.',
+    operationalAction: '🟢 Diagnostic Safe. Can be performed by entry-level technician.',
     timeEstimate: '45-90 minutes',
     estimatedCost: '₱2,500 - ₱15,000 depending on cause',
     dangerLevel: 'CRITICAL - Can damage catalytic converter instantly'
@@ -684,6 +708,160 @@ export const genericDTCs = [
     timeEstimate: '60 minutes',
     estimatedCost: '₱2,000 - ₱6,000',
     dangerLevel: 'HIGH - Affects braking and shifting safety'
+  },
+  {
+    code: 'P0AA1',
+    severity: 'critical',
+    title: 'Hybrid/EV Battery Positive Contactor Circuit Stuck Open',
+    symptoms: [
+      'Vehicle ready light will not illuminate',
+      'High voltage system disabled',
+      'Vehicle will not move',
+      'Red triangle or hybrid system warning light'
+    ],
+    probableCauses: [
+      'Faulty high voltage contactor',
+      'Battery management system (BMS) failure',
+      'High voltage interlock loop (HVIL) fault',
+      'Blown high voltage fuse'
+    ],
+    remediation: [
+      'STEP 1: Verify HVIL continuity across all access points',
+      'STEP 2: Use scan tool to check BMS contactor control signals',
+      'STEP 3: Verify 12V auxiliary battery health (drives contactors)',
+      'STEP 4: Measure resistance of contactor coil (if safe/accessible)',
+      'STEP 5: Check for isolation faults in the high voltage bus'
+    ],
+    toolRequirements: ['Insulated Tools (CAT III/IV 1000V)', 'High Voltage Multimeter', 'OEM Tier Scan Tool'],
+    safetyPrecaution: '🔴 CRITICAL: 400V+ Present. Use Class 0 Gloves and Shield. Arc Flash Hazard.',
+    operationalAction: '🛑 STOP. Do NOT proceed without EV Certification. High risk of fatality.',
+    timeEstimate: '2-4 hours',
+    estimatedCost: '₱15,000 - ₱120,000 (Contactor/BMS replacement)',
+    dangerLevel: 'CRITICAL - HIGH VOLTAGE DANGER. DO NOT OPEN UNIT WITHOUT PROPER PPE.'
+  },
+  {
+    code: 'C1A01',
+    severity: 'high',
+    title: 'Forward Sensing Camera / Radar Alignment Fault (ADAS)',
+    symptoms: [
+      'Adaptive Cruise Control (ACC) disabled',
+      'Forward Collision Warning (FCW) unavailable',
+      'Lane Keep Assist (LKA) system error',
+      'System recalibration message on dash'
+    ],
+    probableCauses: [
+      'Physical impact to front bumper/windshield',
+      'Incorrect wheel alignment after suspension work',
+      'Dirty or obstructed sensor lens',
+      'Mounting bracket deformation'
+    ],
+    remediation: [
+      'STEP 1: Clean windshield camera area and front radar emblem',
+      'STEP 2: Inspect mounting brackets for physical damage or looseness',
+      'STEP 3: Perform 4-wheel alignment check',
+      'STEP 4: Conduct Dynamic or Static ADAS Recalibration using specialized targets'
+    ],
+    toolRequirements: ['ADAS Calibration Rig', 'OEM Targets', 'Alignment Machine'],
+    safetyPrecaution: 'Ensure flat level floor for static calibration. No shadows on targets.',
+    operationalAction: '🟠 Specialist Required. Calibration equipment must be precise.',
+    timeEstimate: '1-3 hours',
+    estimatedCost: '₱8,000 - ₱25,000 (Recalibration)',
+    dangerLevel: 'HIGH - Automatic safety systems might fail to engage'
+  },
+  {
+    code: 'U1104',
+    severity: 'medium',
+    title: 'Secure Gateway (SGW) Authorization Failure',
+    symptoms: [
+      'Limited diagnostic data access',
+      'Unable to clear codes or perform bi-directional tests',
+      'Communication error with Body Control Module (BCM)',
+      'Vehicle security system "locked" message in scan tool'
+    ],
+    probableCauses: [
+      'Scan tool not authorized with manufacturer server',
+      'Expired security subscription (AutoAuth/Renault SGW)',
+      'Bad internet connection at scan tool',
+      'Module cybersecurity firewall breach'
+    ],
+    remediation: [
+      'STEP 1: Ensure scan tool has active internet connection',
+      'STEP 2: Verify account login for Secure Gateway Access (e.g., FCA AutoAuth)',
+      'STEP 3: Attempt manual bypass cable if vehicle is out of warranty',
+      'STEP 4: Check for OTA update status that might be blocking access'
+    ],
+    toolRequirements: ['Certified Secure Scan Tool', 'Manufacturer Portal Subscription', 'SGW Bypass Cable (Optional)'],
+    safetyPrecaution: 'Do not attempt to physical bypass SGW on vehicles under warranty.',
+    operationalAction: '🔵 Admin Task. Requires manufacturer portal authorization.',
+    timeEstimate: '15-45 minutes',
+    estimatedCost: '₱2,500 - ₱5,000 (Subscription fees)',
+    dangerLevel: 'MEDIUM - Prevents complete vehicle diagnosis'
+  },
+  {
+    code: 'TSL-BMS_u029',
+    severity: 'high',
+    title: 'Tesla BMS Isolation Fault (Potential Coolant Leak)',
+    symptoms: [
+      'Maximum charge level reduced',
+      'Vehicle power limited (Tortoise mode)',
+      'Alert message: "Electrical system power reduced"',
+      'Unable to Supercharge'
+    ],
+    probableCauses: [
+      'External coolant leak into battery penthouse',
+      'Internal cell isolation breakdown',
+      'Contaminated high voltage connector',
+      'Humidity sensor trigger inside pack'
+    ],
+    remediation: [
+      'STEP 1: Check for blue/green coolant residue around battery drain p-loops',
+      'STEP 2: Use Tesla Toolbox 3 to read isolation resistance (MΩ) values',
+      'STEP 3: Inspect HV Pyrotechnic Fuse status',
+      'STEP 4: Vacuum test battery pack cooling circuit for leaks'
+    ],
+    toolRequirements: ['Tesla Service Laptop (Toolbox 3)', 'CAN-Bus Deployment Cable', 'Pressure/Vacuum Test Kit'],
+    safetyPrecaution: '⚠️ COOLANT LEAK NEAR HV: Conductive fluid may cause internal pack short. High risk of thermal runaway.',
+    operationalAction: '🛑 SPECIALIST REQUIRED. Requires Tesla-specific diagnostic credentials.',
+    confidence: 0.88,
+    sourceType: 'heuristic',
+    feasibility: 'specialist_required',
+    disclaimer: 'Guidance provided for diagnostic identification only. Servicing Tesla HV batteries requires specialized factory training.',
+    timeEstimate: '3-6 hours',
+    estimatedCost: '₱40,000 - ₱800,000 (Pack replacement if internal)',
+    dangerLevel: 'CRITICAL - HIGH VOLTAGE + CHEMICAL HAZARD'
+  },
+  {
+    code: 'P0CC1',
+    severity: 'medium',
+    title: 'Hybrid/EV Battery Pack Cooling Fan Control Circuit Low',
+    symptoms: [
+      'Fan running at high speed constantly or not at all',
+      'Charging speed throttled during DC fast charging',
+      'Hybrid system warning message',
+      'Battery temperature higher than normal'
+    ],
+    probableCauses: [
+      'Faulty cooling fan motor',
+      'Broken/corroded wiring at fan connector',
+      'Blown cooling fan fuse',
+      'Relay failure in power distribution center'
+    ],
+    remediation: [
+      'STEP 1: Verify fuse integrity in the High Voltage battery junction block',
+      'STEP 2: Check for debris blockage in the battery air intake duct',
+      'STEP 3: Command fan "ON" using bi-directional scan tool',
+      'STEP 4: Measure PWM signal at fan control wire'
+    ],
+    toolRequirements: ['Standard Scan Tool', 'Infrared Thermometer', 'Digital Multimeter'],
+    safetyPrecaution: 'Keep hands clear of fan blades. Fan may start unexpectedly even if vehicle is off.',
+    operationalAction: '🟢 Proceed. Can be inspected with standard mechanical tools.',
+    confidence: 0.94,
+    sourceType: 'oem',
+    feasibility: 'proceed',
+    disclaimer: 'Ensure 12V battery is disconnected before servicing fan wiring.',
+    timeEstimate: '1-2 hours',
+    estimatedCost: '₱5,000 - ₱18,000',
+    dangerLevel: 'MEDIUM - Risk of battery overheating'
   }
 ];
 

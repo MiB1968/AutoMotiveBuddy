@@ -1,6 +1,7 @@
 import api from "../services/api";
 import { getDB } from "../offline/db";
 import { getWeakCacheEntries, deleteCache } from "../services/db";
+import { getQueue, removeFromQueue } from "../lib/offlineDB";
 
 export async function syncData() {
   try {
@@ -20,7 +21,23 @@ export async function syncData() {
       }
     }
 
-    // 3. Get latest updates (e.g. DTC dictionary updates)
+    // 3. Process Smart API Offline Queue (Retries)
+    const queue = await getQueue();
+    if (queue.length > 0) {
+      console.log(`[Sync Engine] Processing ${queue.length} queued requests...`);
+      for (const item of queue) {
+        try {
+          await api.post(item.endpoint, item.payload);
+          await removeFromQueue(item.id);
+          console.log(`[Sync Engine] Successfully synced request ${item.id} to ${item.endpoint}`);
+        } catch (err) {
+          console.warn(`[Sync Engine] Failed to retry request ${item.id}. Still offline?`);
+          // Keep in queue for next sync
+        }
+      }
+    }
+
+    // 4. Get latest updates (e.g. DTC dictionary updates)
     const res = await api.get("/sync/download").catch((err) => {
       console.warn("Sync server unavailable. Working strictly offline.");
       return null;

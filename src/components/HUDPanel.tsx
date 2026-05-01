@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import React from 'react';
 
 export default function HUDPanel({ children, className = "" }: { children: React.ReactNode, className?: string }) {

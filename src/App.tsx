@@ -1562,7 +1562,7 @@ const isTagalog = (text: string) => {
     'magkano', 'ilan', 'kasi', 'dahil', 'ngunit', 'pero', 'subalit', 'habang', 'kapag', 'kung', 'maging', 'para', 'upang', 'kahit', 'bagaman',
     'pwedeng', 'pwede', 'nagawa', 'gagawin', 'tulungan', 'tulong', 'kotse', 'sasakyan', 'makina'
   ];
-  const words = text.toLowerCase().split(/\W+/);
+  const words = (text || "").toLowerCase().split(/\W+/);
   return words.some(word => commonTagalog.includes(word));
 };
 
@@ -1571,7 +1571,7 @@ const speakText = (text: string, enabled: boolean) => {
   window.speechSynthesis.cancel();
   
   // Remove markdown and unwanted symbols
-  const cleanText = text.replace(/[*_#]/g, '').replace(/\[.*?\]/g, '').trim();
+  const cleanText = (text || "").replace(/[*_#]/g, '').replace(/\[.*?\]/g, '').trim();
   if (!cleanText) return;
 
   const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -1652,7 +1652,14 @@ function ChatBot({ currentUser, store, toast }: any) {
   useEffect(() => {
     if (isOpen && !hasWelcomedRef.current) {
       hasWelcomedRef.current = true;
-      const welcomeText = `Welcome to AutoMotive Buddy — your intelligent automotive diagnostic companion. Designed to simplify vehicle troubleshooting, AutoMotive Buddy uses advanced AI to analyze diagnostic trouble codes, identify issues, and guide you toward the right solution — faster and smarter. Whether you're a professional mechanic or a car owner, our system empowers you with real-time insights, accurate diagnostics, and a seamless user experience. AutoMotive Buddy is proudly developed and led by Ruben Llego, owner and lead web developer, with a vision to revolutionize automotive diagnostics through intelligent technology. Get ready to experience the future of vehicle diagnostics. AutoMotive Buddy — Diagnose smarter. Drive better.`;
+      const welcomeText = `Welcome to AutoMotive Buddy — your intelligent automotive diagnostic companion. 
+
+Available Commands:
+/dtc [code] - Quick lookup for diagnostic codes
+/wire [query] - Search wiring diagrams and colors
+/diag [symptom] - Deep AI diagnosis
+
+How can I assist your repair today?`;
       
       const userId = currentUser?.id || 'guest';
       const hasPreviousMessages = store.chatLogs.some((m: any) => m.userId === userId);
@@ -1670,13 +1677,13 @@ function ChatBot({ currentUser, store, toast }: any) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key.toLowerCase() === 'i') {
+      if (e.key?.toLowerCase() === 'i') {
         startStealthTimer();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'i') {
+      if (e.key?.toLowerCase() === 'i') {
         cancelStealthTimer();
       }
     };
@@ -1745,11 +1752,59 @@ function ChatBot({ currentUser, store, toast }: any) {
     
     try {
       const { make, model, year, engine } = useVehicleStore.getState();
+      
+      // Handle Slash Commands
+      if (userMsg.startsWith('/')) {
+        const parts = userMsg.split(' ');
+        const command = (parts[0] || "").toLowerCase();
+        const arg = parts.slice(1).join(' ');
+
+        if (command === '/dtc') {
+          if (!arg) throw new Error("Usage: /dtc [code]");
+          const res = await fetch(`${BASE_API}/api/dtc/search/${arg}`, {
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt')}` }
+          });
+          const data = await res.json();
+          const response = `[SKILL:dtc_lookup] Found ${data.count} result(s) for ${arg}.\n\n${data.results?.map((r: any) => `• ${r.code}: ${r.description}`).join('\n') || 'No records found.'}`;
+          store.addChatMessage(userId, 'ai', response);
+          if (autoSpeak) speakText(response, true);
+          return;
+        }
+
+        if (command === '/wire') {
+          if (!arg) throw new Error("Usage: /wire [query or color]");
+          const res = await fetch(`${BASE_API}/api/wiring/search?query=${arg}`, {
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('jwt')}` }
+          });
+          const data = await res.json();
+          const response = `[SKILL:wiring_search] Found ${data.count} circuits matching "${arg}".\n\n${data.results?.slice(0, 5).map((r: any) => `• ${r.system} | ${r.circuit}: ${r.color} (${r.function})`).join('\n') || 'No wiring data found.'}`;
+          store.addChatMessage(userId, 'ai', response);
+          if (autoSpeak) speakText(response, true);
+          return;
+        }
+
+        if (command === '/diag') {
+          const res = await fetch(`${BASE_API}/api/ai/ai-diagnose`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionStorage.getItem('jwt')}`
+            },
+            body: JSON.stringify({ message: arg, vehicle: { make, model, year } })
+          });
+          const data = await res.json();
+          const response = data.result || "Diagnosis failed.";
+          store.addChatMessage(userId, 'ai', response);
+          if (autoSpeak) speakText(response, true);
+          return;
+        }
+      }
+
       const response = await askAutomotiveAssistant(userMsg, { make, model, year, engine });
       store.addChatMessage(userId, 'ai', response);
       if (autoSpeak) speakText(response, true);
-    } catch (err) {
-      const errMsg = "System temporarily offline. Please try again later.";
+    } catch (err: any) {
+      const errMsg = err.message || "System temporarily offline. Please try again later.";
       store.addChatMessage(userId, 'ai', errMsg);
       if (autoSpeak) speakText(errMsg, true);
     } finally {
@@ -3709,7 +3764,7 @@ function AIChatTab({ user, store, ...props }: any) {
       recognition.lang = 'en-US';
 
       recognition.onresult = (event: any) => {
-        const lastResult = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        const lastResult = (event.results[event.results.length - 1][0]?.transcript || "").toLowerCase();
         console.log('Voice Detected:', lastResult);
 
         // Wake word detection: "hey autobuddy"
@@ -4370,7 +4425,7 @@ function GlobalSearchOverlay({ isOpen, onClose, store, user }: any) {
   
   const results = useMemo(() => {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
+    const q = (query || "").toLowerCase();
     
     const dtcMatches = store.dtcs.filter((d: any) => 
       (d.code || '').toLowerCase().includes(q) || 

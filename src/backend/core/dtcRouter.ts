@@ -1,32 +1,23 @@
 import { Router } from "express";
-import fs from "fs";
-import path from "path";
+import { executeSkill } from "../runtime/skillExecutor";
+import { firestore } from "../../../server";
 
 const router = Router();
-const DTC_PATH = path.join(process.cwd(), 'src/lib/dtc_master.json');
 
-const loadDTCData = () => {
-    try {
-        if (fs.existsSync(DTC_PATH)) {
-            return JSON.parse(fs.readFileSync(DTC_PATH, 'utf-8'));
-        }
-    } catch (e) {
-        console.error("[DTC] Database read error:", e);
-    }
-    return [];
-};
-
-router.get("/search/:keyword", (req, res) => {
+router.get("/search/:keyword", async (req: any, res) => {
     const { keyword } = req.params;
-    const data = loadDTCData();
     
-    const results = data.filter((item: any) => 
-        item.code?.toLowerCase().includes(keyword.toLowerCase()) || 
-        item.description?.toLowerCase().includes(keyword.toLowerCase()) ||
-        item.system?.toLowerCase().includes(keyword.toLowerCase())
-    ).slice(0, 50);
-
-    res.json({ status: "success", count: results.length, results });
+    try {
+        const result = await executeSkill("dtc_lookup", { keyword }, {
+            userId: req.user?.uid || 'guest',
+            user: req.user,
+            tools: { firestore, ai: null },
+            timestamp: new Date().toISOString()
+        });
+        res.json(result.result);
+    } catch (e: any) {
+        res.status(500).json(e);
+    }
 });
 
 export default router;

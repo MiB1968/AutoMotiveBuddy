@@ -1,11 +1,15 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+import { bootstrapSkills } from './src/backend/skills';
+
+// Bootstrap Skills System
+bootstrapSkills();
 
 import { getApps, initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -138,6 +142,7 @@ async function startServer() {
 
   // Vite integration
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

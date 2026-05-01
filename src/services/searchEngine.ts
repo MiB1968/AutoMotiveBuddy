@@ -1,7 +1,7 @@
 import { dbPromise } from '../db/database';
 
 const normalize = (text: string) =>
-  text.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  (text || "").toLowerCase().replace(/[^a-z0-9 ]/g, '');
 
 export const searchLocalDB = async (query: string) => {
   const db = await dbPromise;

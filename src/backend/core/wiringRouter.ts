@@ -1,6 +1,8 @@
 import { Router } from "express";
 import fs from "fs";
 import path from "path";
+import { executeSkill } from "../runtime/skillExecutor";
+import { firestore } from "../../../server";
 
 const router = Router();
 const DB_PATH = path.join(process.cwd(), 'data/wiring_db.json');
@@ -16,37 +18,20 @@ const loadWiringDB = () => {
     return { vehicles: [] };
 };
 
-router.get("/search", (req, res) => {
+router.get("/search", async (req: any, res) => {
     const { color, query } = req.query;
-    const db = loadWiringDB();
-    const results: any[] = [];
-
-    db.vehicles.forEach((v: any) => {
-        v.systems.forEach((s: any) => {
-            s.circuits.forEach((c: any) => {
-                c.wires.forEach((w: any) => {
-                    let match = false;
-                    if (color && w.color.toLowerCase() === (color as string).toLowerCase()) match = true;
-                    if (query && (
-                        w.function.toLowerCase().includes((query as string).toLowerCase()) ||
-                        c.name.toLowerCase().includes((query as string).toLowerCase()) ||
-                        s.system.toLowerCase().includes((query as string).toLowerCase())
-                    )) match = true;
-
-                    if (match) {
-                        results.push({
-                            vehicle: v.name,
-                            system: s.system,
-                            circuit: c.name,
-                            ...w
-                        });
-                    }
-                });
-            });
+    
+    try {
+        const result = await executeSkill("wiring_search", { color: color as string, query: query as string }, {
+            userId: req.user?.uid || 'guest',
+            user: req.user,
+            tools: { firestore, ai: null },
+            timestamp: new Date().toISOString()
         });
-    });
-
-    res.json({ status: "success", count: results.length, results });
+        res.json(result.result);
+    } catch (e: any) {
+        res.status(500).json(e);
+    }
 });
 
 router.get("/systems", (req, res) => {

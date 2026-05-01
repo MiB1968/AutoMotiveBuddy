@@ -21,7 +21,7 @@ export async function getOrCreateUser(uid: string, email: string): Promise<UserP
     throw new Error("Database Service Unavailable");
   }
 
-  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedEmail = (email || '').toLowerCase().trim();
   const now = new Date();
   console.log(`[USER SERVICE] getOrCreateUser probe for: ${normalizedEmail} [${uid}]`);
 

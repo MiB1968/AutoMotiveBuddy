@@ -12,8 +12,54 @@ export interface DTCRecord {
   manufacturer?: string;
   possibleCauses?: string[];
   recommendedActions?: string[];
+  toolRequirements?: string[];
+  safetyPrecaution?: string;
+  operationalAction?: string;
+  confidence?: number; // 0.0 to 1.0
+  confidenceBreakdown?: {
+    dtcMatch: number;
+    sourceAuthority: number;
+    userFeedback: number;
+  };
+  riskScore?: number; // 0.0 to 1.0
+  sourceType?: "oem" | "heuristic" | "ai_inference" | "user_confirmed";
+  feasibility?: "proceed" | "limited" | "specialist_required";
+  disclaimer?: string;
+  workflow?: DiagnosticStep[];
   updatedAt: number;
   createdAt: number;
+}
+
+export interface DiagnosticStep {
+  id: string;
+  title: string;
+  instruction: string;
+  toolRequired?: string;
+  expectedOutcome?: string;
+  validationType?: "text" | "number" | "boolean" | "image";
+  status: "pending" | "in_progress" | "completed" | "failed" | "skipped";
+  result?: string;
+}
+
+export interface DiagnosticSession {
+  id: string;
+  vehicleId?: string;
+  dtcCode: string;
+  status: "active" | "completed" | "aborted";
+  currentStepIndex: number;
+  steps: DiagnosticStep[];
+  startTime: number;
+  endTime?: number;
+  notes?: string;
+  riskAcknowledged: boolean;
+}
+
+export interface Equipment {
+  id: string;
+  name: string;
+  type: "scan_tool" | "multimeter" | "oscilloscope" | "adas_rig" | "hand_tool" | "other";
+  capabilityLevel: "basic" | "intermediate" | "advanced" | "oem";
+  isVerified?: boolean;
 }
 
 export interface CacheEntry<T = unknown> {
@@ -48,13 +94,29 @@ interface AutomotiveDB extends DBSchema {
       "by-expiresAt": number;
     };
   };
+  sessions: {
+    key: string;
+    value: DiagnosticSession;
+    indexes: {
+      "by-status": string;
+      "by-dtcCode": string;
+      "by-startTime": number;
+    };
+  };
+  equipment: {
+    key: string;
+    value: Equipment;
+    indexes: {
+      "by-type": string;
+    };
+  };
   logs: {
     key: number;
     value: LogEntry;
     indexes: {
       "by-level": string;
       "by-timestamp": number;
-      "by-synced": string; // IndexedDB doesn't index booleans well
+      "by-synced": number;
     };
   };
 }
@@ -64,7 +126,7 @@ interface AutomotiveDB extends DBSchema {
 // ============================================================================
 
 const DB_NAME = "automotive-db";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const MAX_LOGS = 1000; // Auto-prune older logs beyond this
 const DEFAULT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
 
@@ -114,6 +176,20 @@ export const getDB = (): Promise<IDBPDatabase<AutomotiveDB>> | null => {
             logsStore.createIndex("by-timestamp", "timestamp");
           if (!logsStore.indexNames.contains("by-synced"))
             logsStore.createIndex("by-synced", "synced");
+        }
+
+        // v3 -> add sessions and equipment
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains("sessions")) {
+            const sessionStore = db.createObjectStore("sessions", { keyPath: "id" });
+            sessionStore.createIndex("by-status", "status");
+            sessionStore.createIndex("by-dtcCode", "dtcCode");
+            sessionStore.createIndex("by-startTime", "startTime");
+          }
+          if (!db.objectStoreNames.contains("equipment")) {
+            const equipmentStore = db.createObjectStore("equipment", { keyPath: "id" });
+            equipmentStore.createIndex("by-type", "type");
+          }
         }
       },
       blocked() {
@@ -246,7 +322,7 @@ export async function setCache<T>(
 export async function smartCacheSearch<T>(query: string, typePrefix?: string): Promise<{score: number, key: string, value: T}[]> {
   return withDB(async (db) => {
     // Normalize query
-    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    const normalize = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
     const qNorm = normalize(query);
     if (!qNorm) return [];
     
@@ -381,7 +457,8 @@ export async function addOfflineLog(
     const count = await db.count("logs");
     if (count > MAX_LOGS) {
       const tx = db.transaction("logs", "readwrite");
-      let cursor = await tx.store.index("by-timestamp").openCursor();
+      const store = tx.objectStore("logs");
+      let cursor = await store.index("by-timestamp").openCursor();
       let toDelete = count - MAX_LOGS;
       while (cursor && toDelete > 0) {
         await cursor.delete();
@@ -397,7 +474,8 @@ export async function addOfflineLog(
 export async function getRecentLogs(limit = 100): Promise<LogEntry[]> {
   return withDB(async (db) => {
     const tx = db.transaction("logs", "readonly");
-    const idx = tx.store.index("by-timestamp");
+    const store = tx.objectStore("logs");
+    const idx = store.index("by-timestamp");
     const results: LogEntry[] = [];
     let cursor = await idx.openCursor(null, "prev");
     while (cursor && results.length < limit) {
@@ -410,7 +488,7 @@ export async function getRecentLogs(limit = 100): Promise<LogEntry[]> {
 
 export async function getUnsyncedLogs(): Promise<LogEntry[]> {
   return withDB(
-    (db) => db.getAllFromIndex("logs", "by-synced", "false" as any),
+    (db) => db.getAllFromIndex("logs", "by-synced", 0 as any),
     []
   );
 }
@@ -418,12 +496,13 @@ export async function getUnsyncedLogs(): Promise<LogEntry[]> {
 export async function markLogsAsSynced(ids: number[]): Promise<void> {
   return withDB(async (db) => {
     const tx = db.transaction("logs", "readwrite");
+    const store = tx.objectStore("logs");
     await Promise.all(
       ids.map(async (id) => {
-        const log = await tx.store.get(id);
+        const log = await store.get(id);
         if (log) {
           log.synced = true;
-          await tx.store.put(log);
+          await store.put(log);
         }
       })
     );
@@ -438,6 +517,43 @@ export async function clearLogs(): Promise<void> {
 }
 
 // ============================================================================
+// Session & Equipment Operations
+// ============================================================================
+
+export async function saveSession(session: DiagnosticSession): Promise<void> {
+  return withDB(async (db) => {
+    await db.put("sessions", session);
+  }, undefined);
+}
+
+export async function getSession(id: string): Promise<DiagnosticSession | null> {
+  return withDB(async (db) => (await db.get("sessions", id)) ?? null, null);
+}
+
+export async function getActiveSessions(): Promise<DiagnosticSession[]> {
+  return withDB(
+    (db) => db.getAllFromIndex("sessions", "by-status", "active"),
+    []
+  );
+}
+
+export async function saveEquipment(equipment: Equipment): Promise<void> {
+  return withDB(async (db) => {
+    await db.put("equipment", equipment);
+  }, undefined);
+}
+
+export async function getAllEquipment(): Promise<Equipment[]> {
+  return withDB((db) => db.getAll("equipment"), []);
+}
+
+export async function deleteEquipment(id: string): Promise<void> {
+  return withDB(async (db) => {
+    await db.delete("equipment", id);
+  }, undefined);
+}
+
+// ============================================================================
 // Maintenance & Diagnostics
 // ============================================================================
 
@@ -445,12 +561,16 @@ export async function getDBStats(): Promise<{
   dtc: number;
   cache: number;
   logs: number;
+  sessions: number;
+  equipment: number;
 } | null> {
   return withDB(
     async (db) => ({
       dtc: await db.count("dtc"),
       cache: await db.count("cache"),
       logs: await db.count("logs"),
+      sessions: await db.count("sessions"),
+      equipment: await db.count("equipment"),
     }),
     null
   );
@@ -458,11 +578,13 @@ export async function getDBStats(): Promise<{
 
 export async function clearAllData(): Promise<void> {
   return withDB(async (db) => {
-    const tx = db.transaction(["dtc", "cache", "logs"], "readwrite");
+    const tx = db.transaction(["dtc", "cache", "logs", "sessions", "equipment"], "readwrite");
     await Promise.all([
       tx.objectStore("dtc").clear(),
       tx.objectStore("cache").clear(),
       tx.objectStore("logs").clear(),
+      tx.objectStore("sessions").clear(),
+      tx.objectStore("equipment").clear(),
     ]);
     await tx.done;
   }, undefined);

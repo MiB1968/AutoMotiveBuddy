@@ -21,6 +21,55 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role", "status"]
+    },
+    "DiagnosticCase": {
+      "title": "Diagnostic Case Record",
+      "description": "Structured data from a diagnostic session used for learning",
+      "type": "object",
+      "properties": {
+        "caseId": { "type": "string" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "vehicle": { "type": "object" },
+        "initialInput": { "type": "object" },
+        "steps": { "type": "array" },
+        "finalDiagnosis": { "type": "object" },
+        "actualFix": { "type": "object" },
+        "isHighValue": { "type": "boolean" }
+      }
+    },
+    "DiagnosticPattern": {
+      "title": "Diagnostic Pattern",
+      "description": "Learned successful diagnostic paths grouped by DTC and vehicle type",
+      "type": "object",
+      "properties": {
+        "dtc": { "type": "string" },
+        "vehicleModel": { "type": "string" },
+        "commonPath": { "type": "array" },
+        "successRate": { "type": "number" },
+        "occurrenceCount": { "type": "number" }
+      }
+    },
+    "SearchLog": {
+      "title": "Search Log",
+      "description": "Log of external search queries and retrieved results for grounding",
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "link": { "type": "string" },
+              "snippet": { "type": "string" }
+            }
+          }
+        },
+        "caseId": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -35,6 +84,22 @@
     "/saved_items/{itemId}": {
       "schema": "object",
       "description": "User saved diagnostics"
+    },
+    "/diagnostic_cases/{caseId}": {
+      "schema": "DiagnosticCase",
+      "description": "Diagnostic session records for DDE learning"
+    },
+    "/diagnostic_patterns/{patternId}": {
+      "schema": "DiagnosticPattern",
+      "description": "Aggregated intelligence from successful repairs"
+    },
+    "/openclaw_logs/{logId}": {
+      "schema": "object",
+      "description": "Audit trail for all OpenClaw framework decisions, requests, and responses"
+    },
+    "/search_logs/{logId}": {
+      "schema": "SearchLog",
+      "description": "Historical external intelligence logs"
     }
   }
 }
