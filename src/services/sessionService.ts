@@ -5,16 +5,16 @@ import {
   Equipment, 
   saveSession, 
   getSession, 
-  getAllEquipment 
+  getAllEquipment,
+  getActiveSessions 
 } from "./db";
-import { v4 as uuidv4 } from "uuid";
 
 export class SessionService {
   /**
    * Initializes a new diagnostic session from a DTC result or record.
    */
   static async startSession(dtc: DTCRecord, vehicleId?: string): Promise<DiagnosticSession> {
-    const sessionId = uuidv4();
+    const sessionId = crypto.randomUUID();
     
     // Check if the record already has a workflow. If not, create a basic one from recommendedActions.
     let steps: DiagnosticStep[] = dtc.workflow || [];
@@ -76,6 +76,13 @@ export class SessionService {
 
     await saveSession(session);
     return session;
+  }
+
+  /**
+   * Retrieves all currently active diagnostic sessions.
+   */
+  static async getActiveSessions(): Promise<DiagnosticSession[]> {
+    return getActiveSessions();
   }
 
   /**

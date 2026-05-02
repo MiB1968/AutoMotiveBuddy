@@ -119,6 +119,7 @@ export interface ChatMessage {
   role: 'user' | 'ai';
   content: string;
   timestamp: string;
+  metadata?: any;
 }
 
 export interface SavedItem {
@@ -1443,13 +1444,14 @@ export function useStore() {
     setLogs(prev => [newLog, ...prev].slice(0, 500));
   };
 
-  const addChatMessage = (userId: string, role: 'user' | 'ai', content: string) => {
+  const addChatMessage = (userId: string, role: 'user' | 'ai', content: string, metadata?: any) => {
     const newMessage: ChatMessage = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 9),
       userId,
       role,
       content,
       timestamp: new Date().toISOString(),
+      metadata
     };
     setChatLogs(prev => [...prev, newMessage]);
   };

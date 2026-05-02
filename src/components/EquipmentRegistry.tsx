@@ -12,7 +12,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Equipment, getAllEquipment, saveEquipment, deleteEquipment } from '../services/db';
-import { v4 as uuidv4 } from 'uuid';
 
 export const EquipmentRegistry: React.FC = () => {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -35,7 +34,7 @@ export const EquipmentRegistry: React.FC = () => {
   const handleAdd = async () => {
     if (!newTool.name) return;
     const tool: Equipment = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name: newTool.name || 'Unknown Tool',
       type: (newTool.type as any) || 'other',
       capabilityLevel: (newTool.capabilityLevel as any) || 'basic',

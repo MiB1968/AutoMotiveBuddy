@@ -32,13 +32,13 @@ import {
   getDTCOffline, 
   saveDTCOffline, 
   addOfflineLog, 
+  updateCacheConfidence,
   DiagnosticSession, 
   DiagnosticStep as DBStep,
   Equipment,
   getAllEquipment
 } from '../services/db';
 import { SessionService } from '../services/sessionService';
-import { v4 as uuidv4 } from 'uuid';
 import { EquipmentRegistry } from './EquipmentRegistry';
 import { BASE_API } from '../lib/config';
 import { LiveDiagnosticTimeline, DiagnosticStep } from './DiagnosticTimeline';
@@ -96,6 +96,21 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
+    // Check for active sessions on load
+    const resumeSession = async () => {
+      const activeSessions = await SessionService.getActiveSessions();
+      if (activeSessions.length > 0) {
+        const lastSession = activeSessions[activeSessions.length - 1];
+        setCurrentSession(lastSession);
+        setCodes(lastSession.dtcCode);
+        setActiveTab('results');
+        
+        // Populate steps from session if possible (or regenerate they might be different)
+        // For simplicity, we just set the tab and session, the user can see progress
+      }
+    };
+    resumeSession();
+
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
     window.addEventListener('online', handleOnline);
@@ -307,7 +322,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
 
         // Start a diagnostic session automatically if we have actions
         if (data && (data.actions || data.workflow)) {
-           const session = await SessionService.startSession(data, currentCaseId || uuidv4());
+           const session = await SessionService.startSession(data, currentCaseId || crypto.randomUUID());
            setCurrentSession(session);
            
            // Check equipment feasibility
@@ -693,9 +708,9 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                              {results.code}
                              {results.feasibility && (
                                 <div className={`text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-tighter ${
-                                   results.feasibility === 'proceed' ? 'bg-green-500/20 text-green-500' :
-                                   results.feasibility === 'limited' ? 'bg-blue-500/20 text-blue-500' :
-                                   'bg-red-500/20 text-red-500'
+                                   results.feasibility.toLowerCase() === 'proceed' ? 'bg-green-500/20 text-green-500 border border-green-500/30' :
+                                   results.feasibility.toLowerCase() === 'limited' ? 'bg-blue-500/20 text-blue-500 border border-blue-500/30' :
+                                   'bg-red-500/20 text-red-500 border border-red-500/30'
                                 }`}>
                                    {results.feasibility.replace('_', ' ')}
                                 </div>
@@ -705,9 +720,19 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                              <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border ${getSeverityColor(results.severity)} inline-block`}>
                                {results.severity || 'Medium'} Severity
                              </div>
+                             {results.provider && (
+                                <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border inline-flex items-center gap-1.5 ${
+                                    results.provider === 'gemini' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                                    results.provider === 'freellm' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                    'bg-zinc-800 border-zinc-700 text-zinc-400'
+                                }`}>
+                                   <div className={`w-1 h-1 rounded-full ${results.provider === 'gemini' ? 'bg-blue-400 animate-pulse' : 'bg-emerald-400'}`} />
+                                   AI: {results.provider.toUpperCase()}
+                                </div>
+                             )}
                              {results.sourceType && (
                                 <div className="px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest border border-zinc-700 bg-zinc-800 text-zinc-400 inline-block">
-                                   Source: {results.sourceType.replace('_', ' ')}
+                                   Source: {results.sourceType.toString().replace('_', ' ')}
                                 </div>
                              )}
                           </div>
@@ -746,7 +771,6 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                                       const vStr = `${year || ''} ${brand || ''} ${model || ''}`.trim() || 'Generic Vehicle';
                                       const key = `ai_dtc_${vStr}_${results.code || ''}`;
                                       try {
-                                          const { updateCacheConfidence } = await import('../services/db');
                                           const ok = await updateCacheConfidence(key, true);
                                           if (ok) {
                                              if (toast) toast('Feedback recorded. Neural matrix updated!', 'success');
@@ -760,7 +784,6 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                                       const vStr = `${year || ''} ${brand || ''} ${model || ''}`.trim() || 'Generic Vehicle';
                                       const key = `ai_dtc_${vStr}_${results.code || ''}`;
                                       try {
-                                          const { updateCacheConfidence } = await import('../services/db');
                                           const ok = await updateCacheConfidence(key, false);
                                           if (ok) {
                                              if (toast) toast('Feedback recorded. Confidence lowered.', 'success');
@@ -774,9 +797,22 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                         </div>
 
                         {results.operationalAction && (
-                          <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Operational Protocol</div>
-                            <div className="text-xs font-bold text-amber-500">{results.operationalAction}</div>
+                          <div className={`p-4 rounded-xl border animate-in fade-in slide-in-from-bottom-2 duration-500 ${
+                            results.operationalAction.includes('🛑') 
+                              ? 'bg-red-500/10 border-red-500/30' 
+                              : 'bg-white/5 border-white/10'
+                          }`}>
+                            <div className="flex items-center gap-2 mb-2">
+                               <ShieldAlert size={14} className={results.operationalAction.includes('🛑') ? 'text-red-500' : 'text-zinc-500'} />
+                               <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                 Operational Protocol
+                               </div>
+                            </div>
+                            <div className={`text-sm font-bold ${
+                              results.operationalAction.includes('🛑') ? 'text-red-500' : 'text-amber-500'
+                            }`}>
+                              {results.operationalAction}
+                            </div>
                           </div>
                         )}
                       </div>

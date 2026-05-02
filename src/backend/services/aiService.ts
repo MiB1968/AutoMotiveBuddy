@@ -1,8 +1,29 @@
 
 import { GoogleGenAI } from "@google/genai";
+import axios from "axios";
+
+/**
+ * Standardized Diagnostic Response Schema
+ */
+export interface DiagnosticResponse {
+    diagnosis: string;
+    confidence: number;
+    riskLevel: "LOW" | "MEDIUM" | "HIGH";
+    feasibility: "PROCEED" | "LIMITED" | "SPECIALIST";
+    actions: string[];
+    disclaimers: string[];
+    sourceType: "OEM" | "HEURISTIC" | "AI";
+    provider: "gemini" | "freellm" | "fail-safe";
+}
 
 let cachedAiKeys: string[] | null = null;
 let lastKeyIndex = -1;
+
+// Provider Health Tracking
+const providerHealth = {
+    gemini: { status: "healthy" as "healthy" | "degraded" | "down", lastError: null as string | null },
+    freellm: { status: "healthy" as "healthy" | "degraded" | "down", lastError: null as string | null }
+};
 
 export class AIService {
     private static getAiKeys(): string[] {
@@ -27,49 +48,149 @@ export class AIService {
         if (keys.length === 0) {
             const mainKey = process.env.GEMINI_API_KEY;
             if (!mainKey || mainKey.length < 10 || mainKey.toLowerCase().includes('your_')) {
-                throw new Error("No valid Gemini API keys found. Please set GEMINI_API_KEY in the settings/environment.");
+                return ""; // No keys available
             }
             return mainKey;
         }
 
-        // Simple rotation
         lastKeyIndex = (lastKeyIndex + 1) % keys.length;
         return keys[lastKeyIndex];
     }
 
-    static async generateJSON(prompt: string, systemInstruction: string, image?: { data: string, mimeType: string }) {
-        const apiKey = this.getApiKey();
-        const ai = new GoogleGenAI({ apiKey });
+    /**
+     * Safety Enforcement Layer
+     * Detects high-risk safety systems
+     */
+    private static detectHighRisk(prompt: string): boolean {
+        const highRiskKeywords = ["airbag", "srs", "abs", "brake", "steering", "stability control", "hybrid battery", "high voltage"];
+        const lowerPrompt = prompt.toLowerCase();
+        return highRiskKeywords.some(keyword => lowerPrompt.includes(keyword));
+    }
+
+    /**
+     * Normalization Layer
+     * Ensures all provider outputs adhere to the OpenClaw standard
+     */
+    private static normalizeResponse(raw: any, provider: DiagnosticResponse["provider"]): DiagnosticResponse {
+        // Map common variations of keys
+        const diagnosis = raw.conclusion || raw.hypothesis || raw.diagnosis || raw.issue || "No specific diagnosis returned.";
+        const actions = Array.isArray(raw.workflow) ? raw.workflow.map((w: any) => w.instruction || w.title) : (Array.isArray(raw.actions) ? raw.actions : []);
+        const disclaimers = Array.isArray(raw.disclaimers) ? raw.disclaimers : (raw.disclaimer ? [raw.disclaimer] : ["Use at your own risk. Verify with professional tools."]);
         
-        const parts: any[] = [{ text: prompt }];
-        if (image) {
-            parts.push({
-                inlineData: {
-                    data: image.data,
-                    mimeType: image.mimeType
-                }
-            });
+        return {
+            diagnosis,
+            confidence: raw.confidence || 0.5,
+            riskLevel: (raw.riskLevel || raw.severity || "LOW").toUpperCase() as any,
+            feasibility: (raw.feasibility || "PROCEED").toUpperCase() as any,
+            actions: actions.length > 0 ? actions : (raw.fixes || []),
+            disclaimers,
+            sourceType: (raw.sourceType || "AI").toUpperCase() as any,
+            provider: provider
+        };
+    }
+
+    private static getFailSafeResponse(reason: string): DiagnosticResponse {
+        return {
+            diagnosis: `Diagnostic System Offline: ${reason}`,
+            confidence: 0,
+            riskLevel: "HIGH",
+            feasibility: "LIMITED",
+            actions: ["Check physical connectors", "Verify battery voltage", "Consult OEM manual manually"],
+            disclaimers: ["Automotive Buddy is currently in Fail-Safe mode."],
+            sourceType: "HEURISTIC",
+            provider: "fail-safe"
+        };
+    }
+
+    private static async callSecondaryProvider(prompt: string, systemInstruction: string): Promise<any> {
+        const apiKey = process.env.FREE_LLM_API_KEY;
+        const baseUrl = process.env.FREE_LLM_API_BASE_URL || "https://api.freellm.io/v1";
+        const model = process.env.FREE_LLM_MODEL || "llama-3-8b-instruct";
+
+        if (!apiKey || apiKey.length < 5) {
+            providerHealth.freellm.status = "down";
+            throw new Error("Secondary provider configured but key is missing.");
         }
 
         try {
-            const response = await ai.models.generateContent({
-                model: "gemini-flash-latest",
-                contents: [{ role: 'user', parts }],
-                config: {
-                    responseMimeType: "application/json",
-                    systemInstruction
-                }
+            const response = await axios.post(`${baseUrl}/chat/completions`, {
+                model,
+                messages: [
+                    { role: "system", content: `${systemInstruction}\nIMPORTANT: You must return a JSON object with: diagnosis, confidence, riskLevel (LOW|MEDIUM|HIGH), feasibility (PROCEED|LIMITED|SPECIALIST), actions (list), disclaimers (list), sourceType.` },
+                    { role: "user", content: prompt }
+                ],
+                response_format: { type: "json_object" }
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 15000 
             });
 
-            // According to @google/genai types, text is available on the response
-            const text = response.text || "{}";
-            return JSON.parse(text);
+            providerHealth.freellm.status = "healthy";
+            const content = response.data.choices[0].message.content;
+            return JSON.parse(content);
         } catch (error: any) {
-            if (error.message?.includes('API key not valid')) {
-                console.error("[AIService] Authentication failed with current key. Key might be invalid or restricted.");
-            }
-            console.error("[AIService] Generation Error:", error);
+            providerHealth.freellm.status = "down";
+            providerHealth.freellm.lastError = error.message;
             throw error;
+        }
+    }
+
+    static async generateJSON(prompt: string, systemInstruction: string, image?: { data: string, mimeType: string }): Promise<DiagnosticResponse> {
+        const apiKey = this.getApiKey();
+        const useSecondary = process.env.FREE_LLM_ENABLED === 'true';
+
+        // 1. External Safety Audit
+        if (this.detectHighRisk(prompt)) {
+            console.warn("[AIService] High-risk system detected in prompt. Boosting safety constraints.");
+            systemInstruction += "\nIMPORTANT: High-risk safety system detected (Airbag/Brakes/Steering). You MUST advise professional inspection if there is any doubt.";
+        }
+
+        // 2. Provider Routing
+        try {
+            // Priority 1: Gemini (Primary + Vision)
+            if (apiKey && providerHealth.gemini.status !== "down") {
+                try {
+                    const ai = new GoogleGenAI({ apiKey });
+                    const parts: any[] = [{ text: prompt }];
+                    if (image) {
+                        parts.push({
+                            inlineData: { data: image.data, mimeType: image.mimeType }
+                        });
+                    }
+
+                    const response = await ai.models.generateContent({
+                        model: "gemini-flash-latest",
+                        contents: [{ role: 'user', parts }],
+                        config: {
+                            responseMimeType: "application/json",
+                            systemInstruction
+                        }
+                    });
+
+                    providerHealth.gemini.status = "healthy";
+                    return this.normalizeResponse(JSON.parse(response.text || "{}"), "gemini");
+                } catch (gErr: any) {
+                    console.error("[AIService] Gemini Failed, attempting fallback...");
+                    providerHealth.gemini.status = "degraded";
+                    providerHealth.gemini.lastError = gErr.message;
+                    if (!useSecondary || image) throw gErr; // Can't fallback for vision effectively
+                }
+            }
+
+            // Priority 2: Secondary Provider (Fallback)
+            if (useSecondary && !image && providerHealth.freellm.status !== "down") {
+                const raw = await this.callSecondaryProvider(prompt, systemInstruction);
+                return this.normalizeResponse(raw, "freellm");
+            }
+
+            throw new Error("No active AI providers available for this task.");
+
+        } catch (error: any) {
+            console.error("[AIService] Global AI Failure:", error.message);
+            return this.getFailSafeResponse(error.message);
         }
     }
 }

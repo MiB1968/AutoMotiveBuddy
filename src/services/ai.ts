@@ -36,7 +36,13 @@ export async function searchMaintenanceGuides(query: string, vehicle: any) {
 
   try {
     const response = await api.post('/api/ai/ai-diagnose', { message: query });
-    const text = response.data.result;
+    const d = response.data;
+    
+    // Extract readable text from structured response if necessary
+    const text = typeof d.result === 'string' 
+      ? d.result 
+      : (d.result?.conclusion || d.result?.hypothesis || d.result?.observation || JSON.stringify(d.result));
+
     if (text) {
       try { await setCache(cacheKey, text, null); } catch(e) {}
       return text;
@@ -59,7 +65,13 @@ export async function askAutomotiveAssistant(prompt: string, vehicle: any, image
 
   try {
     const response = await api.post('/api/ai/ai-diagnose', { message: prompt, image: image });
-    const text = response.data.result;
+    const d = response.data;
+
+    // Extract readable text from structured response if necessary
+    const text = typeof d.result === 'string' 
+      ? d.result 
+      : (d.result?.conclusion || d.result?.hypothesis || d.result?.observation || JSON.stringify(d.result));
+
     if (text) {
       try { await setCache(cacheKey, text, null); } catch(e) {}
       return text;
@@ -91,13 +103,18 @@ export async function performDeepDTCSearch(code: string, vehicleContext?: { make
       const d = response.data;
       const res = {
         code: d.code || code,
-        description: d.issue || d.description,
+        description: d.diagnosis || d.issue || d.description,
         system: d.system || "Engine Management",
-        severity: d.severity || "medium",
+        severity: d.riskLevel || d.severity || "medium",
+        confidence: d.confidence || 0.9,
+        provider: d.provider || "gemini",
+        sourceType: d.sourceType || "AI",
+        feasibility: d.feasibility || "PROCEED",
         causes: Array.isArray(d.causes) ? d.causes : [d.issue],
         symptoms: Array.isArray(d.symptoms) ? d.symptoms : ["Check engine light"],
-        solutions: Array.isArray(d.recommendation) ? d.recommendation : [d.recommendation],
-        remediation: Array.isArray(d.recommendation) ? d.recommendation : [d.recommendation]
+        actions: Array.isArray(d.actions) ? d.actions : (Array.isArray(d.workflow) ? d.workflow : []),
+        fixes: Array.isArray(d.actions) ? d.actions : (Array.isArray(d.workflow) ? d.workflow : []),
+        disclaimers: d.disclaimers || []
       };
       try { await setCache(cacheKey, res, null); } catch(e) {}
       return res;

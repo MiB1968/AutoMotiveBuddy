@@ -71,6 +71,39 @@ router.get("/download", async (req, res) => {
   }
 });
 
+// Sync logs to cloud for observability
+router.post("/logs/sync", async (req: any, res) => {
+  const { logs } = req.body;
+  const user = req.user;
+
+  if (!Array.isArray(logs)) {
+    return res.status(400).json({ error: "Invalid logs payload" });
+  }
+
+  try {
+    if (firestore) {
+      const batch = firestore.batch();
+      const logsRef = firestore.collection('system_logs');
+
+      for (const log of logs) {
+        const docRef = logsRef.doc();
+        batch.set(docRef, {
+          ...log,
+          userId: user?.uid,
+          userEmail: user?.email,
+          receivedAt: new Date().toISOString()
+        });
+      }
+      await batch.commit();
+    }
+
+    res.json({ status: "ok", count: logs.length });
+  } catch (e: any) {
+    console.error("[SYNC] Logs upload failed:", e);
+    res.status(500).json({ error: "Logs sync failure" });
+  }
+});
+
 router.post("/", async (req: any, res) => {
   const { items } = req.body;
   const user = req.user;
@@ -95,6 +128,29 @@ router.post("/", async (req: any, res) => {
           processedAt: new Date().toISOString(),
           status: 'synced_authorized'
         });
+
+        // LWW Strategy: If item has a payload with updatedAt, try to update the master record
+        if (item.payload && (item.payload.id || item.payload.code) && item.payload.updatedAt) {
+          try {
+            const collectionName = item.endpoint.split('/')[2]; // e.g., "dtc" from "/api/dtc/save"
+            if (collectionName) {
+              const targetId = (item.payload.id || item.payload.code).toString();
+              const targetRef = firestore.collection(collectionName).doc(targetId);
+              
+              // We use a transaction or merge with check for LWW
+              // For simplicity in a batch, we just set it, but we can do a merge if we want
+              // Note: batch.set(..., {merge: true}) is common, but for LWW we'd need to fetch first.
+              // Since batches don't support reads, we'd need a Transaction for true LWW.
+              // However, we'll use 'merge' as a step towards stability.
+              batch.set(targetRef, {
+                ...item.payload,
+                lastSyncedAt: new Date().toISOString()
+              }, { merge: true });
+            }
+          } catch (err) {
+            console.warn(`[SYNC] Failed to apply LWW for item: ${item.endpoint}`);
+          }
+        }
       }
       
       await batch.commit();

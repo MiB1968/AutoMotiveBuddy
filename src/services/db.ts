@@ -77,6 +77,22 @@ export interface LogEntry {
   synced?: boolean; // for offline-first sync patterns
 }
 
+export type SyncStatus = "pending" | "processing" | "failed" | "done";
+
+export interface QueuedRequest {
+  id: string; // Using string UUIDs
+  url: string;
+  method: "POST" | "PUT" | "DELETE";
+  body?: any;
+  headers?: Record<string, string>;
+  retries: number;
+  status: SyncStatus;
+  createdAt: number;
+  updatedAt: number;
+  priority: "HIGH" | "LOW";
+  lastError?: string;
+}
+
 interface AutomotiveDB extends DBSchema {
   dtc: {
     key: string;
@@ -110,6 +126,15 @@ interface AutomotiveDB extends DBSchema {
       "by-type": string;
     };
   };
+  requests: {
+    key: string;
+    value: QueuedRequest;
+    indexes: {
+      "by-status": string;
+      "by-priority": string;
+      "by-updatedAt": number;
+    };
+  };
   logs: {
     key: number;
     value: LogEntry;
@@ -125,9 +150,9 @@ interface AutomotiveDB extends DBSchema {
 // Constants
 // ============================================================================
 
-const DB_NAME = "automotive-db";
-const DB_VERSION = 3;
-const MAX_LOGS = 1000; // Auto-prune older logs beyond this
+const DB_NAME = "automotive-buddy-core";
+const DB_VERSION = 5;
+const MAX_LOGS = 1000;
 const DEFAULT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
 
 // ============================================================================
@@ -190,6 +215,25 @@ export const getDB = (): Promise<IDBPDatabase<AutomotiveDB>> | null => {
             const equipmentStore = db.createObjectStore("equipment", { keyPath: "id" });
             equipmentStore.createIndex("by-type", "type");
           }
+        }
+
+        // v4 -> add sync requests
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains("requests")) {
+             const requestStore = db.createObjectStore("requests", { keyPath: "id", autoIncrement: true });
+             requestStore.createIndex("by-status", "status");
+          }
+        }
+
+        // v5 -> redesign requests for Sync Engine v2
+        if (oldVersion < 5) {
+          if (db.objectStoreNames.contains("requests")) {
+            db.deleteObjectStore("requests");
+          }
+          const requestStore = db.createObjectStore("requests", { keyPath: "id" });
+          requestStore.createIndex("by-status", "status");
+          requestStore.createIndex("by-priority", "priority");
+          requestStore.createIndex("by-updatedAt", "updatedAt");
         }
       },
       blocked() {
@@ -551,6 +595,91 @@ export async function deleteEquipment(id: string): Promise<void> {
   return withDB(async (db) => {
     await db.delete("equipment", id);
   }, undefined);
+}
+
+// ============================================================================
+// Sync Queue Operations (Sync Engine v2)
+// ============================================================================
+
+export async function addRequestToQueue(request: Omit<QueuedRequest, "createdAt" | "updatedAt">): Promise<boolean> {
+  return withDB(async (db) => {
+    const now = Date.now();
+    const entry: QueuedRequest = {
+      ...request,
+      createdAt: now,
+      updatedAt: now
+    };
+    await db.put("requests", entry);
+    return true;
+  }, false);
+}
+
+export async function getNextSyncBatch(limit: number): Promise<QueuedRequest[]> {
+  return withDB(async (db) => {
+    const tx = db.transaction("requests", "readonly");
+    const index = tx.store.index("by-status");
+    let cursor = await index.openCursor("pending");
+    const results: QueuedRequest[] = [];
+    
+    while(cursor && results.length < limit) {
+      results.push(cursor.value);
+      cursor = await cursor.continue();
+    }
+    
+    // Sort by priority (HIGH first) manually if index doesn't filter perfectly
+    return results.sort((a, b) => {
+      if (a.priority === b.priority) return a.createdAt - b.createdAt;
+      return a.priority === "HIGH" ? -1 : 1;
+    });
+  }, []);
+}
+
+export async function updateRequestStatus(id: string, status: SyncStatus, error?: string): Promise<boolean> {
+  return withDB(async (db) => {
+    const tx = db.transaction("requests", "readwrite");
+    const item = await tx.store.get(id);
+    if (item) {
+      item.status = status;
+      item.updatedAt = Date.now();
+      if (error) item.lastError = error;
+      await tx.store.put(item);
+      return true;
+    }
+    return false;
+  }, false);
+}
+
+export async function updateRequestRetry(id: string, retries: number): Promise<boolean> {
+  return withDB(async (db) => {
+    const tx = db.transaction("requests", "readwrite");
+    const item = await tx.store.get(id);
+    if (item) {
+      item.retries = retries;
+      item.status = "pending";
+      item.updatedAt = Date.now();
+      await tx.store.put(item);
+      return true;
+    }
+    return false;
+  }, false);
+}
+
+export async function removeRequestFromQueue(id: string): Promise<boolean> {
+  return withDB(async (db) => {
+    await db.delete("requests", id);
+    return true;
+  }, false);
+}
+
+export async function getQueueCount(): Promise<number> {
+  return withDB((db) => db.count("requests"), 0);
+}
+
+export async function clearQueue(): Promise<boolean> {
+  return withDB(async (db) => {
+    await db.clear("requests");
+    return true;
+  }, false);
 }
 
 // ============================================================================

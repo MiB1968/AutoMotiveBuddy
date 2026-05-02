@@ -27,7 +27,7 @@ const dtcMasterData: any = dtcMasterDataRaw;
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { initFuseSearchEngine, searchFuses, buildFuseSearchIndex } from './services/fuseSearch';
-import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch } from './services/ai';
+import { generateDynamicVehicleData, askAutomotiveAssistant, performDeepDTCSearch, searchMaintenanceGuides } from './services/ai';
 import { fuseService } from './backend/services/fuseService';
 
 import DiagnosticInterface from './components/DiagnosticInterface';
@@ -35,20 +35,19 @@ import api from './services/api';
 import HUDPanel from './components/HUDPanel';
 import EnhancedDashboard from './components/Dashboard';
 import { Card, Badge, ProgressBar, Button } from './components/ui';
-import { saveDTCOffline, getDTCOffline, addOfflineLog } from './offline/db';
+import { saveDTCOffline, getDTCOffline, addOfflineLog, getQueueCount, updateCacheConfidence } from './services/db';
 import { syncFromFirebase } from './services/syncService';
 import { startAutoSync } from './services/networkSync';
-import { db, auth, signInWithGoogle, logOut } from './lib/firebase';
+import { db, auth, signInWithGoogle, logOut, loginWithEmail, registerWithEmail, startTrialAccount } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore'; // Re-imported
+import { doc, getDoc, setDoc, collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore'; 
 import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
 import RestrictedAccountModal from './components/RestrictedAccountModal';
-import { syncData } from './sync/syncEngine';
 import axios from 'axios';
-import { startSyncEngine } from './lib/sync';
-import { smartRequest } from './lib/smartApi';
 
 import { BASE_API, getApiUrl } from './lib/config';
+
+import AppErrorHandler from './components/AppErrorHandler';
 
 // --- UI Helper Components ---
 
@@ -81,13 +80,22 @@ function FloatingBackground() {
   );
 }
 
+
 function NetworkStatus() {
   const [online, setOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
+    const checkQueue = async () => {
+      const count = await getQueueCount();
+      setPendingCount(count);
+    };
+
+    checkQueue();
+    const interval = setInterval(checkQueue, 5000);
+
     const handleOnline = () => {
       setOnline(true);
-      syncData();
     };
     const handleOffline = () => setOnline(false);
 
@@ -96,12 +104,23 @@ function NetworkStatus() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      clearInterval(interval);
     };
   }, []);
 
   return (
-    <div className={`p-2 text-sm text-center font-bold tracking-widest uppercase transition-colors ${online ? "text-green-400 bg-green-500/10" : "text-amber-400 bg-amber-500/10"}`}>
-      {online ? "SYSTEM ONLINE - SYNC ACTIVE" : "OFFLINE MODE - LOCAL DB ACTIVE"}
+    <div className={`p-2 text-[10px] text-center font-bold tracking-widest uppercase transition-colors flex items-center justify-center gap-4 ${online ? "text-green-400 bg-green-500/10" : "text-amber-400 bg-amber-500/10"}`}>
+      <div className="flex items-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${online ? "bg-green-500 shadow-[0_0_8px_#22c55e]" : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"} animate-pulse`} />
+        {online ? "SYSTEM ONLINE" : "OFFLINE MODE"}
+      </div>
+      
+      {pendingCount > 0 && (
+        <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+          <CloudDownload size={14} className="animate-bounce" />
+          <span>{pendingCount} PENDING UPDATES</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -236,7 +255,6 @@ function AIMaintenanceTab({ user, store }: any) {
     }
 
     try {
-      const { searchMaintenanceGuides } = await import('./services/ai');
       const text = await searchMaintenanceGuides(searchQuery, store.vehicle);
       setResult(text);
       
@@ -359,7 +377,9 @@ function AIMaintenanceTab({ user, store }: any) {
             </div>
           ) : (
             <div className="prose prose-invert prose-brand max-w-none prose-sm sm:prose-base font-accent prose-headings:font-display prose-headings:tracking-widest prose-headings:uppercase prose-a:text-brand">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {typeof result === 'string' ? result : (result?.diagnosis || result?.observation || JSON.stringify(result))}
+              </ReactMarkdown>
             </div>
           )}
         </HUDPanel>
@@ -399,7 +419,9 @@ function UnitManualsTab() {
       {manual && (
         <HUDPanel>
           <div className="markdown-body font-sans text-sm">
-             <ReactMarkdown remarkPlugins={[remarkGfm]}>{manual}</ReactMarkdown>
+             <ReactMarkdown remarkPlugins={[remarkGfm]}>
+               {typeof manual === 'string' ? manual : JSON.stringify(manual)}
+             </ReactMarkdown>
           </div>
         </HUDPanel>
       )}
@@ -675,9 +697,6 @@ export default function App() {
           
           setCurrentUser(userData);
           addToast(`Access Granted: Welcome ${userData.email}`, 'success');
-          
-          // Start Sync Engine
-          startSyncEngine();
         } catch (error: any) {
           const errMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Unknown identity bridge failure";
           const recoveryHint = error.response?.data?.recovery_hint;
@@ -929,7 +948,8 @@ export default function App() {
   }
 
   return (
-    <div className="relative">
+    <AppErrorHandler>
+      <div className="relative">
       <div className="noise-texture" />
       <div className="mesh-bg" />
       <FloatingBackground />
@@ -976,6 +996,7 @@ export default function App() {
 
       <ChatBot currentUser={currentUser} store={store} toast={addToast} />
     </div>
+    </AppErrorHandler>
   );
 }
 
@@ -1365,7 +1386,6 @@ function AuthPage({ mode, onBack, toast }: any) {
     setError('');
     
     try {
-      const { loginWithEmail, registerWithEmail } = await import('./lib/firebase');
       if (mode === 'login') {
         try {
           await loginWithEmail(email, password);
@@ -1489,7 +1509,6 @@ function AuthPage({ mode, onBack, toast }: any) {
                 setLoading(true);
                 setError('');
                 try {
-                  const { signInWithGoogle } = await import('./lib/firebase');
                   await signInWithGoogle();
                   // onAuthStateChanged in App.tsx takes care of the rest
                 } catch (e: any) {
@@ -1510,7 +1529,6 @@ function AuthPage({ mode, onBack, toast }: any) {
                  setLoading(true);
                  setError('');
                  try {
-                   const { startTrialAccount } = await import('./lib/firebase');
                    await startTrialAccount();
                  } catch (e: any) {
                    setError(`Trial Activation Failed. Please enable Anonymous Auth in Firebase. ${e.message}`);
@@ -2945,7 +2963,6 @@ function FuseRelayTab({ store, user, toast }: any) {
   const handleFeedback = async (isAccurate: boolean) => {
      if (!currentCacheKey) return;
      try {
-        const { updateCacheConfidence } = await import('./services/db');
         const updated = await updateCacheConfidence(currentCacheKey, isAccurate);
         if (updated) {
            toast(`Feedback recorded. Neural matrix updated!`, 'success');
@@ -3890,7 +3907,9 @@ function AIChatTab({ user, store, ...props }: any) {
                   </div>
                 )}
                 <div className="prose prose-invert prose-xs max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {typeof m.content === 'string' ? m.content : (m.content?.text || JSON.stringify(m.content))}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
@@ -3983,8 +4002,6 @@ function AIChatTab({ user, store, ...props }: any) {
   );
 }
 
-import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-
 function MembersTab({ user, store, toast, ...props }: any) {
   const currentUser = user;
   const [users, setUsers] = useState<UserType[]>([]);
@@ -4016,9 +4033,6 @@ function MembersTab({ user, store, toast, ...props }: any) {
     if (!newUserEmail || !newUserPass || !newUserName) return;
     setIsCreatingUser(true);
     try {
-       const { registerWithEmail } = await import('./lib/firebase');
-       const { setDoc, doc } = await import('firebase/firestore');
-       
        const newFbUser = await registerWithEmail(newUserEmail, newUserPass);
        const trialStart = new Date();
        const trialEnd = new Date(trialStart.getTime() + 3 * 3600000);
@@ -4052,7 +4066,6 @@ function MembersTab({ user, store, toast, ...props }: any) {
      if (!approveModalUser) return;
      setIsApproving(true);
      try {
-        const { setDoc, doc } = await import('firebase/firestore');
         let updateData: any = { status: 'active' };
         
         if (user.role === 'super_admin' && selectedDuration !== 'none') {
@@ -4086,7 +4099,6 @@ function MembersTab({ user, store, toast, ...props }: any) {
 
   const handleReject = async (targetUser: UserType) => {
      try {
-        const { setDoc, doc } = await import('firebase/firestore');
         await setDoc(doc(db, 'users', targetUser.id), { status: 'blocked' }, { merge: true });
         toast(`Member ${targetUser.username} blocked.`, 'success');
      } catch(e) {
