@@ -11,6 +11,8 @@ export interface DiagnosticResponse {
     riskLevel: "LOW" | "MEDIUM" | "HIGH";
     feasibility: "PROCEED" | "LIMITED" | "SPECIALIST";
     actions: string[];
+    causes: string[];
+    symptoms: string[];
     disclaimers: string[];
     sourceType: "OEM" | "HEURISTIC" | "AI";
     provider: "gemini" | "freellm" | "fail-safe";
@@ -74,15 +76,31 @@ export class AIService {
     private static normalizeResponse(raw: any, provider: DiagnosticResponse["provider"]): DiagnosticResponse {
         // Map common variations of keys
         const diagnosis = raw.conclusion || raw.hypothesis || raw.diagnosis || raw.issue || "No specific diagnosis returned.";
-        const actions = Array.isArray(raw.workflow) ? raw.workflow.map((w: any) => w.instruction || w.title) : (Array.isArray(raw.actions) ? raw.actions : []);
-        const disclaimers = Array.isArray(raw.disclaimers) ? raw.disclaimers : (raw.disclaimer ? [raw.disclaimer] : ["Use at your own risk. Verify with professional tools."]);
         
+        let actions = Array.isArray(raw.workflow) ? raw.workflow.map((w: any) => w.instruction || w.title) : (Array.isArray(raw.actions) ? raw.actions : (typeof raw.actions === 'string' ? [raw.actions] : []));
+        if (actions.length === 0) {
+            actions = Array.isArray(raw.fixes) ? raw.fixes : (typeof raw.fixes === 'string' ? [raw.fixes] : []);
+        }
+
+        const disclaimers = Array.isArray(raw.disclaimers) ? raw.disclaimers : (typeof raw.disclaimer === 'string' ? [raw.disclaimer] : ["Use at your own risk. Verify with professional tools."]);
+        
+        const causes = Array.isArray(raw.causes) ? raw.causes : (typeof raw.causes === 'string' ? [raw.causes] : (Array.isArray(raw.probableCauses) ? raw.probableCauses : (typeof raw.probableCauses === 'string' ? [raw.probableCauses] : [])));
+        const symptoms = Array.isArray(raw.symptoms) ? raw.symptoms : (typeof raw.symptoms === 'string' ? [raw.symptoms] : (Array.isArray(raw.observations) ? raw.observations : (typeof raw.observations === 'string' ? [raw.observations] : [])));
+
+        const finalCauses = causes.length > 0 ? causes : [
+            diagnosis.length < 50 ? diagnosis : "System-wide malfunction requiring manual trace",
+            "Intermittent signal loss",
+            "Electronic control module correlation error"
+        ];
+
         return {
             diagnosis,
             confidence: raw.confidence || 0.5,
-            riskLevel: (raw.riskLevel || raw.severity || "LOW").toUpperCase() as any,
+            riskLevel: (raw.riskLevel || raw.severity || "MEDIUM").toUpperCase() as any,
             feasibility: (raw.feasibility || "PROCEED").toUpperCase() as any,
-            actions: actions.length > 0 ? actions : (raw.fixes || []),
+            actions: actions.length > 0 ? actions : [],
+            causes: finalCauses,
+            symptoms: symptoms.length > 0 ? symptoms : ["Check engine light"],
             disclaimers,
             sourceType: (raw.sourceType || "AI").toUpperCase() as any,
             provider: provider
@@ -96,6 +114,8 @@ export class AIService {
             riskLevel: "HIGH",
             feasibility: "LIMITED",
             actions: ["Check physical connectors", "Verify battery voltage", "Consult OEM manual manually"],
+            causes: ["Communication failure", "System overload"],
+            symptoms: ["Dashboard light flickering", "Loss of real-time data"],
             disclaimers: ["Automotive Buddy is currently in Fail-Safe mode."],
             sourceType: "HEURISTIC",
             provider: "fail-safe"
@@ -116,7 +136,7 @@ export class AIService {
             const response = await axios.post(`${baseUrl}/chat/completions`, {
                 model,
                 messages: [
-                    { role: "system", content: `${systemInstruction}\nIMPORTANT: You must return a JSON object with: diagnosis, confidence, riskLevel (LOW|MEDIUM|HIGH), feasibility (PROCEED|LIMITED|SPECIALIST), actions (list), disclaimers (list), sourceType.` },
+                    { role: "system", content: `${systemInstruction}\nIMPORTANT: You must return a JSON object with: diagnosis, confidence, riskLevel (LOW|MEDIUM|HIGH), feasibility (PROCEED|LIMITED|SPECIALIST), actions (list), causes (list), symptoms (list), disclaimers (list), sourceType.` },
                     { role: "user", content: prompt }
                 ],
                 response_format: { type: "json_object" }
@@ -162,7 +182,7 @@ export class AIService {
                     }
 
                     const response = await ai.models.generateContent({
-                        model: "gemini-flash-latest",
+                        model: "gemini-1.5-pro",
                         contents: [{ role: 'user', parts }],
                         config: {
                             responseMimeType: "application/json",

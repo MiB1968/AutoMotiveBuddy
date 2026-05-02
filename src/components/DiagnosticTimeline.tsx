@@ -85,19 +85,21 @@ const TimelineCard = ({ step, isLast }: TimelineCardProps) => {
         </div>
         
         <div className={`text-sm font-accent transition-colors duration-500 ${isActive ? 'text-text-primary' : 'text-text-secondary'}`}>
-          {step.content}
+          {typeof step.content === 'string' ? step.content : JSON.stringify(step.content)}
         </div>
 
         {step.metadata?.actions && Array.isArray(step.metadata.actions) && (
           <div className="mt-4 space-y-3">
-            {step.metadata.actions.map((action: any, idx: number) => (
+            {step.metadata.actions.map((action: { instruction?: string; title?: string; toolRequired?: string; expectedOutcome?: string; result?: string } | string | any, idx: number) => (
               <div key={idx} className="p-3 rounded-lg bg-brand/5 border border-brand/20">
                 <div className="flex items-start gap-3">
                   <div className="w-5 h-5 rounded bg-brand/20 flex items-center justify-center text-[10px] font-bold text-brand mt-0.5">
                     {idx + 1}
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-white/90">{action.instruction}</p>
+                    <p className="text-xs font-bold text-white/90">
+                      {typeof action === 'string' ? action : (action?.instruction || action?.title || JSON.stringify(action))}
+                    </p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {action.toolRequired && (
                         <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-brand font-mono">

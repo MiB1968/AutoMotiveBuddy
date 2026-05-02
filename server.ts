@@ -140,6 +140,15 @@ async function startServer() {
     res.json({ rpm: rpm.toString(), temp: temp.toString() });
   });
 
+  // --- ERROR REPORTING ---
+  app.post('/api/error-report', (req, res) => {
+    const { error, name, stack, timestamp, metadata } = req.body;
+    console.error(`[NEURAL-ERROR] ${timestamp}: ${name}: ${error}`);
+    if (stack) console.error(stack);
+    if (metadata) console.log(`[NEURAL-ERROR-METADATA]`, metadata);
+    res.status(204).send();
+  });
+
   // Vite integration
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import('vite');

@@ -49,6 +49,30 @@ import { BASE_API, getApiUrl } from './lib/config';
 
 import AppErrorHandler from './components/AppErrorHandler';
 
+// --- Global Type Definitions ---
+interface SpeechRecognitionResult {
+  readonly length: number;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+
 // --- UI Helper Components ---
 
 function FloatingBackground() {
@@ -173,9 +197,15 @@ function LiveDataTab() {
   );
 }
 
-function AIMaintenanceTab({ user, store }: any) {
+interface AIResult {
+  diagnosis?: string;
+  observation?: string;
+  [key: string]: any;
+}
+
+function AIMaintenanceTab({ user, store }: { user: UserType | null, store: any }) {
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState("");
+  const [result, setResult] = useState<string | AIResult | null>("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -191,12 +221,12 @@ function AIMaintenanceTab({ user, store }: any) {
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript;
         setQuery(transcript);
       };
 
-      recognitionRef.current.onerror = (event: any) => {
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error("Speech recognition error", event.error);
         setIsListening(false);
       };
@@ -378,7 +408,7 @@ function AIMaintenanceTab({ user, store }: any) {
           ) : (
             <div className="prose prose-invert prose-brand max-w-none prose-sm sm:prose-base font-accent prose-headings:font-display prose-headings:tracking-widest prose-headings:uppercase prose-a:text-brand">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {typeof result === 'string' ? result : (result?.diagnosis || result?.observation || JSON.stringify(result))}
+                {String(typeof result === 'string' ? result : (result?.diagnosis || result?.observation || JSON.stringify(result)))}
               </ReactMarkdown>
             </div>
           )}
@@ -420,7 +450,7 @@ function UnitManualsTab() {
         <HUDPanel>
           <div className="markdown-body font-sans text-sm">
              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-               {typeof manual === 'string' ? manual : JSON.stringify(manual)}
+               {String(typeof manual === 'string' ? manual : JSON.stringify(manual))}
              </ReactMarkdown>
           </div>
         </HUDPanel>
@@ -897,7 +927,7 @@ export default function App() {
           toast={addToast} 
           onInstall={handleInstallApp} 
           showInstall={!!deferredPrompt} 
-          onUpdateAvatar={setCurrentUser} 
+          onUpdateAvatar={(url) => setCurrentUser(prev => prev ? ({ ...prev, avatar: url }) : null)} 
         />
       );
     }
@@ -1630,7 +1660,7 @@ const speakText = (text: string, enabled: boolean) => {
 
 // --- AI ChatBot Components ---
 
-function ChatBot({ currentUser, store, toast }: any) {
+function ChatBot({ currentUser, store, toast }: { currentUser: UserType | null, store: any, toast: any }) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -1737,11 +1767,11 @@ How can I assist your repair today?`;
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("Speech Recognition Error:", event.error);
       setIsListening(false);
     };
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
       setInput(transcript);
       // Optional: auto-send if you want it faster
@@ -1814,9 +1844,14 @@ How can I assist your repair today?`;
             body: JSON.stringify({ message: arg, vehicle: { make, model, year } })
           });
           const data = await res.json();
-          const response = data.result || "Diagnosis failed.";
-          store.addChatMessage(userId, 'ai', response);
-          if (autoSpeak) speakText(response, true);
+          let responseText = "";
+          if (data.result) {
+            responseText = typeof data.result === 'string' ? data.result : (data.result.conclusion || data.result.hypothesis || JSON.stringify(data.result));
+          } else {
+            responseText = data.conclusion || data.hypothesis || JSON.stringify(data) || "Diagnosis failed.";
+          }
+          store.addChatMessage(userId, 'ai', responseText);
+          if (autoSpeak) speakText(responseText, true);
           return;
         }
       }
@@ -2035,7 +2070,7 @@ function InstallDrawer({ isOpen, onClose, onInstall, hasPrompt }: { isOpen: bool
 
 // --- Dashboard Layout Logic ---
 
-function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstall, onUpdateAvatar }: any) {
+function AdminDashboard({ h, user, store, onLogout, toast, onInstall, showInstall, onUpdateAvatar }: { h: string; user: UserType | null; store: any; onLogout: () => void; toast: any; onInstall: () => void; showInstall: boolean; onUpdateAvatar: (url: string) => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -2527,7 +2562,7 @@ const NavItem = ({ icon: Icon, label, active, collapsed, onClick }: any) => (
 
 // --- Sub-Tabs ---
 
-function ProfileTab({ user, store, onUpdateAvatar }: any) {
+function ProfileTab({ user, store, onUpdateAvatar }: { user: UserType | null, store: any, onUpdateAvatar: (url: string) => void }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-8">
       <div className="glass-panel p-8 flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
@@ -2594,7 +2629,7 @@ function ProfileTab({ user, store, onUpdateAvatar }: any) {
   );
 }
 
-function OverviewTab({ user, store }: any) {
+function OverviewTab({ user, store }: { user: UserType | null, store: any }) {
   return <EnhancedDashboard user={user} store={store} />;
 }
 
@@ -2708,13 +2743,14 @@ function GlobalVehicleSelector() {
 }
 
 // --- DTC Lookup Tool Component ---
-function DTCLookupTab({ store, toast, user, ...props }: any) {
+function DTCLookupTab({ store, toast, user, ...props }: { store: any, toast: any, user: UserType | null }) {
   return (
     <div className="max-w-4xl mx-auto -mt-8 md:mt-0">
       <DiagnosticInterface 
         user={user} 
         toast={toast}
         onRunDiagnostics={(data) => {
+          if (!user) return;
           store.addSearchHistory({
             userId: user.id,
             query: data.codes,
@@ -3193,10 +3229,10 @@ function FuseRelayTab({ store, user, toast }: any) {
 }
 
 // --- Dynamic Resource Tab Component ---
-function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any) {
+function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: { type: string, title: string, icon: any, store: any, user: UserType | null, toast: any }) {
   const { make, model, year, engine } = useVehicleStore();
   
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState<string | AIResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const [typeCategory, setTypeCategory] = useState<string>('General');
@@ -3211,7 +3247,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
     try {
       // Pass category as extra context
       const promptContext = typeCategory !== 'General' ? ` focus on ${typeCategory}` : '';
-      const data = await generateDynamicVehicleData(type, make, model, year, engine, promptContext);
+      const data = await generateDynamicVehicleData(type as any, make, model, year, engine, promptContext);
       setResult(data);
     } catch(err: any) {
       if (toast) toast(err.message || 'Failed to retrieve vehicle data module from cloud matrix.', 'error');
@@ -3266,7 +3302,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
              <h3 className="text-lg text-brand font-bold uppercase">{year} {make} {model} - {title}</h3>
              <button onClick={() => {
                 store.addSavedItem({
-                  userId: user.id,
+                  userId: user?.id || '',
                   type: 'Article (AI)',
                   itemId: `${type}-${year}-${model}`,
                   title: `${year} ${make} ${model} - ${title}`
@@ -3278,7 +3314,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
           </div>
           <div className="markdown-body text-sm font-sans leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {result}
+              {String(typeof result === 'string' ? result : (result?.diagnosis || result?.observation || JSON.stringify(result)))}
             </ReactMarkdown>
           </div>
         </div>
@@ -3288,7 +3324,7 @@ function DynamicResourceTab({ type, title, icon: Icon, store, user, toast }: any
 }
 
 // --- Manual Guide Tool Component ---
-function ManualsTab({ store, toast, user, ...props }: any) {
+function ManualsTab({ store, toast, user, ...props }: { store: any, toast: any, user: UserType | null }) {
   const [filter, setFilter] = useState<any>({ category: '', make: '', year: '' });
   const [selectedUnit, setSelectedUnit] = useState<VehicleUnit | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -3704,7 +3740,7 @@ function ManualsTab({ store, toast, user, ...props }: any) {
 
 // --- Admin and Core Management Components ---
 
-function AIChatTab({ user, store, ...props }: any) {
+function AIChatTab({ user, store, toast, ...props }: { user: UserType | null, store: any, toast: any }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
@@ -3715,9 +3751,9 @@ function AIChatTab({ user, store, ...props }: any) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { make, model, year, engine } = useVehicleStore();
-  const addToast = props.toast;
+  const addToast = toast;
 
-  const myMessages = store.chatLogs.filter((m: any) => m.userId === user.id);
+  const myMessages = store.chatLogs.filter((m: any) => m.userId === (user?.id || ''));
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -3783,7 +3819,7 @@ function AIChatTab({ user, store, ...props }: any) {
       recognition.interimResults = false;
       recognition.lang = 'en-US';
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const lastResult = (event.results[event.results.length - 1][0]?.transcript || "").toLowerCase();
         console.log('Voice Detected:', lastResult);
 
@@ -3802,7 +3838,7 @@ function AIChatTab({ user, store, ...props }: any) {
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech Recognition Error:', event.error);
         if (event.error === 'not-allowed') {
           setIsListening(false);
@@ -3843,16 +3879,16 @@ function AIChatTab({ user, store, ...props }: any) {
     const userText = text.trim() || (image ? "Explain what you see in this image." : "");
     
     // Add message with image metadata if present
-    store.addChatMessage(user.id, 'user', userText, { image: image });
+    store.addChatMessage(user?.id || '', 'user', userText, { image: image });
     setLoading(true);
 
     try {
       const resp = await askAutomotiveAssistant(userText, { make, model, year, engine }, image as string);
-      store.addChatMessage(user.id, 'ai', resp);
+      store.addChatMessage(user?.id || '', 'ai', resp);
       speakText(resp, true);
     } catch (err: any) {
       const errMsg = "Link failure. Diagnostic offline.";
-      store.addChatMessage(user.id, 'ai', errMsg);
+      store.addChatMessage(user?.id || '', 'ai', errMsg);
       speakText(errMsg, true);
     } finally {
       setLoading(false);
@@ -3908,7 +3944,7 @@ function AIChatTab({ user, store, ...props }: any) {
                 )}
                 <div className="prose prose-invert prose-xs max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {typeof m.content === 'string' ? m.content : (m.content?.text || JSON.stringify(m.content))}
+                    {String(typeof m.content === 'string' ? m.content : (m.content?.text || m.content?.diagnosis || m.content?.conclusion || m.content?.explanation || JSON.stringify(m.content)))}
                   </ReactMarkdown>
                 </div>
               </div>
@@ -4328,7 +4364,7 @@ function MembersTab({ user, store, toast, ...props }: any) {
 }
 
 function SavedItemsTab({ user, store }: any) {
-  const myItems = store.savedItems.filter((i: any) => i.userId === user.id);
+  const myItems = store.savedItems.filter((i: any) => i.userId === (user?.id || ''));
 
   return (
     <div className="space-y-6">
@@ -4386,7 +4422,7 @@ function SavedItemsTab({ user, store }: any) {
 }
 
 function SearchHistoryTab({ user, store }: any) {
-  const myHistory = store.searchHistory.filter((h: any) => h.userId === user.id);
+  const myHistory = store.searchHistory.filter((h: any) => h.userId === (user?.id || ''));
 
   return (
     <div className="space-y-6">

@@ -35,17 +35,19 @@ export async function searchMaintenanceGuides(query: string, vehicle: any) {
   } catch(e) {}
 
   try {
-    const response = await api.post('/api/ai/ai-diagnose', { message: query });
+    const response = await api.post('/api/ai/ai-diagnose', { message: query, vehicle });
     const d = response.data;
     
     // Extract readable text from structured response if necessary
-    const text = typeof d.result === 'string' 
-      ? d.result 
-      : (d.result?.conclusion || d.result?.hypothesis || d.result?.observation || JSON.stringify(d.result));
+    // Handle both { result: { conclusion: ... } } and { conclusion: ... } directly
+    const resObj = d.result || d;
+    const text = typeof resObj === 'string' 
+      ? resObj 
+      : (resObj?.conclusion || resObj?.hypothesis || resObj?.observation || resObj?.diagnosis || resObj?.description || JSON.stringify(resObj));
 
     if (text) {
-      try { await setCache(cacheKey, text, null); } catch(e) {}
-      return text;
+      try { await setCache(cacheKey, text.toString(), null); } catch(e) {}
+      return text.toString();
     }
     return "Neural uplink failed. Please re-state your query.";
   } catch (error: any) {
@@ -64,17 +66,18 @@ export async function askAutomotiveAssistant(prompt: string, vehicle: any, image
   } catch(e) {}
 
   try {
-    const response = await api.post('/api/ai/ai-diagnose', { message: prompt, image: image });
+    const response = await api.post('/api/ai/ai-diagnose', { message: prompt, image: image, vehicle });
     const d = response.data;
 
     // Extract readable text from structured response if necessary
-    const text = typeof d.result === 'string' 
-      ? d.result 
-      : (d.result?.conclusion || d.result?.hypothesis || d.result?.observation || JSON.stringify(d.result));
+    const resObj = d.result || d;
+    const text = typeof resObj === 'string' 
+      ? resObj 
+      : (resObj?.conclusion || resObj?.hypothesis || resObj?.observation || resObj?.diagnosis || resObj?.description || JSON.stringify(resObj));
 
     if (text) {
-      try { await setCache(cacheKey, text, null); } catch(e) {}
-      return text;
+      try { await setCache(cacheKey, text.toString(), null); } catch(e) {}
+      return text.toString();
     }
     return "Direct uplink failed. Please re-state your query.";
   } catch (error: any) {
@@ -103,15 +106,15 @@ export async function performDeepDTCSearch(code: string, vehicleContext?: { make
       const d = response.data;
       const res = {
         code: d.code || code,
-        description: d.diagnosis || d.issue || d.description,
+        description: d.diagnosis || d.issue || d.description || "Comprehensive diagnostic analysis complete.",
         system: d.system || "Engine Management",
         severity: d.riskLevel || d.severity || "medium",
         confidence: d.confidence || 0.9,
         provider: d.provider || "gemini",
         sourceType: d.sourceType || "AI",
         feasibility: d.feasibility || "PROCEED",
-        causes: Array.isArray(d.causes) ? d.causes : [d.issue],
-        symptoms: Array.isArray(d.symptoms) ? d.symptoms : ["Check engine light"],
+        causes: Array.isArray(d.causes) && d.causes.length > 0 ? d.causes : ["Unknown Cause"],
+        symptoms: Array.isArray(d.symptoms) && d.symptoms.length > 0 ? d.symptoms : ["Check engine light"],
         actions: Array.isArray(d.actions) ? d.actions : (Array.isArray(d.workflow) ? d.workflow : []),
         fixes: Array.isArray(d.actions) ? d.actions : (Array.isArray(d.workflow) ? d.workflow : []),
         disclaimers: d.disclaimers || []

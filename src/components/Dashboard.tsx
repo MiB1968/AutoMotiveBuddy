@@ -3,7 +3,9 @@ import { motion } from 'motion/react';
 import { Activity, Users, FileText, Database, Shield, Zap, Terminal } from 'lucide-react';
 import { Card, Badge, ProgressBar } from './ui';
 
-export const EnhancedDashboard = ({ user, store, stats }: any) => {
+import { User as UserType } from '../lib/store';
+
+export const EnhancedDashboard = ({ user, store, stats }: { user: UserType | null, store: any, stats?: any }) => {
   const isAdmin = user?.role === 'admin';
 
   return (

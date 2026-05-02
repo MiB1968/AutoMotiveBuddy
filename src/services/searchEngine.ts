@@ -16,10 +16,10 @@ export const searchLocalDB = async (query: string) => {
       normalize(w.component + ' ' + w.wire_color).includes(normalized)
     ),
     ...fuses.filter(f =>
-      normalize(f.function || '' + ' ' + f.fuse_number).includes(normalized)
+      normalize((f.function || '') + ' ' + (f.fuse_number || '')).includes(normalized)
     ),
     ...relays.filter(r =>
-      normalize(r.relay_name || '' + ' ' + r.function).includes(normalized)
+      normalize((r.relay_name || '') + ' ' + (r.function || '')).includes(normalized)
     )
   ];
 

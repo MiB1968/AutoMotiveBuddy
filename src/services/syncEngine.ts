@@ -1,6 +1,7 @@
 import { getNextBatch, updateStatus, updateRetry, markDone, QueuedRequest } from "./queueStore";
 import { logError, logInfo } from "./logger";
 import { getUnsyncedLogs, markLogsAsSynced, getWeakCacheEntries, deleteCache } from "./db";
+import api from "./apiClient";
 
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 5;
@@ -54,13 +55,9 @@ async function syncLogs() {
   if (unsynced.length === 0) return;
 
   try {
-    const response = await fetch("/api/logs/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ logs: unsynced })
-    });
+    const response = await api.post("/api/logs/sync", { logs: unsynced });
 
-    if (response.ok) {
+    if (response.status === 200 || response.status === 201) {
       const ids = unsynced.map(l => l.id!) as number[];
       await markLogsAsSynced(ids);
       logInfo("sync", `Synced ${ids.length} logs`);
@@ -90,19 +87,12 @@ async function processRequest(req: QueuedRequest) {
 
     logInfo("sync", `Syncing ${req.method} ${req.url}`);
 
-    const res = await fetch(req.url, {
+    const res = await api({
+      url: req.url,
       method: req.method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(req.headers || {})
-      },
-      body: req.body ? JSON.stringify(req.body) : undefined
+      headers: req.headers,
+      data: req.body
     });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Server returned ${res.status}: ${errorText}`);
-    }
 
     await markDone(req.id);
     logInfo("sync", `Successfully synced ${req.id}`);

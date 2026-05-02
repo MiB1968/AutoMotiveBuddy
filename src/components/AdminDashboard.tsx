@@ -20,11 +20,21 @@ export default function AdminDashboardProMax() {
 
   // FETCH USERS
   const fetchUsers = async () => {
-    const res = await fetch(getUrl("/api/admin/users"), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    setUsers(data);
+    try {
+      const res = await fetch(getUrl("/api/admin/users"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setUsers(data);
+      } else {
+        console.warn("Admin fetch did not return array:", data);
+        setUsers([]);
+      }
+    } catch (err) {
+      console.error("Admin fetch fail:", err);
+      setUsers([]);
+    }
   };
 
   useEffect(() => {

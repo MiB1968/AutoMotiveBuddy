@@ -25,8 +25,11 @@ import {
   ThumbsDown,
   Loader2
 } from 'lucide-react';
+import { searchFuses } from '../services/fuseSearch';
 import { diagnoseDTC } from '../services/api';
+import api from '../services/apiClient';
 import { performDeepDTCSearch } from '../services/ai';
+import { User as UserType } from '../lib/store';
 import { 
   DTCRecord, 
   getDTCOffline, 
@@ -42,10 +45,33 @@ import { SessionService } from '../services/sessionService';
 import { EquipmentRegistry } from './EquipmentRegistry';
 import { BASE_API } from '../lib/config';
 import { LiveDiagnosticTimeline, DiagnosticStep } from './DiagnosticTimeline';
+import { Card, Badge, Button } from './ui';
+
+interface AIResult {
+  code?: string;
+  description?: string;
+  severity?: "low" | "high" | "medium" | "critical" | string;
+  system?: string;
+  causes?: any[];
+  fixes?: string[];
+  findings?: string;
+  hypothesis?: string;
+  conclusion?: string;
+  confidence?: number;
+  time_est?: string;
+  timeEstimate?: string;
+  provider?: string;
+  sourceType?: string;
+  feasibility?: 'proceed' | 'limited' | 'specialist_required' | string;
+  operationalAction?: string;
+  actions?: any[];
+  workflow?: any[];
+  cost?: string;
+}
 
 interface DiagnosticInterfaceProps {
   onRunDiagnostics?: (data: { vehicleType: string, brand: string, model: string, year: string, codes: string }) => void;
-  user?: any;
+  user?: UserType | null;
   toast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -57,6 +83,14 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
   const [codes, setCodes] = useState('');
   const [activeTab, setActiveTab] = useState('diagnose');
   const [selectedCircuit, setSelectedCircuit] = useState<string | null>(null);
+  const [fuseSearchResults, setFuseSearchResults] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'fuses' && (brand || model || year)) {
+      const results = searchFuses(`${brand} ${model} ${year}`.trim());
+      setFuseSearchResults(results);
+    }
+  }, [brand, model, year, activeTab]);
   
   // Session State
   const [currentSession, setCurrentSession] = useState<DiagnosticSession | null>(null);
@@ -86,7 +120,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
 
   const currentSuggestions = suggestions[vehicleType as keyof typeof suggestions] || suggestions.light;
   const [isScanning, setIsScanning] = useState(false);
-  const [results, setResults] = useState<any | null>(null);
+  const [results, setResults] = useState<AIResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<DiagnosticStep[]>([]);
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
@@ -177,20 +211,13 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
       });
 
       try {
-        const response = await fetch(`${BASE_API}/api/ai/process-result`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionStorage.getItem('jwt')}`
-          },
-          body: JSON.stringify({ 
-            testAction: action.instruction, 
-            result,
-            previousContext: results?.hypothesis || results?.description || "" ,
-            vehicle: { brand, model, year }
-          })
+        const response = await api.post("/api/ai/process-result", { 
+          testAction: action.instruction, 
+          result,
+          previousContext: results?.hypothesis || results?.description || "" ,
+          vehicle: { brand, model, year }
         });
-        const data = await response.json();
+        const data = response.data;
         
         updateStep(loopStepId, { 
           status: 'done', 
@@ -233,16 +260,16 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
       await new Promise(r => setTimeout(r, 800));
       updateStep('1', { status: 'done', content: `Uplink established. Target vehicle profile loaded: ${year} ${brand} ${model}.` });
 
-      // Step 2: Tool Registry
-      const toolStepId = addStep({ 
-        id: '2', 
-        type: 'tool', 
-        title: 'Registry Search', 
-        content: `Searching master DTC database for ${firstCode}...`,
-        metadata: { skill: 'dtc_lookup', input: { keyword: firstCode } }
+      // Step 2: OpenClaw Neural Processing
+      const openClawId = addStep({ 
+        id: 'openclaw-run', 
+        type: 'reasoning', 
+        title: 'OpenClaw Brain v2', 
+        content: `Initializing Multi-Agent Diagnostic Stack...` 
       });
 
-      let data;
+      let data: AIResult | null = null;
+      
       if (isOffline) {
         const offlineCache = await getDTCOffline(firstCode);
         await new Promise(r => setTimeout(r, 600));
@@ -250,64 +277,68 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
           data = {
             code: offlineCache.code,
             description: offlineCache.description,
-            severity: offlineCache.severity || 'medium',
+            severity: (offlineCache.severity || 'medium') as any,
             system: offlineCache.system || 'Vehicle System',
             causes: offlineCache.possibleCauses?.map(c => ({ item: c, probability: null })) || [],
             fixes: offlineCache.recommendedActions || [],
             confidence: 0.95,
             time_est: 'Saved Locally'
           };
-          updateStep(toolStepId, { status: 'done', content: `Found matching protocol in local device cache.` });
+          updateStep(openClawId, { status: 'done', content: `Found matching protocol in local device cache.` });
         } else {
-          updateStep(toolStepId, { status: 'error', content: `Code not found in local cache. Neural uplink required.` });
+          updateStep(openClawId, { status: 'error', content: `Code not found in local cache. Neural uplink required.` });
           throw new Error("Offline Mode Active: This code is not in your local database.");
         }
       } else {
         try {
-          data = await diagnoseDTC(firstCode);
-          await new Promise(r => setTimeout(r, 1000));
-          if (data) {
-            updateStep(toolStepId, { status: 'done', content: `Neural DB returned validated protocol for ${firstCode}.` });
-          }
-        } catch (err) {
-          updateStep(toolStepId, { status: 'done', content: `Backend registry search failed. Moving to AI reasoning matrix.` });
-        }
+          const runOpenClawDiagnosis = async (symptom: string, vehicle: any) => {
+            const res = await fetch(`${BASE_API}/api/ai/openclaw-diagnose`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionStorage.getItem('jwt')}`
+              },
+              body: JSON.stringify({ message: symptom, vehicle })
+            });
+            if (!res.ok) throw new Error("OpenClaw Neural Brain communication failure.");
+            return res.json();
+          };
 
-        if (!data || !data.fixes || data.fixes.length === 0) {
-          const aiStepId = addStep({ 
-            id: '3', 
-            type: 'reasoning', 
-            title: 'Decision Engine', 
-            content: `Analyzing failure vectors and determining priority tests...` 
+          const openClawRes = await runOpenClawDiagnosis(codes, { make: brand, model, year: parseInt(year) || 0 });
+          const { diagnosis, likely_causes, confidence, recommended_fix, estimated_cost, agent_logs, subsystem } = openClawRes;
+
+          if (agent_logs) {
+            for (const log of agent_logs) {
+              updateStep(openClawId, { content: log.message || `Agent executing ${log.step}...` });
+              await new Promise(r => setTimeout(r, 800)); 
+            }
+          }
+
+          updateStep(openClawId, { 
+            status: 'done', 
+            content: `Neural Analysis Complete. Subsystem Identified: ${subsystem || 'Internal Reasoning Matrix'}` 
           });
-          
-          data = await performDeepDTCSearch(firstCode, { make: brand, model, year });
-          await new Promise(r => setTimeout(r, 1200));
-          
-          if (data && data.actions) {
-             updateStep(aiStepId, { 
-                status: 'done', 
-                content: `Synthesis complete. Identified ${data.actions.length} priority diagnostic procedures.`,
-                metadata: { actions: data.actions }
-             });
 
-             // Step 4: Decision/Action
-             const pTestId = 'p-tests-initial';
-             addStep({ 
-                id: pTestId,
-                type: 'action', 
-                title: 'Priority Tests', 
-                content: 'Perform the following procedural tests to validate the hypothesis.',
-                metadata: { 
-                  actions: data.actions,
-                  onResult: (idx: number, res: string) => handleTestResult(pTestId, idx, res)
-                }
-             });
-          } else {
-             updateStep(aiStepId, { status: 'done', content: `Reasoning complete. No specific actions generated.` });
-          }
+          data = {
+            code: firstCode,
+            description: diagnosis,
+            hypothesis: diagnosis,
+            severity: (confidence > 0.8 ? 'critical' : 'medium') as any,
+            confidence: confidence,
+            fixes: [recommended_fix],
+            causes: likely_causes.map((c: string) => ({ item: c, probability: null })),
+            cost: estimated_cost,
+            system: subsystem || 'Neural Engine v2',
+            feasibility: 'proceed'
+          };
+        } catch (err: any) {
+          updateStep(openClawId, { status: 'error', content: `OpenClaw Error: ${err.message}` });
+          setError(err.message);
+          setIsScanning(false);
+          return;
         }
-
+      }
+      if (data) {
         // Final Conclusion
         addStep({ 
           id: '5', 
@@ -322,13 +353,13 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
 
         // Start a diagnostic session automatically if we have actions
         if (data && (data.actions || data.workflow)) {
-           const session = await SessionService.startSession(data, currentCaseId || crypto.randomUUID());
+           const session = await SessionService.startSession(data as any, currentCaseId || crypto.randomUUID());
            setCurrentSession(session);
            
            // Check equipment feasibility
            const equipCheck = await SessionService.checkEquipmentFeasibility(session);
            setMissingTools(equipCheck.missingTools);
-           setFeasibilityStatus(data.feasibility || (equipCheck.hasRequiredTools ? 'proceed' : 'limited'));
+           setFeasibilityStatus(data.feasibility as any || (equipCheck.hasRequiredTools ? 'proceed' : 'limited'));
         }
 
         // Log to backend for learning
@@ -360,7 +391,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
           await saveDTCOffline({
             code: firstCode,
             description: data.description,
-            severity: data.severity,
+            severity: (data.severity as any) || 'medium',
             system: data.system || 'Powertrain',
             manufacturer: brand,
             possibleCauses: data.causes?.map((c: any) => {
@@ -705,7 +736,7 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                       <div className="flex justify-between items-start mb-6">
                         <div className="space-y-1">
                           <div className="text-3xl font-display font-bold text-amber-500 flex items-center gap-2">
-                             {results.code}
+                             {String(results.code)}
                              {results.feasibility && (
                                 <div className={`text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-tighter ${
                                    results.feasibility.toLowerCase() === 'proceed' ? 'bg-green-500/20 text-green-500 border border-green-500/30' :
@@ -746,7 +777,9 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                       <div className="space-y-4">
                         <div>
                           <h4 className="text-[9px] uppercase font-bold text-zinc-500 tracking-widest mb-1.5">Primary Diagnostic</h4>
-                          <p className="text-sm font-medium leading-relaxed">{results.description}</p>
+                          <p className="text-sm font-medium leading-relaxed">
+                            {typeof results.description === 'string' ? results.description : JSON.stringify(results.description)}
+                          </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 pt-2">
@@ -798,20 +831,20 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
 
                         {results.operationalAction && (
                           <div className={`p-4 rounded-xl border animate-in fade-in slide-in-from-bottom-2 duration-500 ${
-                            results.operationalAction.includes('🛑') 
+                            typeof results.operationalAction === 'string' && results.operationalAction.includes('🛑') 
                               ? 'bg-red-500/10 border-red-500/30' 
                               : 'bg-white/5 border-white/10'
                           }`}>
                             <div className="flex items-center gap-2 mb-2">
-                               <ShieldAlert size={14} className={results.operationalAction.includes('🛑') ? 'text-red-500' : 'text-zinc-500'} />
+                               <ShieldAlert size={14} className={typeof results.operationalAction === 'string' && results.operationalAction.includes('🛑') ? 'text-red-500' : 'text-zinc-500'} />
                                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                                  Operational Protocol
                                </div>
                             </div>
                             <div className={`text-sm font-bold ${
-                              results.operationalAction.includes('🛑') ? 'text-red-500' : 'text-amber-500'
+                              typeof results.operationalAction === 'string' && results.operationalAction.includes('🛑') ? 'text-red-500' : 'text-amber-500'
                             }`}>
-                              {results.operationalAction}
+                              {String(results.operationalAction)}
                             </div>
                           </div>
                         )}
@@ -831,7 +864,9 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                                  <span className="text-amber-500 font-bold text-xs">{idx + 1}</span>
                               </div>
                               <div className="space-y-1 flex-1">
-                                 <div className="text-xs font-bold">{typeof cause === 'string' ? cause : (cause?.item || 'Unknown Cause')}</div>
+                                 <div className="text-xs font-bold">
+                                   {typeof cause === 'string' ? cause : (cause?.item || cause?.cause || cause?.description || JSON.stringify(cause))}
+                                 </div>
                                  {cause?.probability && (
                                     <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
                                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(cause?.probability || 0) * 100}%` }} />
@@ -851,7 +886,9 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                           {results.fixes.map((fix: string, idx: number) => (
                             <div key={idx} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 items-start">
                               <CheckCircle2 className="text-green-500 w-5 h-5 shrink-0 mt-0.5" />
-                              <div className="text-xs leading-relaxed text-zinc-300">{fix}</div>
+                              <div className="text-xs leading-relaxed text-zinc-300">
+                                {typeof fix === 'string' ? fix : ((fix as any)?.instruction || (fix as any)?.title || JSON.stringify(fix))}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1145,6 +1182,28 @@ export default function DiagnosticInterface({ onRunDiagnostics, user, toast }: D
                 <div className="h-px bg-zinc-800/50 w-full my-6" />
 
                 {/* Circuit Buttons Grid */}
+                {fuseSearchResults.length > 0 && (
+                  <div className="mb-6 space-y-3">
+                    <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Identified Circuits</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                       {fuseSearchResults.slice(0, 5).map((res, i) => (
+                         <div key={i} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center font-mono text-[10px] text-zinc-300">
+                                  {res.fuseNumber}
+                               </div>
+                               <div>
+                                  <div className="text-[10px] font-bold text-zinc-200">{res.function}</div>
+                                  <div className="text-[8px] text-zinc-500 uppercase">{res.fuseBoxName} • {res.amperage}A</div>
+                               </div>
+                            </div>
+                            <Badge variant={res.amperage > 20 ? 'error' : 'warning'}>{res.amperage}A</Badge>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="circuit-buttons-grid">
                   {[
                     { id: 'engine', label: 'Engine Bay', icon: <Settings size={18} /> },

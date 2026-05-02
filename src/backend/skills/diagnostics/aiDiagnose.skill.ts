@@ -95,23 +95,25 @@ export const aiDiagnoseSkill: Skill<{ message: string, image?: string }, any> = 
         1. Return exactly a JSON object.
         2. "observation": Summary of input analysis.
         3. "hypothesis": Primary failure theory.
-        4. "severity": "low" | "medium" | "high" | "critical"
-        5. "confidence": A float between 0.0 and 1.0.
-        6. "confidenceBreakdown": { "dtcMatch": float, "sourceAuthority": float, "userFeedback": float }
-        7. "riskScore": A float between 0.0 and 1.0. (High for HV/ADAS).
-        8. "sourceType": "oem" | "heuristic" | "ai_inference".
-        9. "feasibility": "proceed" | "limited" | "specialist_required".
-        10. "workflow": A list of Step objects:
+        4. "causes": A list of specific components or conditions that could cause this issue.
+        5. "symptoms": A list of characteristic observations associated with this failure.
+        6. "severity": "low" | "medium" | "high" | "critical"
+        7. "confidence": A float between 0.0 and 1.0.
+        8. "confidenceBreakdown": { "dtcMatch": float, "sourceAuthority": float, "userFeedback": float }
+        9. "riskScore": A float between 0.0 and 1.0. (High for HV/ADAS).
+        10. "sourceType": "oem" | "heuristic" | "ai_inference".
+        11. "feasibility": "proceed" | "limited" | "specialist_required".
+        12. "workflow": A list of Step objects:
            - "id": unique string
            - "title": short name
            - "instruction": detailed action
            - "toolRequired": specific tool name
            - "expectedOutcome": what to look for
            - "validationType": "boolean" | "number" | "text"
-        11. "safetyPrecaution": (Global) e.g., "High Voltage PPE Required".
-        12. "operationalAction": (Strategic) e.g., "🛑 STOP. Requires specialized certification."
-        13. "disclaimer": regulatory/precision warnings.
-        14. "conclusion": Final verdict or summary.
+        13. "safetyPrecaution": (Global) e.g., "High Voltage PPE Required".
+        14. "operationalAction": (Strategic) e.g., "🛑 STOP. Requires specialized certification."
+        15. "disclaimer": regulatory/precision warnings.
+        16. "conclusion": Final verdict or summary.
 
         SAFETY ESCALATION LOGIC:
         - If multiple HV/Battery faults + insulation error + contactor code: Refuse guidance. operationalAction MUST be "🛑 STOP. EXTREME FIRE/FATALITY RISK."

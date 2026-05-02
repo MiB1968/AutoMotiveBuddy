@@ -74,7 +74,7 @@ export interface LogEntry {
   message: string;
   context?: Record<string, unknown>;
   timestamp: number;
-  synced?: boolean; // for offline-first sync patterns
+  synced?: number; // 0 = unsynced, 1 = synced
 }
 
 export type SyncStatus = "pending" | "processing" | "failed" | "done";
@@ -295,6 +295,7 @@ export async function saveDTCOffline(
 }
 
 export async function getDTCOffline(code: string): Promise<DTCRecord | null> {
+  if (!code || typeof code !== 'string') return null;
   return withDB(async (db) => (await db.get("dtc", code)) ?? null, null);
 }
 
@@ -305,6 +306,7 @@ export async function getAllDTCs(): Promise<DTCRecord[]> {
 export async function getDTCsBySeverity(
   severity: DTCRecord["severity"]
 ): Promise<DTCRecord[]> {
+  if (!severity || typeof severity !== 'string') return [];
   return withDB(
     (db) => db.getAllFromIndex("dtc", "by-severity", severity as string),
     []
@@ -312,10 +314,12 @@ export async function getDTCsBySeverity(
 }
 
 export async function getDTCsBySystem(system: string): Promise<DTCRecord[]> {
+  if (!system || typeof system !== 'string') return [];
   return withDB((db) => db.getAllFromIndex("dtc", "by-system", system), []);
 }
 
 export async function deleteDTCOffline(code: string): Promise<boolean> {
+  if (!code || typeof code !== 'string') return false;
   return withDB(async (db) => {
     await db.delete("dtc", code);
     return true;
@@ -404,6 +408,7 @@ export async function smartCacheSearch<T>(query: string, typePrefix?: string): P
 }
 
 export async function getCache<T>(key: string): Promise<T | null> {
+  if (!key || typeof key !== 'string') return null;
   return withDB(async (db) => {
     const entry = (await db.get("cache", key)) as CacheEntry<T> | undefined;
     if (!entry) return null;
@@ -439,6 +444,7 @@ export async function updateCacheConfidence(key: string, isAccurate: boolean): P
 }
 
 export async function deleteCache(key: string): Promise<boolean> {
+  if (!key || typeof key !== 'string') return false;
   return withDB(async (db) => {
     await db.delete("cache", key);
     return true;
@@ -488,12 +494,18 @@ export async function addOfflineLog(
   log: Omit<LogEntry, "id" | "timestamp"> & Partial<Pick<LogEntry, "timestamp">>
 ): Promise<number | null> {
   return withDB(async (db) => {
+    // Ensure synced is a number (0 or 1), never a boolean
+    let syncVal = 0;
+    const legacySync = log.synced as unknown;
+    if (legacySync === 1 || legacySync === true) syncVal = 1;
+    else if (legacySync === 0 || legacySync === false) syncVal = 0;
+
     const entry: LogEntry = {
       level: log.level ?? "info",
       message: log.message,
       context: log.context,
       timestamp: log.timestamp ?? Date.now(),
-      synced: log.synced ?? false,
+      synced: syncVal,
     };
     const id = (await db.add("logs", entry)) as number;
 
@@ -532,7 +544,7 @@ export async function getRecentLogs(limit = 100): Promise<LogEntry[]> {
 
 export async function getUnsyncedLogs(): Promise<LogEntry[]> {
   return withDB(
-    (db) => db.getAllFromIndex("logs", "by-synced", 0 as any),
+    (db) => db.getAllFromIndex("logs", "by-synced", 0),
     []
   );
 }
@@ -545,7 +557,7 @@ export async function markLogsAsSynced(ids: number[]): Promise<void> {
       ids.map(async (id) => {
         const log = await store.get(id);
         if (log) {
-          log.synced = true;
+          log.synced = 1;
           await store.put(log);
         }
       })
@@ -571,6 +583,7 @@ export async function saveSession(session: DiagnosticSession): Promise<void> {
 }
 
 export async function getSession(id: string): Promise<DiagnosticSession | null> {
+  if (!id || typeof id !== 'string') return null;
   return withDB(async (db) => (await db.get("sessions", id)) ?? null, null);
 }
 
@@ -747,6 +760,10 @@ export async function importData(data: {
       await Promise.all(
         data.logs.map((l) => {
           const { id, ...rest } = l;
+          // Standardize synced to number
+          const s = (rest as any).synced;
+          if (s === true || s === 1) rest.synced = 1;
+          else rest.synced = 0;
           return tx.objectStore("logs").add(rest as LogEntry);
         })
       );
